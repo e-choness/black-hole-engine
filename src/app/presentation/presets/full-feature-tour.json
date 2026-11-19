@@ -427,12 +427,6 @@
     {
       "t": 0.01,
       "action": "set",
-      "path": "look.star_gain",
-      "value": 0.4
-    },
-    {
-      "t": 0.01,
-      "action": "set",
       "path": "look.aberration_strength",
       "value": 1.0
     },

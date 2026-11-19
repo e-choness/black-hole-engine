@@ -43,7 +43,6 @@ async function renderShadow(page, { solver, spin, distance }) {
                 'jet.enabled': false,
                 'bloom.enabled': false,
                 'look.galaxy_gain': 1e5,
-                'look.star_gain': 1e5,
                 // Yaw about the vertical axis first, so camera.rotation.y turns the camera about
                 // the spin axis at constant inclination.
                 'camera.rotation.order': 'YXZ',

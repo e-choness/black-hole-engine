@@ -21,6 +21,7 @@
     "@playwright/test": "1.65.1",
     "eslint": "^10.15.0",
     "globals": "^17.14.0",
+    "jpeg-js": "^0.4.4",
     "prettier": "^3.10.1",
     "vite": "^8.3.8",
     "vitest": "^5.1.1"

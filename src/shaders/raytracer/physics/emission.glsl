@@ -132,6 +132,13 @@ vec3 shifted_sky_radiance(vec3 rgb, float g) {
     return rgb * (seen / max(rest, vec3(1e-3))) * thermal_brightness_ratio(t, g);
 }
 
+// Galactic direction of a hole-frame sky direction, in the frame of the sky cube map (x towards
+// the Galactic Centre, z towards the north galactic pole).
+vec3 sky_direction(vec3 ray) {
+    vec3 p = ray * BG_COORDS;
+    return vec3(p.y, -p.x, p.z);
+}
+
 float static_redshift(float r) {
     return sqrt(max(1.0 - 1.0 / max(r, 1.0001), 1e-4));
 }

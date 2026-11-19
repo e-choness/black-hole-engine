@@ -107,14 +107,24 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 ## Build and test tooling
 
-Vite (apart from the helpers above), Vitest, ESLint, Prettier, Playwright and the Docker base
-images are used only to build and test the project; none of their code is included in the
-published site. The production container image (the `runtime` Dockerfile stage) redistributes
+Vite (apart from the helpers above), Vitest, ESLint, Prettier, Playwright, the Docker base images
+and [jpeg-js](https://github.com/jpeg-js/jpeg-js) (BSD-3-Clause, used by `scripts/build-sky.js` to
+convert the sky map) are used only to build and test the project; none of their code is included
+in the published site. The production container image (the `runtime` Dockerfile stage) redistributes
 nginx (BSD-2-Clause) and Alpine Linux packages under their respective licenses.
 
 ## Assets
 
-| Asset                                                 | Source                                                                                                            | License                                                                       |
-| ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| `public/textures/milkyway.jpg`                        | [Stellarium](https://www.stellarium.org/), based on Nick Risinger's [Photopic Sky Survey](https://skysurvey.org/) | [CC BY-NC 2.0](https://creativecommons.org/licenses/by-nc/2.0/) — **not** MIT |
-| Other files in `public/textures/` and `public/icons/` | The upstream black-hole projects named in the project license section                                             | MIT                                                                           |
+| Asset                                                 | Source                                                                                                                                                                                                                                               | License                                                                                                                                    |
+| ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `public/textures/sky/`                                | [Deep Star Maps](https://svs.gsfc.nasa.gov/3895) (ID 3895, 2012), NASA/Goddard Space Flight Center Scientific Visualization Studio; visualization by Ernie Wright from the Bright Star, Tycho-2 and UCAC3 catalogues. Source file: `starmap_g8k.jpg` | Public domain ([SVS usage policy](https://svs.gsfc.nasa.gov/help/): "All of our content is in the public domain (unless otherwise noted)") |
+| Other files in `public/textures/` and `public/icons/` | The upstream black-hole projects named in the project license section                                                                                                                                                                                | MIT                                                                                                                                        |
+
+The sky faces are modified from the source: `scripts/build-sky.js` reprojects the galactic plate
+carrée to cube-map faces, resamples them to 2048, 1024 and 512 px and recompresses them as JPEG.
+
+The blackbody and synchrotron colour table `src/app/core/physics/emission-lut.json` is generated
+in this repository by `scripts/generate-emission-lut.js` from the CIE 1931 colour-matching
+function fit of Wyman, Sloan and Shirley (2013) and carries no third-party rights. It replaces the
+former `spectra.png`; the procedural `stars.png` was removed because the sky map contains the
+real star field.

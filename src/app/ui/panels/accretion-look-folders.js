@@ -546,21 +546,13 @@ export function setupAccretionLookFolders(options) {
         onChange: updateUniformsLive,
         help: 'Scales apparent directional warping from observer motion.',
     });
-    addControl(lookFolder, p.look, 'star_gain', {
-        min: 0.0,
-        max: 2.5,
-        step: 0.01,
-        name: 'star gain',
-        onChange: updateUniformsLive,
-        help: 'Brightness multiplier for background stars.',
-    });
     addControl(lookFolder, p.look, 'galaxy_gain', {
         min: 0.0,
         max: 2.5,
         step: 0.01,
-        name: 'galaxy gain',
+        name: 'sky gain',
         onChange: updateUniformsLive,
-        help: 'Brightness multiplier for the background galaxy map.',
+        help: 'Brightness multiplier for the background sky: the Milky Way and its stars, seen from Earth and shown in galactic coordinates as a stand-in for the host galaxy.',
     });
     lookFolder.open();
 

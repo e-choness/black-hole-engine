@@ -1,18 +1,16 @@
-// Role: Application entry point - checks for WebGL 2, loads all textures in parallel, then
-//       calls init() with the build-time bundled GLSL template once everything is ready.
+// Role: Application entry point - checks for WebGL 2, loads the textures in parallel (the sky
+//       cube-map tier of the starting quality preset and the planet map), then calls init()
+//       with the build-time bundled GLSL template once everything is ready.
 
 import * as THREE from 'three';
 import { RAYTRACER_FRAGMENT_TEMPLATE } from '../shaders/raytracer/index.js';
 import { init } from './core/renderer/renderer.js';
 import { animate } from './core/renderer/render-loop.js';
+import { initialQualityPreset } from './core/renderer/renderer-quality.js';
 import { isWebGL2Available, showWebGL2Unavailable } from './core/renderer/webgl-support.js';
+import { initialSkyTier, loadSkyTier } from './core/sky.js';
 
-var textures = {};
-
-function checkReady() {
-    for (var key in textures) {
-        if (textures[key] === null) return;
-    }
+function start(textures) {
     document.getElementById('loader').hidden = true;
     document.querySelectorAll('.initially-hidden').forEach(function (element) {
         element.classList.remove('initially-hidden');
@@ -21,24 +19,26 @@ function checkReady() {
     animate();
 }
 
-var texLoader = new THREE.TextureLoader();
-
-// Textures keep the default NoColorSpace: the ray tracer samples the stored values and writes
-// display values itself, so three.js must not decode or encode colours along the way.
-function loadTexture(symbol, filename, interpolation) {
-    textures[symbol] = null;
-    texLoader.load(filename, function (tex) {
-        tex.magFilter = interpolation;
-        tex.minFilter = interpolation;
-        textures[symbol] = tex;
-        checkReady();
+// Colour images are sRGB-encoded; three.js uploads them as sRGB8_ALPHA8, so the GPU decodes them to
+// linear values before filtering.
+function loadPlanetTexture() {
+    return new THREE.TextureLoader().loadAsync('textures/beach-ball.png').then(function (tex) {
+        tex.colorSpace = THREE.SRGBColorSpace;
+        tex.magFilter = THREE.LinearFilter;
+        tex.minFilter = THREE.LinearFilter;
+        return tex;
     });
 }
 
 if (isWebGL2Available()) {
-    loadTexture('galaxy', 'textures/milkyway.jpg', THREE.NearestFilter);
-    loadTexture('moon', 'textures/beach-ball.png', THREE.LinearFilter);
-    loadTexture('stars', 'textures/stars.png', THREE.LinearFilter);
+    Promise.all([loadSkyTier(initialSkyTier(initialQualityPreset())), loadPlanetTexture()]).then(
+        function ([sky, moon]) {
+            start({ sky: sky, moon: moon });
+        },
+        function (error) {
+            console.error('Texture loading failed:', error);
+        },
+    );
 } else {
     showWebGL2Unavailable();
 }

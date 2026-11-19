@@ -14,11 +14,10 @@ import { applyQualityPresetValues } from '../../ui/quality-presets.js';
 import {
     beginQualityBenchmarkIfNeeded,
     isLikelyMobileDevice,
-    readStoredQualityPreset,
+    initialQualityPreset,
     clampResolutionScale,
 } from './renderer-quality.js';
 import { updateObserverDistanceBinding } from '../runtime/ui-bindings.js';
-import { isE2eMode, requestedQualityPreset } from '../runtime/test-hooks.js';
 import { diveState, hoverState } from '../scenarios/scenario-state.js';
 import { SHADER_MASS, iscoRadius } from '../physics/kerr.js';
 import {
@@ -32,6 +31,7 @@ import {
     referenceLog2Luminance,
 } from '../physics/emission.js';
 import { kerrCameraFrame } from '../physics/kerr-camera.js';
+import { setSkyAnisotropy, syncSkyTier } from '../sky.js';
 import {
     DISK_TEMPERATURE_MIN,
     DISK_TEMPERATURE_MAX,
@@ -151,9 +151,7 @@ export function init(glslSource, textures) {
         document.body.classList.add('mobile-ui');
     }
 
-    var storedQualityPreset = isE2eMode ? null : readStoredQualityPreset();
-    var initialQualityPreset = requestedQualityPreset || storedQualityPreset || 'optimal';
-    applyQualityPresetValues(shader.parameters, initialQualityPreset, { selectSolver: true });
+    applyQualityPresetValues(shader.parameters, initialQualityPreset(), { selectSolver: true });
 
     var nextContainer = document.createElement('div');
     document.body.appendChild(nextContainer);
@@ -210,7 +208,6 @@ export function init(glslSource, textures) {
         look_glow: { value: 0.0 },
         look_doppler_boost: { value: 1.0 },
         look_aberration_strength: { value: 1.0 },
-        look_star_gain: { value: 1.0 },
         look_galaxy_gain: { value: 1.0 },
         torus_r0: { value: 4.0 },
         torus_h_ratio: { value: 0.45 },
@@ -237,8 +234,7 @@ export function init(glslSource, textures) {
         grmhd_electron_kappa: { value: 5.0 },
         grmhd_magnetic_field_str: { value: 1.0 },
         grav_blueshift_factor: { value: 1.0 },
-        star_texture: { value: textures.stars },
-        galaxy_texture: { value: textures.galaxy },
+        sky_cube: { value: textures.sky },
         planet_texture: { value: textures.moon },
     };
     setShaderUniforms(uniforms);
@@ -301,8 +297,10 @@ export function init(glslSource, textures) {
         uniforms.look_glow.value = shader.parameters.look.glow;
         uniforms.look_doppler_boost.value = shader.parameters.look.doppler_boost;
         uniforms.look_aberration_strength.value = shader.parameters.look.aberration_strength;
-        uniforms.look_star_gain.value = shader.parameters.look.star_gain;
         uniforms.look_galaxy_gain.value = shader.parameters.look.galaxy_gain;
+        syncSkyTier(uniforms.sky_cube, shader.parameters.quality, function () {
+            shader.needsUpdate = true;
+        });
 
         uniforms.torus_r0.value = shader.parameters.torus.r0;
         uniforms.torus_h_ratio.value = shader.parameters.torus.h_ratio;
@@ -448,6 +446,9 @@ export function init(glslSource, textures) {
     nextRenderer.domElement.style.touchAction = 'none';
     container.appendChild(nextRenderer.domElement);
     setRenderer(nextRenderer);
+    var maxAnisotropy = Math.min(16, renderer.capabilities.getMaxAnisotropy());
+    setSkyAnisotropy(maxAnisotropy);
+    textures.sky.anisotropy = maxAnisotropy;
 
     renderer.domElement.addEventListener(
         'webglcontextlost',

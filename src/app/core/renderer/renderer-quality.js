@@ -29,6 +29,13 @@ export function readStoredQualityPreset() {
     }
 }
 
+// Preset the app starts with: the ?quality= switch, else the benchmark result stored by an earlier
+// visit (ignored in e2e mode), else the recommended preset.
+export function initialQualityPreset() {
+    var storedQualityPreset = isE2eMode ? null : readStoredQualityPreset();
+    return requestedQualityPreset || storedQualityPreset || 'optimal';
+}
+
 export function storeQualityPreset(qualityName, avgFrameMs) {
     if (!qualityName || !QUALITY_PRESETS[qualityName]) return;
 

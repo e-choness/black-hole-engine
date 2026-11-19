@@ -92,7 +92,6 @@ export function Shader(mustacheTemplate) {
             glow: 0.0,
             doppler_boost: 1.0,
             aberration_strength: 1.0,
-            star_gain: 0.4,
             galaxy_gain: 0.4,
         },
         bloom: {
