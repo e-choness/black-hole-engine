@@ -12,6 +12,7 @@ import {
     timelinePanel,
 } from '../engine/engine';
 import { stepPlayback, togglePlayback } from '../engine/playback';
+import { setSoundEnabled, soundEnabled } from '../engine/sound';
 import { focusControl } from '../lib/focus';
 import { toggleFullscreen } from '../lib/fullscreen';
 import { MOD_KEY } from '../lib/keys';
@@ -120,6 +121,12 @@ function actions(): Action[] {
             keys: ['?'],
             keywords: 'legal source about',
             run: () => ui.setShortcutsOpen(true),
+        },
+        {
+            id: 'sound',
+            label: soundEnabled() ? 'Turn the sound off' : 'Turn the sound on',
+            keywords: 'audio sonification mute unmute volume',
+            run: () => setSoundEnabled(!soundEnabled()),
         },
         {
             id: 'physics',

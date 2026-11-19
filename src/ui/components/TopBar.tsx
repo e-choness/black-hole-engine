@@ -33,6 +33,7 @@ import { captureActive, readCaptureStatus } from '../engine/capture';
 import { toggleRecording } from '../state/capture-actions';
 import { copyViewLink } from '../state/share';
 import { openCapture, useUi } from '../state/ui-store';
+import { SoundFab } from './SoundControls';
 
 function ScenarioPicker() {
     const active = useEngineValue(activeBlackHolePreset);
@@ -311,6 +312,7 @@ export function MobileActions() {
     return (
         <div className="fabs" role="group" aria-label="View actions">
             <CaptureButtons />
+            <SoundFab />
             <button
                 type="button"
                 className="icon-btn"

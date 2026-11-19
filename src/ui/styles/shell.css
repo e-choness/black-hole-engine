@@ -244,6 +244,9 @@ body.has-timeline-panel .shell-footer {
     margin: 4px 0 0 16px;
     padding: 8px 6px;
     border-radius: var(--radius-lg);
+    max-height: calc(100% - 20px);
+    overflow-y: auto;
+    scrollbar-width: none;
 }
 
 .rail-group {
@@ -284,6 +287,25 @@ body.has-timeline-panel .shell-footer {
     height: 1px;
     margin: 4px 0;
     background: rgb(255 255 255 / 0.1);
+}
+
+/* Short windows get a denser rail, which scrolls only when even that does not fit. */
+@media (max-height: 720px) {
+    .rail-btn {
+        gap: 2px;
+        padding: 5px 0 4px;
+        font-size: 10px;
+        line-height: 12px;
+    }
+
+    .rail-btn svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    .rail-sep {
+        margin: 2px 0;
+    }
 }
 
 .stage-toast-region {

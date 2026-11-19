@@ -5,6 +5,7 @@ import { currentMode, enterMode, timelinePanel, type ObserverMode } from '../eng
 import { useEngineValue } from '../engine/hooks';
 import { useFrameSampler } from '../engine/telemetry';
 import { useUi } from '../state/ui-store';
+import { SoundRailButton } from './SoundControls';
 
 const MODES: { value: ObserverMode; label: string; icon: typeof Orbit; key: string }[] = [
     { value: 'orbit', label: 'Orbit', icon: Orbit, key: '1' },
@@ -75,6 +76,7 @@ export function ModeRail() {
                 Capture
             </button>
             <span className="rail-sep" aria-hidden="true" />
+            <SoundRailButton />
             <button
                 type="button"
                 className="rail-btn"
