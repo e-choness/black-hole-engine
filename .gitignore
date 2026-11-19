@@ -5,6 +5,7 @@ assets/img/milkyway.png
 ### these files should not be pushed
 .claude/
 CLAUDE.md
-docs/
+docs/*
+!docs/LEGAL.md
 ### local caches & tool state (never committed; all caches live here, not on C:)
 .cache/
