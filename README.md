@@ -179,4 +179,6 @@ has started), `stopRecording()`, `state()` and `getPathValue(path)`.
   version in `package.json`. Dependabot proposes the two updates separately, so merge them
   together.
 
-Licensing and third-party notices: [docs/LEGAL.md](docs/LEGAL.md).
+## License
+
+Licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE.md).
