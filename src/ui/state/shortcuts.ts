@@ -14,10 +14,17 @@ import { useUi } from './ui-store';
 export interface Shortcut {
     keys: string[];
     label: string;
+    timeline?: boolean;
+}
+
+export interface ShortcutGroup {
+    title: string;
+    shortcuts: Shortcut[];
+    timeline?: boolean;
 }
 
 // The single source for the shortcut sheet; the handler below implements the same keys.
-export const SHORTCUT_GROUPS: { title: string; shortcuts: Shortcut[] }[] = [
+export const SHORTCUT_GROUPS: ShortcutGroup[] = [
     {
         title: 'General',
         shortcuts: [
@@ -36,11 +43,12 @@ export const SHORTCUT_GROUPS: { title: string; shortcuts: Shortcut[] }[] = [
             { keys: ['1'], label: 'Orbit' },
             { keys: ['2'], label: 'Hover' },
             { keys: ['3'], label: 'Dive' },
-            { keys: ['T'], label: 'Timeline editor' },
+            { keys: ['T'], label: 'Timeline editor', timeline: true },
         ],
     },
     {
         title: 'Timeline editor, while open',
+        timeline: true,
         shortcuts: [
             { keys: ['Space'], label: 'Play or pause the presentation' },
             { keys: ['K'], label: 'Add a keyframe' },

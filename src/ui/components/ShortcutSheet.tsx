@@ -1,8 +1,9 @@
 import { Dialog } from 'radix-ui';
 import { X } from 'lucide-react';
+import { timelineAvailable } from '../engine/engine';
 import { MOD_KEY } from '../lib/keys';
 import { portalContainer } from '../lib/portal';
-import { SHORTCUT_GROUPS } from '../state/shortcuts';
+import { SHORTCUT_GROUPS, type ShortcutGroup } from '../state/shortcuts';
 import { useUi } from '../state/ui-store';
 
 const LINKS = [
@@ -11,9 +12,19 @@ const LINKS = [
     { href: 'docs/LEGAL.md', label: 'Legal notices and licenses' },
 ];
 
+// Phones have no timeline editor (engine.timelineAvailable), so its shortcuts are left out there.
+function availableGroups(): ShortcutGroup[] {
+    if (timelineAvailable()) return SHORTCUT_GROUPS;
+    return SHORTCUT_GROUPS.filter((group) => !group.timeline).map((group) => ({
+        ...group,
+        shortcuts: group.shortcuts.filter((shortcut) => !shortcut.timeline),
+    }));
+}
+
 export function ShortcutSheet() {
     const open = useUi((state) => state.shortcutsOpen);
     const setOpen = useUi((state) => state.setShortcutsOpen);
+    const groups = availableGroups();
     return (
         <Dialog.Root open={open} onOpenChange={setOpen}>
             <Dialog.Portal container={portalContainer()}>
@@ -26,7 +37,7 @@ export function ShortcutSheet() {
                         </Dialog.Close>
                     </div>
                     <div className="sheet-groups">
-                        {SHORTCUT_GROUPS.map((group) => (
+                        {groups.map((group) => (
                             <section key={group.title} className="sheet-group">
                                 <h3 className="caps-label">{group.title}</h3>
                                 <dl>

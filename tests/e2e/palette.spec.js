@@ -97,7 +97,8 @@ test('keyboard shortcuts drive playback, modes, the interface and the help sheet
     expect(problems).toEqual([]);
 });
 
-// Phones have no room for the timeline editor, so neither its shortcut nor the palette opens it.
+// Phones have no room for the timeline editor, so neither its shortcut, the palette nor
+// the shortcut sheet offers it.
 test.describe('on a phone', () => {
     test.use({ viewport: { width: 390, height: 844 } });
 
@@ -113,6 +114,13 @@ test.describe('on a phone', () => {
         await page.keyboard.type('presentation keyframes');
         await expect(palette).toContainText('Nothing matches “presentation keyframes”');
         await expect(page.locator('body')).not.toHaveClass(/has-timeline-panel/);
+
+        await page.keyboard.press('Escape');
+        await expect(palette).toBeHidden();
+        await page.keyboard.press('Shift+Slash');
+        const sheet = page.getByRole('dialog', { name: 'Keyboard shortcuts' });
+        await expect(sheet).toContainText('Command palette');
+        await expect(sheet).not.toContainText('Timeline editor');
         expect(problems).toEqual([]);
     });
 });
