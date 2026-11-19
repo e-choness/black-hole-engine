@@ -27,7 +27,11 @@ import {
     PLANET_ORBIT_MIN,
     clampObserverDistance,
 } from '../core/observer.js';
-import { updateCamera } from '../scene/camera-runtime.js';
+import {
+    DEFAULT_VIEW_INCLINATION,
+    setViewInclination,
+    updateCamera,
+} from '../scene/camera-runtime.js';
 import {
     applyQualityPresetValues,
     QUALITY_PRESET_LABELS,
@@ -187,6 +191,7 @@ export function setupGUI() {
             look: {
                 disk_gain: p.look.disk_gain,
                 glow: p.look.glow,
+                galaxy_gain: p.look.galaxy_gain,
                 tone_mapper: p.look.tone_mapper,
                 white_balance_enabled: p.look.white_balance_enabled,
                 white_balance_k: p.look.white_balance_k,
@@ -239,6 +244,7 @@ export function setupGUI() {
         p.doppler_shift = state.doppler_shift;
         p.look.disk_gain = state.look.disk_gain;
         p.look.glow = state.look.glow;
+        p.look.galaxy_gain = state.look.galaxy_gain;
         p.look.tone_mapper = state.look.tone_mapper;
         p.look.white_balance_enabled = state.look.white_balance_enabled;
         p.look.white_balance_k = state.look.white_balance_k;
@@ -519,6 +525,7 @@ export function setupGUI() {
         p.doppler_shift = preset.doppler_shift;
         p.look.disk_gain = preset.disk_gain;
         p.look.glow = preset.glow;
+        p.look.galaxy_gain = preset.galaxy_gain;
         p.look.tone_mapper = preset.tone_mapper;
         p.look.white_balance_enabled = preset.white_balance_k !== undefined;
         if (preset.white_balance_k !== undefined) p.look.white_balance_k = preset.white_balance_k;
@@ -528,6 +535,11 @@ export function setupGUI() {
             p.bloom.strength = preset.bloom.strength;
             p.bloom.radius = preset.bloom.radius;
         }
+        setViewInclination(
+            preset.view_inclination !== undefined
+                ? preset.view_inclination
+                : DEFAULT_VIEW_INCLINATION,
+        );
 
         updateDependentVisibility();
         updateCamera();

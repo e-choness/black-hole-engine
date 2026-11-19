@@ -1,3 +1,16 @@
+import { BH_PRESETS } from '../presets.js';
+
+// Preset menu entries carry the temperature scale: an artist disk colour is a choice, a physical
+// one follows from the mass and the accretion rate.
+function presetMenuOptions() {
+    var menu = { Custom: 'Custom' };
+    Object.keys(BH_PRESETS).forEach(function (name) {
+        var physical = BH_PRESETS[name].disk.temperature_mode === 'physical';
+        menu[name + (physical ? ' (physical)' : ' (artist)')] = name;
+    });
+    return menu;
+}
+
 export function setupRenderingFolder(options) {
     options = options || {};
 
@@ -18,20 +31,11 @@ export function setupRenderingFolder(options) {
     var presetsFolder = gui.addFolder('Black Hole Presets');
     var blackHolePresetController = addControl(presetsFolder, presetObj, 'preset', {
         name: 'preset',
-        options: [
-            'Custom',
-            'Default',
-            'M87*',
-            'Sgr A*',
-            'Cygnus X-1',
-            'GRS 1915+105',
-            'Gargantua (Interstellar visuals)',
-            'Schwarzschild',
-        ],
+        options: presetMenuOptions(),
         onChange: function (value) {
             if (applyBlackHolePreset) applyBlackHolePreset(value);
         },
-        help: 'Load a literature-inspired black-hole preset. These are illustrative starting points, not definitive measurements.',
+        help: 'Load a literature-inspired black-hole preset. Physical presets derive the disk temperature from the mass and accretion rate; artist presets choose it. These are illustrative starting points, not definitive measurements.',
     });
     presetsFolder.open();
 

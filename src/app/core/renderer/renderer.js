@@ -189,6 +189,7 @@ export function init(glslSource, textures) {
         radiance_visible: { value: 0.0 },
         bolometric_log2_coeff: { value: bolometricLog2Coefficient() },
         disk_temperature_peak: { value: 5000.0 },
+        disk_uniform_temperature: { value: 0.0 },
         disk_color_correction: { value: 1.0 },
         disk_limb: { value: new THREE.Vector2(1, 0) },
         disk_opacity: { value: 1.0 },
@@ -263,6 +264,7 @@ export function init(glslSource, textures) {
         uniforms.log2_look_scale.value = log2Exposure + log2Reference;
         uniforms.radiance_visible.value = p.radiance_model === 'visible' ? 1.0 : 0.0;
         uniforms.disk_temperature_peak.value = peakTemperature;
+        uniforms.disk_uniform_temperature.value = p.disk.temperature_mode === 'uniform' ? 1.0 : 0.0;
         uniforms.disk_color_correction.value = colorCorrection;
         var limb = LIMB_DARKENING_LAWS[p.disk.limb_darkening] || LIMB_DARKENING_LAWS.chandrasekhar;
         uniforms.disk_limb.value.set(limb[0], limb[1]);

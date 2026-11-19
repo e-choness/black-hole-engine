@@ -6,10 +6,14 @@
 import * as THREE from 'three';
 import { degToRad } from '../core/shader.js';
 import { diveState, hoverState } from '../core/scenarios/scenario-state.js';
-import { camera, observer, shader } from '../core/runtime/runtime-state.js';
+import { camera, cameraControls, observer, shader } from '../core/runtime/runtime-state.js';
 
-export function initializeCamera(targetCamera) {
-    var pitchAngle = 3.0;
+// Starting line of sight, in degrees from the spin axis: just above the disk plane.
+export const DEFAULT_VIEW_INCLINATION = 87.0;
+
+// pitchAngle: elevation of the line of sight above the equatorial plane, in degrees.
+export function initializeCamera(targetCamera, pitchAngle) {
+    if (pitchAngle === undefined) pitchAngle = 90.0 - DEFAULT_VIEW_INCLINATION;
     var yawAngle = 0.0;
 
     targetCamera.matrixWorldInverse.makeRotationX(degToRad(-pitchAngle));
@@ -19,6 +23,17 @@ export function initializeCamera(targetCamera) {
 
     var m = targetCamera.matrixWorldInverse.elements;
     targetCamera.position.set(m[2], m[6], m[10]);
+}
+
+// Looks at the hole along a line of sight inclined by inclination degrees to the spin axis
+// (0: pole-on, 90: edge-on), the viewing angle quoted for disks and jets.
+export function setViewInclination(inclination) {
+    initializeCamera(camera, 90.0 - inclination);
+    if (cameraControls) {
+        cameraControls.target.set(0, 0, 0);
+        cameraControls.update();
+    }
+    updateCamera();
 }
 
 export function updateCamera() {

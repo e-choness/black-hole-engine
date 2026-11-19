@@ -51,6 +51,7 @@ export var BH_PRESETS = {
         doppler_shift: true,
         disk_gain: 1.0,
         glow: 0.0,
+        galaxy_gain: 0.4,
         tone_mapper: 'agx',
         bloom: { enabled: true, strength: 0.04, radius: 0.7 },
     },
@@ -58,6 +59,8 @@ export var BH_PRESETS = {
         // Illustrative M87*-inspired preset:
         // high-spin, jet-producing, MAD-like thick torus motivated by EHT-era
         // GRMHD studies. The exact spin and plasma parameters remain model dependent.
+        // M = 6.5e9 M_sun (EHT 2019 paper VI); the jet axis lies about 17 deg from the line of
+        // sight (Walker+ 2018).
         spin_enabled: true,
         spin: 0.9,
         spin_strength: 1.0,
@@ -66,7 +69,7 @@ export var BH_PRESETS = {
         disk_temperature: 20000,
         disk: {
             temperature_mode: 'artist',
-            mass_msun: 1e8,
+            mass_msun: 6.5e9,
             eddington_ratio: 0.1,
             color_correction: 1.0,
             limb_darkening: 'chandrasekhar',
@@ -100,11 +103,13 @@ export var BH_PRESETS = {
             magnetic_field_str: 1.5,
         },
         observer: { distance: 11.0 },
+        view_inclination: 17.0,
         beaming: true,
         physical_beaming: true,
         doppler_shift: true,
         disk_gain: 1.0,
         glow: 0.0,
+        galaxy_gain: 0.4,
         tone_mapper: 'agx',
         bloom: { enabled: true, strength: 0.05, radius: 0.75 },
     },
@@ -112,7 +117,7 @@ export var BH_PRESETS = {
         // Illustrative Sgr A*-inspired preset:
         // moderate spin, quiescent ADAF/RIAF-like torus, no persistent jet.
         // EHT modeling does not isolate a unique spin, so this is a representative
-        // visualization preset rather than a measurement claim.
+        // visualization preset rather than a measurement claim. M = 4.297e6 M_sun (GRAVITY 2022).
         spin_enabled: true,
         spin: 0.5,
         spin_strength: 1.0,
@@ -121,7 +126,7 @@ export var BH_PRESETS = {
         disk_temperature: 15000,
         disk: {
             temperature_mode: 'artist',
-            mass_msun: 1e8,
+            mass_msun: 4.297e6,
             eddington_ratio: 0.1,
             color_correction: 1.0,
             limb_darkening: 'chandrasekhar',
@@ -160,16 +165,18 @@ export var BH_PRESETS = {
         doppler_shift: true,
         disk_gain: 1.0,
         glow: 0.0,
+        galaxy_gain: 0.4,
         tone_mapper: 'agx',
         bloom: { enabled: true, strength: 0.04, radius: 0.7 },
     },
     'Cygnus X-1': {
         // Near-extremal thin-disk X-ray-binary preset inspired by continuum-fitting
         // work on Cygnus X-1 (M = 21.2 M_sun, Miller-Jones+ 2021). The physical
-        // temperature scale puts the disk peak near 5e6 K, an X-ray photosphere whose
+        // temperature scale puts the disk peak near 6e6 K, an X-ray photosphere whose
         // visible colour is the Rayleigh-Jeans blue-white; f_col = 1.7 (Shimura & Takahara 1995).
+        // The measured spin exceeds 0.9985 (Zhao+ 2021); a = 0.998 is the Thorne (1974) ceiling.
         spin_enabled: true,
-        spin: 0.99,
+        spin: 0.998,
         spin_strength: 1.0,
         accretion_disk: true,
         accretion_mode: 'thin_disk',
@@ -214,13 +221,16 @@ export var BH_PRESETS = {
         doppler_shift: true,
         disk_gain: 1.0,
         glow: 0.0,
+        galaxy_gain: 0.4,
         tone_mapper: 'agx',
         bloom: { enabled: true, strength: 0.035, radius: 0.65 },
     },
     'GRS 1915+105': {
         // Near-extremal slim-disk microquasar preset inspired by continuum-fitting
         // and superluminal-jet observations of GRS 1915+105 (M = 12.4 M_sun, Reid+ 2014);
-        // the physical temperature scale gives T_peak = 1.1e7 K at L = 0.3 L_Edd.
+        // the physical temperature scale gives T_peak = 1.1e7 K at L = 0.3 L_Edd. The ejecta move at
+        // beta = 0.92 at 70 deg to the line of sight (Mirabel & Rodriguez 1994), so Gamma = 2.6 and
+        // both jets are de-boosted (delta = 0.57 approaching, 0.30 receding).
         spin_enabled: true,
         spin: 0.98,
         spin_strength: 1.0,
@@ -241,7 +251,7 @@ export var BH_PRESETS = {
             enabled: true,
             mode: 'simple',
             half_angle: 3.0,
-            lorentz_factor: 4.0,
+            lorentz_factor: 2.6,
             brightness: 1.0,
             length: 25.0,
             magnetization: 10.0,
@@ -262,28 +272,148 @@ export var BH_PRESETS = {
             magnetic_field_str: 2.0,
         },
         observer: { distance: 9.0 },
+        view_inclination: 70.0,
         beaming: true,
         physical_beaming: true,
         doppler_shift: true,
         disk_gain: 1.0,
         glow: 0.0,
+        galaxy_gain: 0.4,
         tone_mapper: 'agx',
         bloom: { enabled: true, strength: 0.04, radius: 0.7 },
     },
-    'Gargantua (Interstellar visuals)': {
+    '3C 273': {
+        // Quasar 3C 273: M = 2.6e8 M_sun from the GRAVITY broad-line-region model (GRAVITY 2018).
+        // The spin is unmeasured (0.9 is a placeholder) and L = 0.3 L_Edd is illustrative, which
+        // puts the Page-Thorne peak near 1.3e5 K, blue-white. The one-sided jet has Gamma = 15 and
+        // alpha = 0.7 (MOJAVE, Lister+ 2021). Its quoted viewing angle of about 4 deg assumes a
+        // distant observer; from the camera, about 11 r_s out, that line of sight runs inside the
+        // jet, so the preset looks 12 deg off the axis, where delta = 2.8 still boosts the jet
+        // and the counter-jet (delta = 0.034) disappears.
         spin_enabled: true,
-        spin: 0.7,
+        spin: 0.9,
+        spin_strength: 1.0,
+        accretion_disk: true,
+        accretion_mode: 'slim_disk',
+        disk_temperature: 30000,
+        disk: {
+            temperature_mode: 'physical',
+            mass_msun: 2.6e8,
+            eddington_ratio: 0.3,
+            color_correction: 1.0,
+            limb_darkening: 'chandrasekhar',
+            opacity: 1.0,
+        },
+        torus: { r0: 4.0, h_ratio: 0.45, radial_falloff: 2.5, opacity: 0.015, outer_radius: 3.5 },
+        slim: { h_ratio: 0.15, opacity: 0.65, puff_factor: 2.5 },
+        jet: {
+            enabled: true,
+            mode: 'physical',
+            half_angle: 2.0,
+            lorentz_factor: 15.0,
+            brightness: 1.5,
+            length: 40.0,
+            spectral_index: 0.7,
+            magnetization: 10.0,
+            knot_spacing: 6.0,
+            corona_brightness: 1.5,
+            base_width: 0.35,
+            corona_extent: 0.6,
+        },
+        grmhd: {
+            enabled: true,
+            r_high: 20.0,
+            magnetic_beta: 10.0,
+            mad_flux: 0.3,
+            density_scale: 1.5,
+            turbulence_amp: 1.2,
+            electron_kappa: 4.5,
+            magnetic_field_str: 1.2,
+        },
+        observer: { distance: 11.0 },
+        view_inclination: 12.0,
+        beaming: true,
+        physical_beaming: true,
+        doppler_shift: true,
+        disk_gain: 1.0,
+        glow: 0.0,
+        galaxy_gain: 0.4,
+        tone_mapper: 'agx',
+        bloom: { enabled: true, strength: 0.08, radius: 0.85 },
+    },
+    'TON 618': {
+        // Hyperluminous quasar TON 618: M = 4.07e10 M_sun from C IV (Ge+ 2019). The spin is
+        // unmeasured (0.9 is a placeholder) and L = 0.3 L_Edd is illustrative, giving a
+        // Page-Thorne peak near 3.6e4 K. The jet is off: no resolved kinematics are known. Here
+        // GM/c^3 is 2.3 days and the ISCO period about 65 days.
+        spin_enabled: true,
+        spin: 0.9,
+        spin_strength: 1.0,
+        accretion_disk: true,
+        accretion_mode: 'slim_disk',
+        disk_temperature: 30000,
+        disk: {
+            temperature_mode: 'physical',
+            mass_msun: 4.07e10,
+            eddington_ratio: 0.3,
+            color_correction: 1.0,
+            limb_darkening: 'chandrasekhar',
+            opacity: 1.0,
+        },
+        torus: { r0: 4.0, h_ratio: 0.45, radial_falloff: 2.5, opacity: 0.015, outer_radius: 3.5 },
+        slim: { h_ratio: 0.15, opacity: 0.65, puff_factor: 2.5 },
+        jet: {
+            enabled: false,
+            mode: 'physical',
+            half_angle: 2.0,
+            lorentz_factor: 10.0,
+            brightness: 1.5,
+            length: 40.0,
+            spectral_index: 0.7,
+            magnetization: 10.0,
+            knot_spacing: 6.0,
+            corona_brightness: 1.5,
+            base_width: 0.35,
+            corona_extent: 0.6,
+        },
+        grmhd: {
+            enabled: true,
+            r_high: 20.0,
+            magnetic_beta: 10.0,
+            mad_flux: 0.3,
+            density_scale: 1.5,
+            turbulence_amp: 1.2,
+            electron_kappa: 4.5,
+            magnetic_field_str: 1.2,
+        },
+        observer: { distance: 11.0 },
+        beaming: true,
+        physical_beaming: true,
+        doppler_shift: true,
+        disk_gain: 1.0,
+        glow: 0.0,
+        galaxy_gain: 0.4,
+        tone_mapper: 'agx',
+        bloom: { enabled: true, strength: 0.08, radius: 0.85 },
+    },
+    'Gargantua-style cinematic': {
+        // After the disk of Interstellar (James, von Tunzelmann, Franklin & Thorne 2015, sec. 5 and
+        // app. A): a = 0.6, a thin and marginally optically thick disk at a uniform 4500 K with no
+        // frequency shifts at all (Doppler and gravitational) and a 6500 K white point. Without
+        // GRMHD stress nothing emits inside the ISCO.
+        spin_enabled: true,
+        spin: 0.6,
         spin_strength: 1.0,
         accretion_disk: true,
         accretion_mode: 'thin_disk',
         disk_temperature: 4500,
         disk: {
-            temperature_mode: 'artist',
+            temperature_mode: 'uniform',
             mass_msun: 1e8,
             eddington_ratio: 0.1,
             color_correction: 1.0,
             limb_darkening: 'chandrasekhar',
-            opacity: 1.0,
+            opacity: 0.95,
         },
         torus: { r0: 4.0, h_ratio: 0.45, radial_falloff: 2.5, opacity: 0.015, outer_radius: 3.5 },
         slim: { h_ratio: 0.15, opacity: 0.6, puff_factor: 2.5 },
@@ -301,7 +431,7 @@ export var BH_PRESETS = {
             corona_extent: 0.5,
         },
         grmhd: {
-            enabled: true,
+            enabled: false,
             r_high: 40.0,
             magnetic_beta: 10.0,
             mad_flux: 0.0,
@@ -314,9 +444,11 @@ export var BH_PRESETS = {
         beaming: false,
         physical_beaming: false,
         doppler_shift: false,
-        disk_gain: 2.0,
-        glow: 1.0,
+        disk_gain: 1.0,
+        glow: 0.0,
+        galaxy_gain: 0.4,
         tone_mapper: 'aces',
+        white_balance_k: 6500,
         bloom: { enabled: true, strength: 0.06, radius: 0.8 },
     },
     Schwarzschild: {
@@ -368,6 +500,7 @@ export var BH_PRESETS = {
         doppler_shift: true,
         disk_gain: 1.0,
         glow: 0.0,
+        galaxy_gain: 0.4,
         tone_mapper: 'agx',
         bloom: { enabled: true, strength: 0.035, radius: 0.65 },
     },

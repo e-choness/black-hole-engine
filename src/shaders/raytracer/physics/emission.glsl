@@ -11,6 +11,7 @@ uniform float radiance_visible;      // 1: photometric Y(g f_col T); 0: bolometr
 uniform float bolometric_log2_coeff; // log2(K_6504 sigma / pi), luminance of (sigma T^4 / pi)
 
 uniform float disk_temperature_peak; // K, effective temperature at the flux maximum
+uniform float disk_uniform_temperature; // 1: the whole disk at disk_temperature_peak
 uniform float disk_color_correction; // f_col
 uniform vec2 disk_limb;              // L(mu) = x + y mu, normalised to 2 int L mu dmu = 1
 uniform float disk_opacity;
@@ -162,6 +163,7 @@ float disk_relative_flux(float r, float stress) {
 }
 
 float disk_temperature_at(float r, float stress) {
+    if (disk_uniform_temperature > 0.5) return disk_temperature_peak;
     return disk_temperature_peak * pow(disk_relative_flux(r, stress), 0.25);
 }
 

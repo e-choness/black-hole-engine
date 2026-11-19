@@ -49,13 +49,17 @@ export function setupAccretionLookFolders(options) {
     });
     var diskTempModeCtrl = addControl(diskFolder, p.disk, 'temperature_mode', {
         name: 'temperature scale',
-        options: { artist: 'artist', 'physical (M, Mdot)': 'physical' },
+        options: {
+            'artist (Page-Thorne profile)': 'artist',
+            'artist (uniform)': 'uniform',
+            'physical (M, Mdot)': 'physical',
+        },
         trackBlackHolePreset: true,
         onChange: function () {
             syncDependentVisibility();
             updateUniformsLive();
         },
-        help: 'Artist: the peak temperature below. Physical: the Novikov-Thorne peak temperature of a hole of the given mass accreting at the given Eddington ratio (Page & Thorne 1974).',
+        help: 'Artist: the Page-Thorne profile with the peak temperature below. Artist uniform: the whole disk at that temperature, as in the film Interstellar (James et al. 2015). Physical: the Novikov-Thorne peak temperature of a hole of the given mass accreting at the given Eddington ratio (Page & Thorne 1974).',
     });
     var diskTempCtrl = addControl(diskFolder, p, 'disk_temperature', {
         min: diskTemperatureMin,
@@ -64,7 +68,7 @@ export function setupAccretionLookFolders(options) {
         name: 'peak temperature (K)',
         trackBlackHolePreset: true,
         onChange: updateUniformsLive,
-        help: 'Effective temperature at the flux maximum of the Page-Thorne profile, before relativistic shifts.',
+        help: 'Effective temperature at the flux maximum of the Page-Thorne profile, or of the whole disk in uniform mode, before relativistic shifts. An artist choice: physical disks peak at 1e4-1e5 K around supermassive holes and 1e6-1e7 K around stellar-mass ones.',
     });
     var diskMassCtrl = addControl(diskFolder, p.disk, 'mass_msun', {
         min: 1,
@@ -428,9 +432,9 @@ export function setupAccretionLookFolders(options) {
         help: 'Enables Kerr-like rotation effects. Disable for a Schwarzschild-style shadow.',
     });
     var spinCtrl = addControl(spinFolder, p.black_hole, 'spin', {
-        min: -0.99,
-        max: 0.99,
-        step: 0.01,
+        min: -0.998,
+        max: 0.998,
+        step: 0.001,
         name: 'a/M',
         trackBlackHolePreset: true,
         onChange: updateUniformsLive,
@@ -551,6 +555,7 @@ export function setupAccretionLookFolders(options) {
         max: 2.5,
         step: 0.01,
         name: 'sky gain',
+        trackBlackHolePreset: true,
         onChange: updateUniformsLive,
         help: 'Brightness multiplier for the background sky: the Milky Way and its stars, seen from Earth and shown in galactic coordinates as a stand-in for the host galaxy.',
     });
