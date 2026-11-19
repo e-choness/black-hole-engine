@@ -17,6 +17,18 @@ export const MANIFEST_ICONS = Object.freeze([
     { src: 'icons/maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
 ]);
 
+// The Workbox modules that workbox-build bundles into sw.js and workbox-[hash].js for the options
+// below; expiration and cacheable-response serve the texture cache. They never pass through Vite's
+// module graph, so the legal notice lists them explicitly (config/legal-notice.js).
+export const SERVICE_WORKER_PACKAGES = Object.freeze([
+    'workbox-cacheable-response',
+    'workbox-core',
+    'workbox-expiration',
+    'workbox-precaching',
+    'workbox-routing',
+    'workbox-strategies',
+]);
+
 // Linked from index.html; iOS prefers it to the manifest icons and rounds its corners itself.
 export const APPLE_TOUCH_ICON = Object.freeze({
     src: 'icons/apple-touch-icon.png',

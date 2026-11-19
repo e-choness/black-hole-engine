@@ -130,7 +130,7 @@ src/styles/              stylesheets of the page and the timeline editor
 public/                  files served as-is: textures and icons
 tests/unit/              Vitest unit tests
 tests/e2e/               Playwright tests: rendering, controls, recording, missing WebGL 2
-config/                  security headers shared by every server
+config/                  build settings: security headers, PWA, link previews, legal notice
 docker/                  container entrypoint and nginx configuration
 scripts/                 build helpers
 .github/                 CI workflow and Dependabot configuration

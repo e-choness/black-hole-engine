@@ -1,26 +1,11 @@
-import { readFile } from 'node:fs/promises';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
-import { pwaOptions } from './config/pwa.js';
+import { legalNoticePlugin } from './config/legal-notice.js';
+import { SERVICE_WORKER_PACKAGES, pwaOptions } from './config/pwa.js';
 import { securityHeaders, serializeContentSecurityPolicy } from './config/security-headers.js';
 import { sitePreviewPlugin } from './config/site-metadata.js';
-
-// The help sheet links to docs/LEGAL.md, so every build ships it next to the page.
-function legalNotice() {
-    return {
-        name: 'black-hole:legal-notice',
-        apply: 'build',
-        async generateBundle() {
-            this.emitFile({
-                type: 'asset',
-                fileName: 'docs/LEGAL.md',
-                source: await readFile(new URL('./docs/LEGAL.md', import.meta.url), 'utf8'),
-            });
-        },
-    };
-}
 
 // Static hosts without custom headers (GitHub Pages) still get the CSP through a <meta> tag that
 // is placed right after <meta charset> so it governs every later resource.
@@ -48,7 +33,9 @@ export default defineConfig({
         react(),
         tailwindcss(),
         contentSecurityPolicyMeta(),
-        legalNotice(),
+        // Tailwind CSS generates the theme variables and utilities of the stylesheet outside the
+        // module graph, and workbox-build bundles the service worker after it.
+        legalNoticePlugin({ extraPackages: ['tailwindcss', ...SERVICE_WORKER_PACKAGES] }),
         sitePreviewPlugin(),
         VitePWA(pwaOptions),
     ],
