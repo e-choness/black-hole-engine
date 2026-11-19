@@ -22,6 +22,10 @@ export function Shader(mustacheTemplate) {
             motion_rejection: 8.0,
             max_camera_delta: 0.08,
         },
+        accumulation: {
+            enabled: true,
+            max_frames: 256,
+        },
         max_revolutions: 2.0,
         rk4_integration: false,
         quality: 'high',

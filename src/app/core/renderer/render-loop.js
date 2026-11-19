@@ -36,6 +36,58 @@ var lastCameraMat = new THREE.Matrix4().identity();
 var resetRendererFrameClock = function () {};
 var rendererOfflineSteppingActive = false;
 
+// Uniforms that change from frame to frame without changing the converged image: the sub-pixel
+// jitter always, and the simulation clock when nothing in the scene moves with it.
+var STILL_IGNORED = { taa_jitter: true };
+var STILL_IGNORED_TIMELESS = { taa_jitter: true, time: true };
+var stillSignature = [];
+var nextStillSignature = [];
+
+function pushUniformValue(out, value) {
+    if (typeof value === 'number') {
+        out.push(value);
+    } else if (typeof value === 'boolean') {
+        out.push(value ? 1 : 0);
+    } else if (value && value.isTexture) {
+        out.push(value.id, value.version);
+    } else if (value && typeof value.toArray === 'function') {
+        Array.prototype.push.apply(out, value.toArray());
+    } else if (Array.isArray(value)) {
+        value.forEach(function (item) {
+            pushUniformValue(out, item);
+        });
+    }
+}
+
+// True when every ray-tracer uniform that shapes the image (camera included) equals its value in
+// the previous frame, so the new frame differs from the last one only by its jitter.
+function viewUnchanged(uniforms, ignored) {
+    var next = nextStillSignature;
+    next.length = 0;
+    for (var name in uniforms) {
+        if (!ignored[name]) pushUniformValue(next, uniforms[name].value);
+    }
+    var previous = stillSignature;
+    var same =
+        next.length === previous.length &&
+        next.every(function (value, i) {
+            return Object.is(value, previous[i]);
+        });
+    nextStillSignature = previous;
+    stillSignature = next;
+    return same;
+}
+
+// A static view keeps rendering until its running mean holds the configured number of frames.
+function stillRefining() {
+    var accumulation = shader.parameters.accumulation;
+    return !!(
+        taaPass &&
+        accumulation.enabled &&
+        taaPass.accumulatedFrames < accumulation.max_frames
+    );
+}
+
 var getFrameDuration = (function () {
     var MAX_FRAME_DT = 0.1;
     var nowFn =
@@ -125,6 +177,7 @@ function drawRendererFrame(forceRender) {
         forceRender ||
         shader.needsUpdate ||
         shader.hasMovingParts() ||
+        stillRefining() ||
         frobeniusDistance(camera.matrixWorldInverse, lastCameraMat) > 1e-10
     ) {
         shader.needsUpdate = false;
@@ -163,23 +216,33 @@ export function animate() {
 }
 
 function render() {
-    var taaEnabled = !!shader.parameters.taa_enabled && !!taaPass;
-    if (shaderUniforms && shaderUniforms.taa_jitter) {
-        if (taaEnabled) {
-            var jitter = taaPass.nextJitter();
-            shaderUniforms.taa_jitter.value.set(jitter.x, jitter.y);
-        } else {
-            shaderUniforms.taa_jitter.value.set(0, 0);
-        }
-    }
-
     updateUniforms();
 
+    // A static view accumulates jittered frames into a still; once it holds max_frames frames the
+    // trace is skipped and the finished mean is shown. Otherwise TAA, when enabled, resolves the
+    // jittered frame.
+    var taaEnabled = !!shader.parameters.taa_enabled && !!taaPass;
+    var accumulation = shader.parameters.accumulation;
+    var unchanged = viewUnchanged(
+        shaderUniforms,
+        shader.hasMovingParts() ? STILL_IGNORED : STILL_IGNORED_TIMELESS,
+    );
+    var still = !!taaPass && accumulation.enabled && unchanged;
+    var converged = still && taaPass.accumulatedFrames >= accumulation.max_frames;
+
     // Trace into the HDR target, resolve it temporally, then glare and tone map it.
-    renderer.setRenderTarget(hdrTarget);
-    renderer.render(scene, camera);
+    if (!converged) {
+        var jitter = still || taaEnabled ? taaPass.nextJitter(still) : null;
+        shaderUniforms.taa_jitter.value.set(jitter ? jitter.x : 0, jitter ? jitter.y : 0);
+        renderer.setRenderTarget(hdrTarget);
+        renderer.render(scene, camera);
+    }
     var resolved = hdrTarget.texture;
-    if (taaEnabled) {
+    if (converged) {
+        resolved = taaPass.historyRT.texture;
+    } else if (still) {
+        resolved = taaPass.accumulate(renderer, hdrTarget, shader.parameters.taa);
+    } else if (taaEnabled) {
         resolved = taaPass.render(
             renderer,
             hdrTarget,

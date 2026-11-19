@@ -8,9 +8,9 @@ import { trackPageProblems } from './support.js';
 const AZIMUTHS = 4;
 
 // Renders the free camera, a static observer looking at the hole, against a saturated sky. One
-// sample per pixel without TAA or bloom makes every pixel a single ray, bright when it escapes.
-// Escaping rays can still be dark where the sky texture is black, so a pixel counts as captured
-// only when it is dark at every azimuth.
+// sample per pixel without TAA, still accumulation or bloom makes every pixel a single ray, bright
+// when it escapes. Escaping rays can still be dark where the sky texture is black, so a pixel
+// counts as captured only when it is dark at every azimuth.
 async function renderShadow(page, { solver, spin, distance }) {
     await page.goto('./?quality=medium&e2e=1');
     await page.waitForFunction(() => window.__BH__ !== undefined);
@@ -32,6 +32,7 @@ async function renderShadow(page, { solver, spin, distance }) {
             const params = window.__BH__.params;
             params.sample_count = 1;
             params.taa_enabled = false;
+            params.accumulation.enabled = false;
             const settings = {
                 kerr_mode: solver,
                 'black_hole.spin_enabled': spin !== 0,

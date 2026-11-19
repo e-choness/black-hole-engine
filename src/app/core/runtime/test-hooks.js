@@ -1,5 +1,5 @@
 import { QUALITY_PRESETS } from '../../ui/quality-presets.js';
-import { shader } from './runtime-state.js';
+import { shader, taaPass } from './runtime-state.js';
 
 // URL switches used by automated tests and reproducible screenshots:
 //   ?quality=<preset>  start with that quality preset and skip the GPU benchmark
@@ -31,5 +31,8 @@ window.__BH__ = Object.freeze({
     },
     get params() {
         return shader ? shader.parameters : null;
+    },
+    get accumulatedFrames() {
+        return taaPass ? taaPass.accumulatedFrames : 0;
     },
 });

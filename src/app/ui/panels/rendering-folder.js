@@ -126,6 +126,19 @@ export function setupRenderingFolder(options) {
         onChange: onTaaSettingChange,
         help: 'Hard camera-motion cutoff where TAA history is fully discarded.',
     });
+    addControl(renderFolder, parameters.accumulation, 'enabled', {
+        name: 'still accumulation',
+        onChange: onTaaSettingChange,
+        help: 'While the camera, the simulation clock and every ray-tracing setting stay unchanged, average successive jittered frames with equal weights, so a still converges to a clean, anti-aliased image. Pausing the clock (time scale 0) freezes an animated scene for it.',
+    });
+    addControl(renderFolder, parameters.accumulation, 'max_frames', {
+        min: 16,
+        max: 4096,
+        step: 16,
+        name: 'still frames',
+        onChange: onTaaSettingChange,
+        help: 'Frames averaged into a still before it is final and ray tracing pauses until the view changes.',
+    });
     addControl(renderFolder, parameters, 'rk4_integration', {
         name: 'RK4 integration',
         trackQualityPreset: true,

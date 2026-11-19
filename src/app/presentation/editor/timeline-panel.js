@@ -3050,7 +3050,7 @@ export function buildTimelinePanel() {
     // ── Auto Keyframe ───────────────────────────────────────────────────────
     // Parameters that are UI/performance meta-settings and should never be
     // captured as timeline keyframes (they would override the user's choice on play).
-    // These are all the parameters owned by the quality preset system.
+    // These are the parameters owned by the quality preset system and the still accumulation.
     var SNAPSHOT_EXCLUDED_PATHS = {
         quality: true,
         n_steps: true,
@@ -3063,6 +3063,8 @@ export function buildTimelinePanel() {
         'taa.clip_gamma': true,
         'taa.motion_rejection': true,
         'taa.max_camera_delta': true,
+        'accumulation.enabled': true,
+        'accumulation.max_frames': true,
     };
 
     function captureSnapshot() {

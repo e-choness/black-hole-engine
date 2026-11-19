@@ -2,7 +2,9 @@
 // sub-pixel offset; the resolve blends the new frame into an exponential history after
 // rectifying the history against the 3x3 neighbourhood of the new frame (Karis 2014; Salvi 2016).
 // Without motion vectors the camera motion only lowers the history weight, and the clipping
-// removes most of the ghosting it leaves.
+// removes most of the ghosting it leaves. While the view is static the same history instead
+// becomes an equal-weight running mean of jittered frames, which converges to the box-filtered
+// pixel integral (progressive accumulation).
 
 import * as THREE from 'three';
 import { FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
@@ -35,6 +37,7 @@ uniform sampler2D tHistory;
 uniform vec2 texel;
 uniform float historyWeight;
 uniform float clipGamma;
+uniform bool accumulate;
 in vec2 vUv;
 out vec4 fragColor;
 
@@ -60,6 +63,10 @@ vec3 clip_towards_mean(vec3 mu, vec3 extent, vec3 history) {
 }
 
 void main() {
+    if (accumulate) {
+        fragColor = vec4(mix(texture(tCurrent, vUv).rgb, texture(tHistory, vUv).rgb, historyWeight), 1.0);
+        return;
+    }
     vec3 m1 = vec3(0.0);
     vec3 m2 = vec3(0.0);
     vec3 current = vec3(0.0);
@@ -91,6 +98,7 @@ export function setupTemporalAA(renderer) {
             texel: { value: new THREE.Vector2() },
             historyWeight: { value: 0.0 },
             clipGamma: { value: 1.25 },
+            accumulate: { value: false },
         },
         RESOLVE_FRAGMENT_SHADER,
     );
@@ -101,11 +109,13 @@ export function setupTemporalAA(renderer) {
         outputRT: createRenderTarget(renderer, 1, 1),
         historyValid: false,
         frameIndex: 0,
+        accumulatedFrames: 0,
         jitter: new THREE.Vector2(0, 0),
 
         reset: function () {
             this.historyValid = false;
             this.frameIndex = 0;
+            this.accumulatedFrames = 0;
         },
 
         resize: function (w, h) {
@@ -116,8 +126,10 @@ export function setupTemporalAA(renderer) {
             this.reset();
         },
 
-        nextJitter: function () {
-            var idx = (this.frameIndex % JITTER_PHASES) + 1;
+        // The TAA cycles through JITTER_PHASES offsets; a still walks on along the unbounded
+        // sequence, so n accumulated frames sample n distinct, evenly spread sub-pixel positions.
+        nextJitter: function (still) {
+            var idx = still ? this.accumulatedFrames + 1 : (this.frameIndex % JITTER_PHASES) + 1;
             this.jitter.set(halton(idx, 2) - 0.5, halton(idx, 3) - 0.5);
             this.frameIndex++;
             return this.jitter;
@@ -138,8 +150,31 @@ export function setupTemporalAA(renderer) {
             u.texel.value.set(1 / currentTarget.width, 1 / currentTarget.height);
             u.historyWeight.value = useHistory ? baseWeight * attenuation : 0.0;
             u.clipGamma.value = clampSetting(settings.clip_gamma, 1.25, 0.25, 4.0);
-            renderPass(rdr, this.quad, resolveMat, this.outputRT);
+            u.accumulate.value = false;
+            this.accumulatedFrames = 0;
+            return this.resolve(rdr);
+        },
 
+        // Adds the frame to the running mean of a static view, in linear HDR. A valid TAA history
+        // seeds the mean with the weight of the 1 / (1 - w) frames it holds, so the image does not
+        // fall back to a single aliased frame when the camera stops.
+        accumulate: function (rdr, currentTarget, taaSettings) {
+            var settings = taaSettings || {};
+            var n = this.accumulatedFrames;
+            if (n === 0 && this.historyValid) {
+                n = Math.round(1.0 / (1.0 - clampSetting(settings.history_weight, 0.9, 0.0, 0.98)));
+            }
+            var u = resolveMat.uniforms;
+            u.tCurrent.value = currentTarget.texture;
+            u.tHistory.value = this.historyRT.texture;
+            u.historyWeight.value = n / (n + 1);
+            u.accumulate.value = true;
+            this.accumulatedFrames = n + 1;
+            return this.resolve(rdr);
+        },
+
+        resolve: function (rdr) {
+            renderPass(rdr, this.quad, resolveMat, this.outputRT);
             var tmp = this.historyRT;
             this.historyRT = this.outputRT;
             this.outputRT = tmp;

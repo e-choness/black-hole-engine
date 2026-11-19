@@ -208,7 +208,7 @@ function normalizePresentationTimeline(timeline) {
     var maxTime = 0.0;
     // Paths that are UI/performance meta-settings and must never be driven by
     // a timeline (they would silently override the user's chosen setting on play).
-    // These are all the parameters owned by the quality preset system.
+    // These are the parameters owned by the quality preset system and the still accumulation.
     var TIMELINE_EXCLUDED_PATHS = {
         quality: true,
         n_steps: true,
@@ -221,6 +221,8 @@ function normalizePresentationTimeline(timeline) {
         'taa.clip_gamma': true,
         'taa.motion_rejection': true,
         'taa.max_camera_delta': true,
+        'accumulation.enabled': true,
+        'accumulation.max_frames': true,
     };
     function normalizeExcludedTimelinePath(path) {
         if (typeof path !== 'string') return '';
