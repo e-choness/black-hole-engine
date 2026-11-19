@@ -1,0 +1,13 @@
+**/node_modules
+dist
+coverage
+test-results
+playwright-report
+.cache
+.git
+.claude
+CLAUDE.md
+docs/*
+!docs/LEGAL.md
+*.log
+.env*

@@ -35,20 +35,31 @@ libraries and assets keep their own licenses, listed below.
 
 ## Third-party libraries
 
-| Component | Location | License |
-|-----------|----------|---------|
-| [dat.GUI](https://github.com/dataarts/dat.gui) | `js-libs/dat.gui.min.js` | Apache-2.0 |
-| [jQuery](https://jquery.org) | `js-libs/jquery-2.1.4.min.js` | MIT |
-| [three.js](https://threejs.org) (+ `Detector.js`, `OrbitControls.js`) | `js-libs/` | MIT |
-| [stats.js](https://github.com/mrdoob/stats.js) | `js-libs/stats.min.js` | MIT |
-| [mustache.js](https://github.com/janl/mustache.js) | `js-libs/mustache.min.js` | MIT |
-| [webm-muxer](https://github.com/Vanilagy/webm-muxer) | `js-libs/webm-muxer.js` | MIT |
-| [ShaderLoader.js](https://github.com/codecruzer/webgl-shader-loader-js) | `js-libs/ShaderLoader.min.js` | MIT |
-| Font Awesome 4.5 CSS (loaded from a CDN at runtime, not bundled) | — | SIL OFL 1.1 / MIT |
+These libraries are served from `public/vendor/` and shipped with every build. `OrbitControls.js`
+carries project modifications (pan/zoom callbacks and roll).
+
+| Component                                                             | Location                                                        | License           |
+| --------------------------------------------------------------------- | --------------------------------------------------------------- | ----------------- |
+| [dat.GUI](https://github.com/dataarts/dat.gui)                        | `public/vendor/dat.gui.min.js`                                  | Apache-2.0        |
+| [jQuery](https://jquery.org)                                          | `public/vendor/jquery-2.1.4.min.js`                             | MIT               |
+| [three.js](https://threejs.org) (+ `Detector.js`, `OrbitControls.js`) | `public/vendor/three.min.js`, `Detector.js`, `OrbitControls.js` | MIT               |
+| [stats.js](https://github.com/mrdoob/stats.js)                        | `public/vendor/stats.min.js`                                    | MIT               |
+| [mustache.js](https://github.com/janl/mustache.js)                    | `public/vendor/mustache.min.js`                                 | MIT               |
+| [webm-muxer](https://github.com/Vanilagy/webm-muxer)                  | `public/vendor/webm-muxer.js`                                   | MIT               |
+| Font Awesome 4.5 CSS (loaded from a CDN at runtime, not bundled)      | —                                                               | SIL OFL 1.1 / MIT |
+
+`public/vendor/three-js-monkey-patch.js` is first-party code covered by the project license.
+
+## Build and test tooling
+
+Vite, Vitest, ESLint, Prettier, Playwright and the Docker base images are used only to build and
+test the project; none of their code is included in the published site. The production container
+image (the `runtime` Dockerfile stage) redistributes nginx (BSD-2-Clause) and Alpine Linux
+packages under their respective licenses.
 
 ## Assets
 
-| Asset | Source | License |
-|-------|--------|---------|
-| `assets/img/milkyway.jpg` | [Stellarium](https://www.stellarium.org/), based on Nick Risinger's [Photopic Sky Survey](https://skysurvey.org/) | [CC BY-NC 2.0](https://creativecommons.org/licenses/by-nc/2.0/) — **not** MIT |
-| Other files in `assets/` | Upstream projects listed above | MIT |
+| Asset                                                 | Source                                                                                                            | License                                                                       |
+| ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `public/textures/milkyway.jpg`                        | [Stellarium](https://www.stellarium.org/), based on Nick Risinger's [Photopic Sky Survey](https://skysurvey.org/) | [CC BY-NC 2.0](https://creativecommons.org/licenses/by-nc/2.0/) — **not** MIT |
+| Other files in `public/textures/` and `public/icons/` | Upstream projects listed above                                                                                    | MIT                                                                           |

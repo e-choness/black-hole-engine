@@ -1,0 +1,70 @@
+# The project name comes from the directory, so a git worktree checkout gets its own
+# containers, images and node_modules volumes.
+
+x-labels: &labels
+  com.black-hole.project: black-hole
+
+x-tooling: &tooling
+  build:
+    context: .
+    target: dev
+  init: true
+  labels: *labels
+  volumes:
+    - .:/app
+    - node_modules:/app/node_modules
+    - ${BH_CACHE_DIR:-./.cache}/npm:/home/node/.npm
+
+services:
+  dev:
+    <<: *tooling
+    environment:
+      BH_WATCH_POLLING: ${BH_WATCH_POLLING:-1}
+    ports:
+      - ${BH_DEV_PORT:-5173}:5173
+    command: [npm, run, dev, --, --host, 0.0.0.0]
+
+  test:
+    <<: *tooling
+    command: [sh, -c, npm run lint && npm test]
+
+  build:
+    <<: *tooling
+    command: [npm, run, build]
+
+  preview:
+    build:
+      context: .
+      target: runtime
+    labels: *labels
+    ports:
+      - ${BH_PREVIEW_PORT:-8080}:8080
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+  e2e:
+    build:
+      context: .
+      target: e2e
+    init: true
+    labels: *labels
+    shm_size: 1gb
+    environment:
+      CI: ${CI:-}
+    volumes:
+      - .:/app
+      - node_modules_e2e:/app/node_modules
+      - ${BH_CACHE_DIR:-./.cache}/npm:/home/ubuntu/.npm
+      - ${BH_CACHE_DIR:-./.cache}/screenshots:/app/.cache/screenshots
+      - ${BH_CACHE_DIR:-./.cache}/playwright:/app/.cache/playwright
+
+volumes:
+  node_modules:
+    labels: *labels
+  node_modules_e2e:
+    labels: *labels

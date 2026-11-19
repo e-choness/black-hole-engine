@@ -1,0 +1,154 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  DOCKER_BUILD_RECORD_UPLOAD: false
+
+jobs:
+  verify:
+    name: Lint, unit tests and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Lint and unit tests
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          target: test
+          outputs: type=cacheonly
+          provenance: false
+          sbom: false
+          cache-from: type=gha,scope=test
+          cache-to: type=gha,scope=test,mode=max
+
+      - name: Build static site
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          target: dist
+          outputs: type=local,dest=dist
+          provenance: false
+          sbom: false
+          cache-from: |
+            type=gha,scope=test
+            type=gha,scope=dist
+          cache-to: type=gha,scope=dist,mode=max
+
+      - name: Build production image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          target: runtime
+          outputs: type=cacheonly
+          provenance: false
+          sbom: false
+          cache-from: |
+            type=gha,scope=dist
+            type=gha,scope=runtime
+          cache-to: type=gha,scope=runtime,mode=max
+
+      - name: Upload Pages artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: dist/
+
+  e2e:
+    name: End-to-end smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Build Playwright image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          target: e2e
+          load: true
+          tags: black-hole-e2e:ci
+          provenance: false
+          sbom: false
+          cache-from: type=gha,scope=e2e
+          cache-to: type=gha,scope=e2e,mode=max
+
+      # The image runs as uid 1000 and the runner as uid 1001, so the bind-mounted output
+      # directories must be writable by both.
+      - name: Run Playwright
+        run: |
+          install -d -m 0777 .cache/screenshots .cache/playwright
+          docker run --rm --init --shm-size=1g --env CI=true \
+            --volume "$PWD/.cache/screenshots:/app/.cache/screenshots" \
+            --volume "$PWD/.cache/playwright:/app/.cache/playwright" \
+            black-hole-e2e:ci
+
+      - name: Upload screenshots
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: screenshots
+          path: .cache/screenshots/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-report
+          path: .cache/playwright/
+          if-no-files-found: warn
+          retention-days: 14
+
+  deploy:
+    name: Deploy to GitHub Pages
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [verify, e2e]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    concurrency:
+      group: github-pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Configure Pages
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
