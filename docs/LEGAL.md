@@ -35,26 +35,36 @@ libraries and assets keep their own licenses, listed below.
 
 ## Third-party libraries
 
-Vite bundles these npm packages into the published site at the versions recorded in
+The build bundles these npm packages into the published site at the versions recorded in
 `package-lock.json`. Minification strips their license comments, so their notices are kept here.
 
-| Package                                            | Version | Used for                                                                                 | License |
-| -------------------------------------------------- | ------- | ---------------------------------------------------------------------------------------- | ------- |
-| [three.js](https://threejs.org) (`three`)          | 0.187.0 | WebGL 2 renderer, plus `OrbitControls`, `FullScreenQuad` and the stats panel from addons | MIT     |
-| [lil-gui](https://github.com/georgealways/lil-gui) | 0.21.0  | Settings panel                                                                           | MIT     |
-| [mustache.js](https://github.com/janl/mustache.js) | 4.2.0   | Shader source templates                                                                  | MIT     |
-| [Mediabunny](https://mediabunny.dev)               | 1.66.1  | MP4 and WebM encoding and muxing for offline recordings                                  | MPL-2.0 |
+| Package                                                        | Version | Used for                                                                                 | License |
+| -------------------------------------------------------------- | ------- | ---------------------------------------------------------------------------------------- | ------- |
+| [three.js](https://threejs.org) (`three`)                      | 0.187.0 | WebGL 2 renderer, plus `OrbitControls`, `FullScreenQuad` and the stats panel from addons | MIT     |
+| [lil-gui](https://github.com/georgealways/lil-gui)             | 0.21.0  | Settings panel                                                                           | MIT     |
+| [mustache.js](https://github.com/janl/mustache.js)             | 4.2.0   | Shader source templates                                                                  | MIT     |
+| [Mediabunny](https://mediabunny.dev)                           | 1.66.1  | MP4 and WebM encoding and muxing for offline recordings                                  | MPL-2.0 |
+| [Workbox](https://developer.chrome.com/docs/workbox)           | 7.4.1   | Service worker runtime and its registration, see below                                   | MIT     |
+| [vite-plugin-pwa](https://github.com/vite-pwa/vite-plugin-pwa) | 2.0.0   | Service worker registration module `virtual:pwa-register`                                | MIT     |
+
+The service worker files `sw.js` and `workbox-[hash].js` contain the Workbox modules
+`workbox-core`, `workbox-precaching`, `workbox-routing`, `workbox-strategies`, `workbox-expiration`
+and `workbox-cacheable-response`, bundled by `workbox-build`. `workbox-window` is the chunk
+`assets/workbox-window.prod.es5-[hash].js`, and the entry chunk contains vite-plugin-pwa's
+registration module.
 
 ### MIT-licensed packages
 
-three.js, lil-gui and mustache.js are distributed under the MIT License. Its text is the permission
-notice in the project license section above, which applies to each package with that package's
-copyright notice in place of the project's:
+three.js, lil-gui, mustache.js, Workbox and vite-plugin-pwa are distributed under the MIT License.
+Its text is the permission notice in the project license section above, which applies to each
+package with that package's copyright notice in place of the project's:
 
 - three.js: Copyright © 2010-2026 three.js authors
 - lil-gui: Copyright (c) 2019 George Michael Brower
 - mustache.js: Copyright (c) 2009 Chris Wanstrath (Ruby); Copyright (c) 2010-2014 Jan Lehnardt
   (JavaScript); Copyright (c) 2010-2015 The mustache.js community
+- Workbox (every `workbox-*` package above): Copyright 2018 Google LLC
+- vite-plugin-pwa: Copyright (c) 2020-PRESENT Anthony Fu
 
 ### Mediabunny (MPL-2.0)
 
@@ -107,18 +117,21 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 ## Build and test tooling
 
-Vite (apart from the helpers above), Vitest, ESLint, Prettier, Playwright, the Docker base images
-and [jpeg-js](https://github.com/jpeg-js/jpeg-js) (BSD-3-Clause, used by `scripts/build-sky.js` to
+Vite (apart from the helpers above), vite-plugin-pwa and `workbox-build` (apart from the service
+worker code above), Vitest, ESLint, Prettier, Playwright, the Docker base images and
+[jpeg-js](https://github.com/jpeg-js/jpeg-js) (BSD-3-Clause, used by `scripts/build-sky.js` to
 convert the sky map) are used only to build and test the project; none of their code is included
-in the published site. The production container image (the `runtime` Dockerfile stage) redistributes
-nginx (BSD-2-Clause) and Alpine Linux packages under their respective licenses.
+in the published site. The production container image (the `runtime` Dockerfile stage)
+redistributes nginx (BSD-2-Clause) and Alpine Linux packages under their respective licenses.
 
 ## Assets
 
-| Asset                                                 | Source                                                                                                                                                                                                                                               | License                                                                                                                                    |
-| ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `public/textures/sky/`                                | [Deep Star Maps](https://svs.gsfc.nasa.gov/3895) (ID 3895, 2012), NASA/Goddard Space Flight Center Scientific Visualization Studio; visualization by Ernie Wright from the Bright Star, Tycho-2 and UCAC3 catalogues. Source file: `starmap_g8k.jpg` | Public domain ([SVS usage policy](https://svs.gsfc.nasa.gov/help/): "All of our content is in the public domain (unless otherwise noted)") |
-| Other files in `public/textures/` and `public/icons/` | The upstream black-hole projects named in the project license section                                                                                                                                                                                | MIT                                                                                                                                        |
+| Asset                                                                   | Source                                                                                                                                                                                                                                               | License                                                                                                                                    |
+| ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `public/textures/sky/`                                                  | [Deep Star Maps](https://svs.gsfc.nasa.gov/3895) (ID 3895, 2012), NASA/Goddard Space Flight Center Scientific Visualization Studio; visualization by Ernie Wright from the Bright Star, Tycho-2 and UCAC3 catalogues. Source file: `starmap_g8k.jpg` | Public domain ([SVS usage policy](https://svs.gsfc.nasa.gov/help/): "All of our content is in the public domain (unless otherwise noted)") |
+| `public/icons/black-hole.svg` and the other files in `public/textures/` | The upstream black-hole projects named in the project license section                                                                                                                                                                                | MIT                                                                                                                                        |
+| `public/icons/*.png`                                                    | Rendered from `public/icons/black-hole.svg` by `scripts/render-pwa-icons.js`                                                                                                                                                                         | MIT, as their source                                                                                                                       |
+| `public/og-image.jpg`                                                   | Rendered by this project's ray tracer (`scripts/render-og-image.js`)                                                                                                                                                                                 | MIT; it shows only the public-domain sky map and MIT-licensed textures                                                                     |
 
 The sky faces are modified from the source: `scripts/build-sky.js` reprojects the galactic plate
 carrée to cube-map faces, resamples them to 2048, 1024 and 512 px and recompresses them as JPEG.

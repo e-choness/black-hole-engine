@@ -1,6 +1,9 @@
 import { readFile } from 'node:fs/promises';
 import { defineConfig } from 'vite';
+import { VitePWA } from 'vite-plugin-pwa';
+import { pwaOptions } from './config/pwa.js';
 import { securityHeaders, serializeContentSecurityPolicy } from './config/security-headers.js';
+import { sitePreviewPlugin } from './config/site-metadata.js';
 
 // The link bar in index.html points at docs/LEGAL.md, so every build ships it next to the page.
 function legalNotice() {
@@ -39,7 +42,7 @@ function contentSecurityPolicyMeta() {
 
 export default defineConfig({
     base: './',
-    plugins: [contentSecurityPolicyMeta(), legalNotice()],
+    plugins: [contentSecurityPolicyMeta(), legalNotice(), sitePreviewPlugin(), VitePWA(pwaOptions)],
     build: {
         target: 'es2022',
         sourcemap: true,
