@@ -13,8 +13,8 @@ export function isVideoRequest({ request, url }) {
     );
 }
 
-// Files in public/textures/, including the sky tiers in its subfolders, keep their names across
-// releases, so they are cached at runtime and revalidated rather than precached.
+// Files in public/textures/ and its subfolders keep their names across releases, so they are
+// cached at runtime and revalidated rather than precached.
 export function isTextureRequest({ url, sameOrigin }) {
     return (
         sameOrigin &&

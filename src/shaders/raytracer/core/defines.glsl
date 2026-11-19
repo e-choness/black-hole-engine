@@ -49,6 +49,8 @@ uniform float accretion_inner_r;
 uniform float look_disk_gain, look_glow, look_doppler_boost;
 uniform float look_aberration_strength;
 uniform float look_galaxy_gain;
+// 0: galaxy cube map, 1: coordinate grid.
+uniform float sky_mode;
 uniform float torus_r0, torus_h_ratio, torus_radial_falloff, torus_opacity, torus_outer_radius;
 uniform float slim_h_ratio, slim_opacity, slim_puff_factor;
 uniform float jet_half_angle, jet_lorentz, jet_brightness, jet_length, jet_spectral_index;
@@ -84,10 +86,10 @@ const float KERR_VOLUME_STEP = 0.06;
 const float ACCRETION_WIDTH = 12.0;
 #define ACCRETION_MIN_R accretion_inner_r
 
-// The sky map is a display-referred image (linear sRGB once decoded), scaled like the other look
-// layers by H Y_ref; this factor lifts its dark background so the Milky Way band stays visible at
-// the default sky gain.
-const float SKY_BRIGHTNESS = 8.0;
+// The galaxy cube holds webgpu-galaxy's display values in linear light, scaled like the other look
+// layers by H Y_ref; this factor sets the galaxy's brightness relative to the disk at the default
+// sky gain.
+const float SKY_BRIGHTNESS = 1.5;
 // Screen-space change of the escape direction (rad per pixel) beyond which neighbouring rays are
 // taken to be discontinuous, e.g. on opposite sides of a caustic.
 const float SKY_MAX_GRADIENT = 1.0;
@@ -95,9 +97,6 @@ const float SKY_MAX_GRADIENT = 1.0;
 const float PLANET_AMBIENT = 0.0;
 const float PLANET_LIGHTNESS = 1.5;
 const float PLANET_LIGHT_REF_DISTANCE = 14.0;
-
-// Orientation of the galactic sky relative to the hole frame.
-mat3 BG_COORDS = ROT_Y(45.0 * DEG_TO_RAD);
 
 // planet texture coordinate system
 const float PLANET_AXIAL_TILT = 30.0 * DEG_TO_RAD;

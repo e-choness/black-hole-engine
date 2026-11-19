@@ -133,11 +133,32 @@ vec3 shifted_sky_radiance(vec3 rgb, float g) {
     return rgb * (seen / max(rest, vec3(1e-3))) * thermal_brightness_ratio(t, g);
 }
 
-// Galactic direction of a hole-frame sky direction, in the frame of the sky cube map (x towards
-// the Galactic Centre, z towards the north galactic pole).
-vec3 sky_direction(vec3 ray) {
-    vec3 p = ray * BG_COORDS;
-    return vec3(p.y, -p.x, p.z);
+// Latitude-longitude grid about the spin axis, every 15 degrees with the equator and the +x
+// meridian highlighted, on a dim base so every escaping ray is visible. Line widths grow with the
+// pixel footprint on the sky (the textureGrad gradients) and fade to their mean coverage once the
+// footprint spans a grid cell, so lensed regions converge instead of aliasing.
+vec3 grid_sky(vec3 dir, vec3 dx, vec3 dy) {
+    const float SPACING = 15.0 * DEG_TO_RAD;
+    const float HALF_WIDTH = 0.2 * DEG_TO_RAD;
+    float footprint = max(length(dx), length(dy));
+    float lat = asin(clamp(dir.z, -1.0, 1.0));
+    float lon = atan(dir.y, dir.x);
+    float w = HALF_WIDTH + footprint;
+    float d_lat = abs(fract(lat / SPACING + 0.5) - 0.5) * SPACING;
+    float d_lon = abs(fract(lon / SPACING + 0.5) - 0.5) * SPACING * max(cos(lat), 1e-3);
+    float lines = max(1.0 - smoothstep(HALF_WIDTH, w, d_lat), 1.0 - smoothstep(HALF_WIDTH, w, d_lon));
+    float mean = clamp(4.0 * HALF_WIDTH / SPACING, 0.0, 1.0);
+    lines = mix(lines, mean, smoothstep(0.25 * SPACING, SPACING, footprint));
+    bool equator = abs(lat) < w;
+    bool meridian = abs(lon) < w / max(cos(lat), 1e-3);
+    vec3 line_color = equator ? vec3(1.0, 0.55, 0.18) : (meridian ? vec3(0.35, 0.75, 1.0) : vec3(0.85));
+    return mix(vec3(0.02, 0.025, 0.04), line_color, lines);
+}
+
+// Radiance of the sky along a hole-frame direction, filtered over the pixel footprint.
+vec3 sky_radiance(vec3 dir, vec3 dx, vec3 dy) {
+    if (sky_mode > 0.5) return grid_sky(dir, dx, dy);
+    return textureGrad(sky_cube, dir, dx, dy).rgb;
 }
 
 float static_redshift(float r) {

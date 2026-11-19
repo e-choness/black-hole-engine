@@ -1,88 +1,44 @@
-// Sky cube-map tiers (scripts/build-sky.js): six sRGB JPEG faces per size in galactic
-// coordinates. The quality preset picks the tier; mipmaps are built in linear light by the GPU
-// from the sRGB8_ALPHA8 upload, and anisotropic filtering handles the sheared footprints of the
-// lensed sky near the photon ring.
+// The sky behind the hole: the procedural galaxy cube map (src/app/sky/galaxy-sky.js), or the
+// coordinate grid the ray tracer draws itself (sky_mode 1). The ray tracer samples sky_cube
+// along each escaping ray; sky_revision changes whenever the cube is re-rendered so the frame
+// accumulator restarts.
 
-import * as THREE from 'three';
+import { GalaxySky } from '../sky/galaxy-sky.js';
+import { applySkyView } from '../../features/galaxy/model.js';
 
-const FACES = ['px', 'nx', 'py', 'ny', 'pz', 'nz'];
-const DEFAULT_TIER = 1024;
+let galaxy = null;
 
-// Face size per quality preset; a face of N texels resolves 2/N rad at its centre.
-export const SKY_TIERS = {
-    mobile: 512,
-    optimal: 1024,
-    medium: 1024,
-    high: 2048,
-    ultra: 2048,
-    cinematic: 2048,
-};
-
-const loader = new THREE.CubeTextureLoader();
-const pending = new Map();
-let anisotropy = 1;
-let requestedTier = null;
-
-export function skyTierForQuality(quality) {
-    return SKY_TIERS[quality] || null;
+export function initSky(renderer, uniforms, anisotropy) {
+    galaxy = new GalaxySky(renderer, { anisotropy });
+    uniforms.sky_cube.value = galaxy.texture;
+    return galaxy;
 }
 
-export function setSkyAnisotropy(value) {
-    anisotropy = Math.max(1, value);
-}
-
-export function loadSkyTier(size) {
-    if (!pending.has(size)) {
-        const urls = FACES.map((face) => `textures/sky/${size}/${face}.jpg`);
-        const request = new Promise((resolve, reject) => {
-            loader.load(
-                urls,
-                (texture) => {
-                    texture.colorSpace = THREE.SRGBColorSpace;
-                    texture.generateMipmaps = true;
-                    texture.minFilter = THREE.LinearMipmapLinearFilter;
-                    texture.magFilter = THREE.LinearFilter;
-                    texture.anisotropy = anisotropy;
-                    texture.userData.skyTier = size;
-                    texture.needsUpdate = true;
-                    resolve(texture);
-                },
-                undefined,
-                reject,
-            );
-        });
-        pending.set(size, request);
+export function updateSky(uniforms, params, time) {
+    if (!galaxy) return;
+    const sky = params.sky;
+    uniforms.sky_mode.value = sky.mode === 'grid' ? 1 : 0;
+    if (sky.mode !== 'grid') {
+        galaxy.update({ params: sky.galaxy, quality: params.quality, time });
+        uniforms.sky_cube.value = galaxy.texture;
     }
-    return pending.get(size);
+    uniforms.sky_revision.value = galaxy.revision;
 }
 
-export function initialSkyTier(quality) {
-    return skyTierForQuality(quality) || DEFAULT_TIER;
+// True while the galaxy turns with the simulation clock.
+export function skyAnimates(params) {
+    return params.sky.mode === 'galaxy' && params.sky.galaxy.rotation_speed > 0;
 }
 
-// Keeps `uniform.value` on the tier of the current quality preset (custom quality keeps the tier
-// it has). A new tier replaces the old one once its faces have loaded, and the old texture is
-// released.
-export function syncSkyTier(uniform, quality, onSwap) {
-    const size = skyTierForQuality(quality);
-    if (!size || size === requestedTier) return;
-    requestedTier = size;
-    if (uniform.value && uniform.value.userData.skyTier === size) return;
-    loadSkyTier(size).then(
-        (texture) => {
-            if (requestedTier !== size) return;
-            const previous = uniform.value;
-            texture.anisotropy = anisotropy;
-            uniform.value = texture;
-            if (previous && previous !== texture) {
-                pending.delete(previous.userData.skyTier);
-                previous.dispose();
-            }
-            if (onSwap) onSwap();
-        },
-        (error) => {
-            if (requestedTier === size) requestedTier = null;
-            console.warn('Sky tier ' + size + ' failed to load:', error);
-        },
-    );
+// Moves the hole to one of the named places in the galaxy (model.js SKY_VIEWS).
+export function setSkyView(params, view) {
+    return applySkyView(params.sky.galaxy, view);
+}
+
+export function skyStatus() {
+    return galaxy ? galaxy.status() : null;
+}
+
+export function probeSky(width, height) {
+    return galaxy ? galaxy.probe(width, height) : null;
 }

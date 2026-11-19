@@ -249,7 +249,94 @@ export const VIEW_STATE_V1 = deepFreeze({
     refine: refineV1,
 });
 
-export const VIEW_STATE_VERSIONS = Object.freeze([VIEW_STATE_V1]);
+// Version 2 adds the sky: the background mode, the place of the hole in its galaxy
+// (src/features/galaxy/model.js SKY_VIEWS and GALAXY_LIMITS) and the shape, motion and look of the
+// galaxy. Version 1 links predate it; they get the place that the scenario they started from
+// chooses (app/ui/presets.js sky_view at the time version 2 was added).
+const V1_SCENARIO_SKY_VIEWS = Object.freeze({
+    'sgr-a-star': Object.freeze({
+        view: 'centre',
+        distance: 0,
+        inclination: 70,
+        position_angle: 20,
+        longitude: 90,
+        latitude: 0,
+    }),
+    'cygnus-x-1': Object.freeze({
+        view: 'disk',
+        distance: 0.62,
+        inclination: 88,
+        position_angle: 25,
+        longitude: 75,
+        latitude: 5,
+    }),
+    'grs-1915-105': Object.freeze({
+        view: 'disk',
+        distance: 0.62,
+        inclination: 88,
+        position_angle: 25,
+        longitude: 75,
+        latitude: 5,
+    }),
+});
+
+function migrateV1(previous, carried) {
+    const place = V1_SCENARIO_SKY_VIEWS[previous['scenario.preset']];
+    if (place) {
+        for (const [field, value] of Object.entries(place)) carried[`sky.galaxy.${field}`] = value;
+    }
+    return carried;
+}
+
+export const VIEW_STATE_V2 = deepFreeze({
+    version: 2,
+    fields: [
+        ...VIEW_STATE_V1.fields,
+        choice('km', 'sky.mode', 'galaxy', [
+            ['galaxy', 'gal'],
+            ['grid', 'grid'],
+        ]),
+        choice('kv', 'sky.galaxy.view', 'outside', [
+            ['outside', 'out'],
+            ['centre', 'ctr'],
+            ['disk', 'disk'],
+            ['custom', 'cus'],
+        ]),
+        number('kd', 'sky.galaxy.distance', 4.5, 0, 6, 0.01),
+        number('ki', 'sky.galaxy.inclination', 45, 0, 90, 0.1),
+        number('kp', 'sky.galaxy.position_angle', 30, -180, 180, 0.1, { wrap: true }),
+        number('ko', 'sky.galaxy.longitude', 80, -180, 180, 0.1, { wrap: true }),
+        number('ka', 'sky.galaxy.latitude', 12, -90, 90, 0.1),
+        number('ks', 'sky.galaxy.seed', 1, 1, 9999, 1),
+        number('kr', 'sky.galaxy.rotation_speed', 0.1, 0, 1, 0.01),
+        choice('kw', 'sky.galaxy.arms', 'density_wave', [
+            ['density_wave', 'dw'],
+            ['winding', 'wind'],
+        ]),
+        number('kc', 'sky.galaxy.corotation', 0.6, 0.2, 1.2, 0.01),
+        number('kl', 'sky.galaxy.lifetime', 0.12, 0.02, 0.5, 0.01),
+        number('kn', 'sky.galaxy.arm_count', 2, 1, 6, 1),
+        number('kt', 'sky.galaxy.spiral_tightness', 1.75, 0, 6, 0.01),
+        number('kh', 'sky.galaxy.arm_width', 2.25, 0.5, 5, 0.01),
+        number('kx', 'sky.galaxy.randomness', 1.8, 0, 5, 0.01),
+        number('kz', 'sky.galaxy.thickness', 3, 0.1, 8, 0.1),
+        number('kb', 'sky.galaxy.bulge', 0.15, 0, 0.6, 0.01),
+        number('ke', 'sky.galaxy.star_size', 0.06, 0.02, 0.3, 0.005),
+        number('kg', 'sky.galaxy.star_brightness', 0.3, 0, 2, 0.01),
+        choice('kq', 'sky.galaxy.palette', 'vivid', [
+            ['vivid', 'viv'],
+            ['stellar', 'stel'],
+        ]),
+        number('ku', 'sky.galaxy.cloud_size', 3, 0.5, 10, 0.1),
+        number('ky', 'sky.galaxy.cloud_opacity', 0.02, 0, 0.2, 0.001),
+        number('kf', 'sky.galaxy.nebulae', 0.15, 0, 0.6, 0.01),
+        number('kk', 'sky.galaxy.background_stars', 1, 0, 3, 0.01),
+    ],
+    refine: refineV1,
+    migrate: migrateV1,
+});
+
+export const VIEW_STATE_VERSIONS = Object.freeze([VIEW_STATE_V1, VIEW_STATE_V2]);
 
 const LATEST_FIELDS = VIEW_STATE_VERSIONS.at(-1).fields;
 

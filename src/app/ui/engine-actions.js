@@ -21,6 +21,8 @@ import {
 } from '../scene/camera-runtime.js';
 import { applyQualityPresetValues, QUALITY_PRESETS, KERR_MODE_LABELS } from './quality-presets.js';
 import { BH_PRESETS } from './presets.js';
+import { setSkyView } from '../core/sky.js';
+import { VIEW_FIELDS } from '../../features/galaxy/model.js';
 import { registerBlackHoleUiBinding } from '../core/runtime/runtime-registry.js';
 
 export const CUSTOM_PRESET = 'Custom';
@@ -130,7 +132,18 @@ function captureBlackHolePresetState() {
             white_balance_k: p.look.white_balance_k,
         },
         bloom: clone(p.bloom),
+        sky_view: skyViewState(p),
     };
+}
+
+// The place in the galaxy a scenario puts the hole: the named view and its geometry.
+function skyViewState(p) {
+    const galaxy = p.sky.galaxy;
+    const state = { view: galaxy.view };
+    VIEW_FIELDS.forEach((field) => {
+        state[field] = galaxy[field];
+    });
+    return state;
 }
 
 function restoreBlackHolePresetState(state) {
@@ -150,6 +163,7 @@ function restoreBlackHolePresetState(state) {
     p.doppler_shift = state.doppler_shift;
     Object.assign(p.look, state.look);
     Object.assign(p.bloom, state.bloom);
+    if (state.sky_view) Object.assign(p.sky.galaxy, state.sky_view);
 }
 
 export function markBlackHolePresetCustom() {
@@ -233,6 +247,7 @@ export function applyBlackHolePreset(name) {
     p.look.white_balance_enabled = preset.white_balance_k !== undefined;
     if (preset.white_balance_k !== undefined) p.look.white_balance_k = preset.white_balance_k;
     if (preset.bloom) Object.assign(p.bloom, preset.bloom);
+    setSkyView(p, preset.sky_view || 'outside');
     setViewInclination(
         preset.view_inclination !== undefined ? preset.view_inclination : DEFAULT_VIEW_INCLINATION,
     );
@@ -242,6 +257,17 @@ export function applyBlackHolePreset(name) {
     updateCamera();
     scene.updateShader();
     presetApplied('scenario');
+    notifyEngineChanged();
+}
+
+// Puts the hole at a named place in its galaxy (model.js SKY_VIEWS); 'custom' keeps the current
+// geometry. The scenario presets choose the view, so a change customises the scenario.
+export function selectSkyView(view) {
+    const p = params();
+    if (view === 'custom') p.sky.galaxy.view = 'custom';
+    else if (!setSkyView(p, view)) return;
+    markBlackHolePresetCustom();
+    shader.needsUpdate = true;
     notifyEngineChanged();
 }
 

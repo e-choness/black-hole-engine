@@ -193,6 +193,7 @@ export const applyQualityPreset = actions.applyQualityPreset as (name: string) =
 export const applyKerrMode = actions.applyKerrMode as (mode: KerrMode) => void;
 export const markScenarioCustom = actions.markBlackHolePresetCustom as () => void;
 export const markQualityCustom = actions.markQualityPresetCustom as () => void;
+export const selectSkyView = actions.selectSkyView as (view: string) => void;
 export const planetAvailable = actions.planetAvailable as () => boolean;
 export const resetCamera = actions.resetObserverCamera as () => void;
 export const setObserverDistance = actions.setObserverDistance as (distance: number) => void;

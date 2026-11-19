@@ -272,10 +272,46 @@ kinematic part is `delta = 1 / (Gamma (1 - beta cos(theta)))`, so a `Gamma = 15`
 
 ### Sky
 
-The background is a galactic plate carree of the Milky Way star field (NASA SVS 3895, Wright
-2012), reprojected by `scripts/build-sky.js` to cube faces in galactic coordinates with 3 x 3
-supersampling in linear light and stored at 512, 1024 and 2048 px per face; the quality preset
-picks the size. The ray tracer samples it with `textureGrad`, using the screen-space
+The background is a procedural spiral galaxy and a field of distant stars, drawn as particles
+seen from the hole into a cube map (`src/app/sky/`, reference model `src/features/galaxy/model.js`).
+The galaxy is so far away in units of `r_s` that the cube sits at infinity: an escaping ray shows
+the sky along its asymptotic direction. Disk stars and dust clouds follow webgpu-galaxy
+(Greenheck 2025): radius `sqrt(u) R` with `R = 13` units, one of `m` arms whose angle grows
+linearly with radius, scatter about the arm ridge that also sets the colour, a thickness tapering
+outwards, and the rotation law `Omega(r) = s / (1 + 0.1 r)`, whose speed flattens beyond the core.
+A flattened Plummer bulge (Plummer 1911; scale `0.11 R`, axis ratio 0.6, cut at four scale radii)
+holds a share of the stars. Field stars lie uniformly on the sphere with Euclidean counts
+`N(>F) ~ F^-3/2`, normalised so the bright end does not depend on their number, and blackbody
+colours from 2600 to 25 000 K.
+
+No particle is stored or integrated: each is a function of its index (the integer hash lowbias32,
+identical in JavaScript and GLSL) and of the pattern phase `Phi = Omega_p t`, where `t` is the
+observer's coordinate time. The galaxy therefore turns faster while the observer's clock runs slow
+near the hole, stops with the clock, and seeks and offline renders are deterministic. In winding
+mode every star keeps its orbit, `theta = theta_0 - Omega(r) t`, as in webgpu-galaxy, and
+differential rotation winds the arms up within a few turns (the winding problem, Binney and
+Tremaine 2008, section 6.1). The default density-wave mode keeps the arms: the pattern turns
+rigidly at the angular speed `Omega_p` of the corotation radius, and young stars and clouds are
+born on it and drift at `Omega(r) - Omega_p` for one lifetime, a fraction of a pattern turn, with
+the brightness envelope `smoothstep(0, 0.06, a) (1 - a)^2` over their age `a` (quasi-stationary
+spiral structure, Lin and Shu 1964). The phase terms are reduced modulo `2 pi` and modulo a
+lifetime in double precision before they reach the shader, so they stay exact at any time.
+
+Each particle stands for a star cloud of fixed size. Its sprite keeps the light of the particle's
+solid angle down to 2 px, where brightness replaces size, and stops growing at 4 px; above
+0.012 rad the light grows more slowly than the solid angle, so from inside the galaxy the nearest
+particles stay bright stars instead of washing out the sky. Particle brightness scales inversely
+with the particle count, so every quality preset (384 to 2048 px faces, 60 000 to 1 000 000
+stars) shows the same total light. The cube is R11G11B10F (RGBA16F or RGBA8 without float colour
+buffers) with mipmaps. It is rendered again when a parameter changes, and while the galaxy turns
+only the faces its bounding sphere reaches, once the fastest particle could have moved 0.35
+texel; a revision uniform tells still accumulation that the sky changed. The scenarios place the
+hole outside its galaxy, at the centre (Sgr A*) or in the disk at 0.62 `R` (stellar-mass holes).
+The grid sky instead draws lines of latitude and longitude every 15 degrees about the spin axis on
+a dim base, widened by the pixel footprint and faded to their mean coverage once the footprint
+spans a grid cell.
+
+The ray tracer samples the sky with `textureGrad`, using the screen-space
 derivatives of the escape direction taken in uniform control flow, so the strongly minified and
 sheared sky near the photon ring reads pre-filtered mip levels with anisotropic taps. Where a
 2x2 pixel quad straddles a capture boundary, or the direction changes by more than 1 rad between
@@ -372,18 +408,23 @@ out that line of sight runs inside the jet, so the preset views it from 12 degre
   to `1e-7`, the `a = 0` capture threshold is `b_c = 3 sqrt(3) M` within 0.5 %, and equatorial
   and polar capture match the Bardeen curve for `a/M = 0.5, 0.9, 0.998`.
 - `tests/e2e/shadow.spec.js` renders the free camera, a static observer looking at the hole,
-  with one ray per pixel against a saturated sky, so a pixel is bright exactly when its ray
-  escapes. Escaping rays that land on black parts of the sky texture would look captured, so
-  each view is rendered at four camera azimuths about the spin axis and a pixel counts as
-  captured only when it is dark in all of them. The edge in each angular sector is the smallest
-  radius of an escaping pixel, which approaches it from outside within a fraction of a pixel.
+  with one ray per pixel against the grid sky at a gain that saturates even its dim base, so a
+  pixel is bright exactly when its ray escapes. Each view is rendered at four camera azimuths
+  about the spin axis and a pixel counts as captured only when it is dark in all of them. The
+  radius in each angular sector follows from the area its captured pixels cover, which averages
+  the edge over the sector: a stray ray that escapes just inside the edge moves it by hundredths
+  of a pixel, and the radius resolves to about a pixel.
   - `a = 0`, both solvers, `r = 5` and `11 r_s`: the angular radius in 16 sectors matches
-    `sin(psi) = (3 sqrt(3)/2)(r_s/r) sqrt(1 - r_s/r)` (Synge 1966) within 1 %. Measured:
-    Kerr-inspired (Binet) -0.11 to -0.21 %, Full Kerr +0.005 to +0.08 %.
+    `sin(psi) = (3 sqrt(3)/2)(r_s/r) sqrt(1 - r_s/r)` (Synge 1966) within 1 %, or 1.5 px where
+    that is more (about 1.6 % at `r = 11 r_s` in the 800 px test view). Measured: Kerr-inspired
+    (Binet) -0.2 to -0.5 % at `r = 5 r_s` and +0.1 to -1.2 % at `r = 11 r_s`, Full Kerr 0 to
+    -0.3 % and +0.3 to -1.2 %. The low value is the top sector in both solvers: the top pixel row
+    of the shadow renders as escaping, an effect tied to the screen that stays at the top when the
+    camera is rolled upside down.
   - `a/M = 0.9`, Full Kerr, `r = 30 r_s`, inclination 87 degrees: the flattened prograde edge
     and the far retrograde edge, converted to impact parameters with
     `b = r sin(psi) / sqrt(1 - r_s/r)`, match the Bardeen curve within 3 % of its width.
-    Measured: +1.3 % and -0.6 %, part of which is the `g_t_phi / g_tt ~ 0.03 M` shift of a static
+    Measured: 2.2 % and 0.6 %, part of which is the `g_t_phi / g_tt ~ 0.03 M` shift of a static
     observer at that distance.
 - `tests/unit/colorimetry.test.js`: the blackbody chromaticity table and CIE illuminant A within
   the error of the colour-matching fit, band luminance `Y(g T) / Y(T)` instead of `g^3`, the
@@ -473,8 +514,8 @@ SwiftShader (2494 ms without it); GPUs filter in hardware.
   region or dusty torus.
 - Jet knots are standing reconfinement shocks; moving knots at the retarded time, and with them
   apparent superluminal motion, are not modelled.
-- The sky's stars are part of the map, so bright stars are blurred to the map resolution instead
-  of being drawn as point sources.
+- The galaxy is a particle model: its clouds glow and never absorb, so there are no dust lanes,
+  and stars are sprites of at least 2 cube texels rather than point sources.
 - Exposure is manual or anchored; there is no automatic exposure with adaptation.
 - The Scientific colour bar is a page overlay, so recordings and canvas captures leave it out.
 - Without float render targets the HDR frame falls back to RGBA8 and clips at 1.
@@ -518,7 +559,12 @@ SwiftShader (2494 ms without it); GPUs filter in hardware.
   source counts", ApJ 295, 358 (1985).
 - I. F. Mirabel and L. F. Rodriguez, "A superluminal source in the Galaxy", Nature 371, 46
   (1994).
-- E. Wright, "Deep Star Maps", NASA Scientific Visualization Studio, ID 3895 (2012).
+- D. Greenheck, "webgpu-galaxy", github.com/dgreenheck/webgpu-galaxy (2025).
+- H. C. Plummer, "On the problem of distribution in globular star clusters", MNRAS 71, 460
+  (1911).
+- C. C. Lin and F. H. Shu, "On the spiral structure of disk galaxies", ApJ 140, 646 (1964).
+- J. Binney and S. Tremaine, Galactic Dynamics, 2nd ed., Princeton University Press (2008).
+- C. Wellons, "Prospecting for hash functions", nullprogram.com (2018).
 - B. Karis, "High-quality temporal supersampling", SIGGRAPH Advances in Real-Time Rendering
   (2014).
 - M. Salvi, "An excursion in temporal supersampling", GDC (2016).

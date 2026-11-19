@@ -60,10 +60,10 @@ function jpegSize(bytes) {
 
 const urlCases = [
     // [url, request destination, same origin, video?, texture?]
-    ['https://a.test/app/textures/sky/1024/px.jpg', 'image', true, false, true],
+    ['https://a.test/app/textures/maps/1024/moon.jpg', 'image', true, false, true],
     ['https://a.test/app/textures/beach-ball.png', 'image', true, false, true],
     ['https://a.test/textures/galaxy-8k.webp', 'image', true, false, true],
-    ['https://cdn.test/textures/sky/512/nz.jpg', 'image', false, false, false],
+    ['https://cdn.test/textures/maps/512/moon.jpg', 'image', false, false, false],
     ['https://a.test/app/textures/clip.mp4', 'video', true, true, false],
     ['https://a.test/app/intro.WEBM', '', true, true, false],
     ['https://a.test/app/stream', 'video', true, true, false],
@@ -157,7 +157,7 @@ test('the precache holds the app shell but no textures, preview image, video or 
         assert.ok(precached(file), file);
     }
     for (const file of [
-        'textures/sky/2048/px.jpg',
+        'textures/maps/2048/moon.jpg',
         'textures/beach-ball.png',
         'og-image.jpg',
         'assets/index-a1.js.map',

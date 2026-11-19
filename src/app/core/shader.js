@@ -5,6 +5,7 @@
 
 import Mustache from 'mustache';
 import { diveState, hoverState } from './scenarios/scenario-state.js';
+import { GALAXY_DEFAULTS } from '../../features/galaxy/model.js';
 
 export function degToRad(a) {
     return (Math.PI * a) / 180.0;
@@ -97,6 +98,10 @@ export function Shader(mustacheTemplate) {
             aberration_strength: 1.0,
             galaxy_gain: 0.4,
         },
+        sky: {
+            mode: 'galaxy',
+            galaxy: { ...GALAXY_DEFAULTS },
+        },
         bloom: {
             enabled: true,
             strength: 0.04,
@@ -146,6 +151,8 @@ export function Shader(mustacheTemplate) {
             that.parameters.jet.enabled ||
             that.parameters.planet.enabled ||
             that.parameters.observer.motion ||
+            (that.parameters.sky.mode === 'galaxy' &&
+                that.parameters.sky.galaxy.rotation_speed > 0) ||
             (diveState.active && !diveState.paused) ||
             (hoverState.active && !hoverState.paused)
         );

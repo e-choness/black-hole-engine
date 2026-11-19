@@ -2,11 +2,8 @@ import { expect, test } from '@playwright/test';
 import { openSimulation, trackPageProblems } from './support.js';
 
 const PWA_EVENTS = ['bh:pwa-offline-ready', 'bh:pwa-update-ready', 'bh:pwa-error'];
-// openSimulation() runs the mobile preset, which loads the 512 px sky tier.
-const TEXTURES = [
-    'beach-ball.png',
-    ...['px', 'nx', 'py', 'ny', 'pz', 'nz'].map((face) => `sky/512/${face}.jpg`),
-];
+// The sky is generated on the GPU, so the planet map is the only texture the app loads.
+const TEXTURES = ['beach-ball.png'];
 
 // Records the controller's DOM events from the first script on, so none can be missed.
 function recordPwaEvents(page) {

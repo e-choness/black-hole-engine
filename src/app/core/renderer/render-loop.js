@@ -32,6 +32,7 @@ import { registerBlackHoleRuntimeApi } from '../runtime/runtime-registry.js';
 import { isE2eMode, notifyFrameRendered } from '../runtime/test-hooks.js';
 import { recordRenderedFrame } from '../runtime/frame-stats.js';
 import { updateScientificLegend } from '../../ui/widgets/scientific-legend.js';
+import { updateSky } from '../sky.js';
 
 var lastCameraMat = new THREE.Matrix4().identity();
 var resetRendererFrameClock = function () {};
@@ -218,6 +219,8 @@ export function animate() {
 
 function render() {
     updateUniforms();
+    // Before the still check, so a re-rendered sky (a new sky_revision) restarts accumulation.
+    updateSky(shaderUniforms, shader.parameters, observer.time);
 
     // A static view accumulates jittered frames into a still; once it holds max_frames frames the
     // trace is skipped and the finished mean is shown. Otherwise TAA, when enabled, resolves the

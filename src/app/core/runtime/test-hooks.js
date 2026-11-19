@@ -1,5 +1,6 @@
 import { QUALITY_PRESETS } from '../../ui/quality-presets.js';
 import { shader, taaPass } from './runtime-state.js';
+import { probeSky, skyStatus } from '../sky.js';
 
 // URL switches used by automated tests and reproducible screenshots:
 //   ?quality=<preset>  start with that quality preset and skip the GPU benchmark
@@ -34,5 +35,13 @@ window.__BH__ = Object.freeze({
     },
     get accumulatedFrames() {
         return taaPass ? taaPass.accumulatedFrames : 0;
+    },
+    // Galaxy cube: revision, face size, particle counts and storage format.
+    get sky() {
+        return skyStatus();
+    },
+    // Equirectangular readback of the galaxy cube: { width, height, rgb } in linear light.
+    probeSky(width, height) {
+        return probeSky(width, height);
     },
 });

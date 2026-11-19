@@ -7,10 +7,11 @@ import { trackPageProblems } from './support.js';
 // the same in all of them while the sky behind it changes.
 const AZIMUTHS = 4;
 
-// Renders the free camera, a static observer looking at the hole, against a saturated sky. One
-// sample per pixel without TAA, still accumulation or bloom makes every pixel a single ray, bright
-// when it escapes. Escaping rays can still be dark where the sky texture is black, so a pixel
-// counts as captured only when it is dark at every azimuth.
+// Renders the free camera, a static observer looking at the hole, against the grid sky at a gain
+// that saturates even its dim base between the lines, which rays at the shadow edge show
+// unfiltered. One sample per pixel without TAA, still accumulation or bloom makes every pixel a
+// single ray, bright when it escapes; a pixel counts as captured only when it is dark at every
+// azimuth.
 async function renderShadow(page, { solver, spin, distance }) {
     await page.goto('./?quality=medium&e2e=1');
     await page.waitForFunction(() => window.__BH__ !== undefined);
@@ -43,7 +44,8 @@ async function renderShadow(page, { solver, spin, distance }) {
                 'planet.enabled': false,
                 'jet.enabled': false,
                 'bloom.enabled': false,
-                'look.galaxy_gain': 1e5,
+                'look.galaxy_gain': 1e7,
+                'sky.mode': 'grid',
                 // Yaw about the vertical axis first, so camera.rotation.y turns the camera about
                 // the spin axis at constant inclination.
                 'camera.rotation.order': 'YXZ',
@@ -98,13 +100,15 @@ async function renderShadow(page, { solver, spin, distance }) {
     return { images, position, camera };
 }
 
-// Smallest radius rho = |p| of an escaping pixel within each sector [centre - half, centre +
-// half] of the polar angle about the image centre, where the camera axis points at the hole.
-// p = (x, y) are the normalised image coordinates of the ray (x, y, 1) in main.glsl with
-// FOV_MULT = 1. A pixel escapes exactly when the ray through its centre lies outside the
-// shadow, and many pixel centres sit just outside the edge, so the minimum approaches the edge
-// from outside within a small fraction of a pixel.
-async function escapeRadii({ images, sectors }) {
+// Shadow radius rho = |p| within each sector [centre - half, centre + half] of the polar angle
+// about the image centre, where the camera axis points at the hole. p = (x, y) are the
+// normalised image coordinates of the ray (x, y, 1) in main.glsl with FOV_MULT = 1, and a pixel
+// is captured when the ray through its centre is. The radius follows from the area the captured
+// pixels cover inside the largest circle the image holds: the sector of a disk of radius rho
+// has area rho^2 half. The area averages the edge over the sector, so a stray ray that escapes
+// near the photon sphere moves the radius by a few hundredths of a pixel, where the innermost
+// escaping pixel would move it by a whole one.
+async function shadowRadii({ images, sectors }) {
     let bright = null;
     let w = 0;
     let h = 0;
@@ -125,30 +129,32 @@ async function escapeRadii({ images, sectors }) {
             if (data[4 * i] + data[4 * i + 1] + data[4 * i + 2] >= 3 * 128) bright[i] = 1;
         }
     }
-    const radii = sectors.map(() => Infinity);
+    const pixelArea = (2 / w) ** 2;
+    const outer = (h - 2) / w;
+    const captured = sectors.map(() => 0);
     for (let j = 0; j < h; j++) {
         const y = (1 - (2 * (j + 0.5)) / h) * (h / w);
         for (let i = 0; i < w; i++) {
-            if (!bright[j * w + i]) continue;
+            if (bright[j * w + i]) continue;
             const x = -1 + (2 * (i + 0.5)) / w;
+            if (Math.hypot(x, y) >= outer) continue;
             const angle = Math.atan2(y, x);
-            const rho = Math.hypot(x, y);
             sectors.forEach(([centre, half], s) => {
                 const offset = Math.abs(
                     Math.atan2(Math.sin(angle - centre), Math.cos(angle - centre)),
                 );
-                if (offset <= half && rho < radii[s]) radii[s] = rho;
+                if (offset <= half) captured[s] += 1;
             });
         }
     }
-    return radii;
+    return sectors.map(([, half], s) => Math.sqrt((captured[s] * pixelArea) / half));
 }
 
 // The page's content security policy blocks data URLs, so the PNGs are decoded on a blank page.
 async function measure(page, shot, sectors) {
     const blank = await page.context().newPage();
     try {
-        return await blank.evaluate(escapeRadii, { images: shot.images, sectors });
+        return await blank.evaluate(shadowRadii, { images: shot.images, sectors });
     } finally {
         await blank.close();
     }
@@ -161,16 +167,23 @@ for (const solver of ['kerr_inspired_disk_velocity', 'full_kerr']) {
         test.slow();
         const problems = trackPageProblems(page);
         const sectors = Array.from({ length: 16 }, (_, k) => [(k * Math.PI) / 8, Math.PI / 16]);
+        const pixel = 2 / page.viewportSize().width;
         for (const distance of [5, 11]) {
             const shot = await renderShadow(page, { solver, spin: 0, distance });
             const expected = schwarzschildShadowAngle(Math.hypot(...shot.position));
+            // A sector's radius resolves to about a pixel, which at r = 11 is 1.1 % of the shadow,
+            // so the tolerance is the larger of 1 % and 1.5 px.
+            const tolerance = Math.max(
+                0.01,
+                (1.5 * pixel) / (1 + Math.tan(expected) ** 2) / expected,
+            );
             const radii = await measure(page, shot, sectors);
             radii.forEach((rho, k) => {
                 const ratio = Math.atan(rho) / expected;
                 expect(
                     Math.abs(ratio - 1),
                     `sector ${k * 22.5} deg at r = ${distance}`,
-                ).toBeLessThan(0.01);
+                ).toBeLessThan(tolerance);
             });
         }
         expect(problems).toEqual([]);

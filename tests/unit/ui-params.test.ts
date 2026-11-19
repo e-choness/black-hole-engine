@@ -42,6 +42,11 @@ vi.mock('../../src/ui/engine/engine', () => ({
     },
     markQualityCustom: () => {},
     markScenarioCustom: () => {},
+    selectSkyView: (view: string) => {
+        (
+            (engine.parameters.sky as Record<string, unknown>).galaxy as Record<string, unknown>
+        ).view = view;
+    },
     params: () => engine.parameters,
     subscribePresetApplied: () => () => {},
 }));
@@ -210,4 +215,19 @@ test('value chips accept displayed and plain numbers', () => {
     expect(parseNumber('abc')).toBeNaN();
     expect(editableNumber(6.5e9)).toBe('6.500e9');
     expect(editableNumber(0.9)).toBe('0.9');
+});
+
+test('moving the galaxy by hand leaves the named view', () => {
+    const galaxy = (engine.parameters.sky as Record<string, unknown>).galaxy as Record<
+        string,
+        unknown
+    >;
+    const distance = PARAMS.find((def) => def.path === 'sky.galaxy.distance')!;
+    const view = PARAMS.find((def) => def.path === 'sky.galaxy.view')!;
+    expect(galaxy.view).toBe('outside');
+    setParam(distance, 2.5);
+    expect(galaxy.distance).toBe(2.5);
+    expect(galaxy.view).toBe('custom');
+    setParam(view, 'disk');
+    expect(galaxy.view).toBe('disk');
 });

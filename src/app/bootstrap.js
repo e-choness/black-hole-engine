@@ -1,14 +1,12 @@
-// Role: Application entry point - checks for WebGL 2, loads the textures in parallel (the sky
-//       cube-map tier of the starting quality preset and the planet map), then calls init()
-//       with the build-time bundled GLSL template once everything is ready, and mounts the UI.
+// Role: Application entry point - checks for WebGL 2, loads the planet map, then calls init()
+//       with the build-time bundled GLSL template and mounts the UI. The sky is generated on
+//       the GPU (src/app/core/sky.js), so there is no sky image to wait for.
 
 import * as THREE from 'three';
 import { RAYTRACER_FRAGMENT_TEMPLATE } from '../shaders/raytracer/index.js';
 import { init } from './core/renderer/renderer.js';
 import { animate } from './core/renderer/render-loop.js';
-import { initialQualityPreset } from './core/renderer/renderer-quality.js';
 import { isWebGL2Available, showWebGL2Unavailable } from './core/renderer/webgl-support.js';
-import { initialSkyTier, loadSkyTier } from './core/sky.js';
 import { mountUi } from '../ui/main.tsx';
 
 function start(textures) {
@@ -30,9 +28,9 @@ function loadPlanetTexture() {
 }
 
 if (isWebGL2Available()) {
-    Promise.all([loadSkyTier(initialSkyTier(initialQualityPreset())), loadPlanetTexture()]).then(
-        function ([sky, moon]) {
-            start({ sky: sky, moon: moon });
+    loadPlanetTexture().then(
+        function (moon) {
+            start({ moon: moon });
         },
         function (error) {
             console.error('Texture loading failed:', error);

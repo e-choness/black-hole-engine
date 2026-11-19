@@ -12,7 +12,8 @@ setup into a scripted presentation that can be recorded to video.
 - Accretion flows: thin disk (Shakura-Sunyaev / Novikov-Thorne style), thick ADAF/RIAF torus,
   super-Eddington slim disk and GRMHD-inspired variants, with Doppler beaming, gravitational
   redshift and blackbody colours.
-- Relativistic jets, an orbiting planet lit by the disk, and a lensed Milky Way and star field.
+- Relativistic jets, an orbiting planet lit by the disk, and a lensed, rotating procedural galaxy
+  and star field that can be seen from outside, from its centre or from within its disk.
 - Bloom, temporal anti-aliasing and cinematic tone mapping. Quality presets range from Mobile to
   Cinematic, and a one-time GPU benchmark picks the default.
 - Observer orbits plus scripted "dive" and "hover" scenarios.
@@ -118,9 +119,10 @@ src/app/core/            renderer, render loop, runtime state, observer physics,
 src/app/graphics/        bloom and the shared full-screen pass helpers
 src/app/presentation/    timeline editor, presentation runtime and recording, bundled presets
 src/app/scene/           camera runtime and the mouse and touch observer controls
+src/app/sky/             procedural galaxy drawn into the sky cube map
 src/app/ui/              engine actions for the interface, quality presets, colour-bar widget
 src/ui/                  React interface: top bar, mode rail, inspector, time bar and dialogs
-src/features/            units, clocks, sonification, view links and the offline app
+src/features/            galaxy model, units, clocks, sonification, view links and the offline app
 src/content/             physics notes shown in the app
 src/shaders/raytracer/   GLSL ES 3.00 ray tracer; index.js sets the order the shards are joined in
 src/styles/              stylesheets of the page and the timeline editor
@@ -149,6 +151,8 @@ Two URL parameters make the app scriptable:
 | `ready`      | Promise that resolves on the animation frame after the first rendered frame |
 | `frameCount` | Number of frames rendered so far                                            |
 | `params`     | Live shader parameters (`null` before initialisation)                       |
+| `sky`        | Galaxy sky status: cube face size, particle counts, colour format, revision |
+| `probeSky`   | `probeSky(width, height)` reads the sky cube back as equirectangular RGB    |
 
 ```js
 await page.goto('/?quality=mobile&e2e=1');

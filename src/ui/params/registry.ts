@@ -9,9 +9,11 @@ import {
     applyKerrMode,
     applyQualityPreset,
     observerDistanceMin,
+    params,
     planetAvailable,
     qualityPresetLabels,
     resetTurbulenceClock,
+    selectSkyView,
     setCaptureSmoothing,
     setObserverDistance,
     setObserverMotion,
@@ -24,7 +26,7 @@ import {
 import { SOLVER_LABELS } from '../lib/scenarios';
 import { formatMass, formatNumber, formatTemperature, MINUS } from '../lib/units';
 
-export type InspectorTab = 'blackhole' | 'disk' | 'jets' | 'observer' | 'look' | 'render';
+export type InspectorTab = 'blackhole' | 'disk' | 'jets' | 'observer' | 'look' | 'sky' | 'render';
 export type ParamValue = number | boolean | string;
 
 export const TABS: { id: InspectorTab; label: string }[] = [
@@ -33,6 +35,7 @@ export const TABS: { id: InspectorTab; label: string }[] = [
     { id: 'jets', label: 'Jets' },
     { id: 'observer', label: 'Observer' },
     { id: 'look', label: 'Look' },
+    { id: 'sky', label: 'Sky' },
     { id: 'render', label: 'Render' },
 ];
 
@@ -150,6 +153,15 @@ const diskMode = (mode: string) => (p: EngineParams) => disk(p) && p.accretion_m
 const physicalTemperature = (p: EngineParams) => p.disk.temperature_mode === 'physical';
 const jet = (p: EngineParams) => !!p.jet.enabled;
 const look = (p: EngineParams) => (p as P).look;
+type SkyParams = { mode: string; galaxy: Record<string, unknown> & { view: string; arms: string } };
+const sky = (p: EngineParams) => (p as P).sky as SkyParams;
+const galaxySky = (p: EngineParams) => sky(p).mode === 'galaxy';
+const densityWave = (p: EngineParams) => sky(p).galaxy.arms === 'density_wave';
+// Moving the galaxy by hand leaves the named view.
+const leaveNamedView = () => {
+    sky(params()).galaxy.view = 'custom';
+};
+const degrees = (decimals: number) => (value: number) => signedFixed(decimals)(value) + '°';
 
 export const PARAMS: ParamDef[] = [
     ...section('blackhole', 'Black hole', [
@@ -655,11 +667,6 @@ export const PARAMS: ParamDef[] = [
             visible: (p) => !!p.aberration,
             help: 'Scales apparent directional warping from observer motion.',
         }),
-        slider('look.galaxy_gain', 'Sky brightness', 0, 2.5, 0.01, {
-            format: fixed(2),
-            track: 'scenario',
-            help: 'Brightness multiplier for the background sky: the Milky Way and its stars, seen from Earth and shown in galactic coordinates as a stand-in for the host galaxy.',
-        }),
     ]),
     ...section('look', 'Bloom', [
         toggle('bloom.enabled', 'Bloom', {
@@ -682,6 +689,191 @@ export const PARAMS: ParamDef[] = [
             help: 'Share of the glare passed on to each twice-as-wide blur level; higher values give wider halos.',
         }),
     ]),
+
+    ...section('sky', 'Sky', [
+        choice(
+            'sky.mode',
+            'Background',
+            options([
+                ['galaxy', 'Galaxy'],
+                ['grid', 'Grid'],
+            ]),
+            {
+                control: 'segmented',
+                apply: 'redraw',
+                help: 'Galaxy: a procedural spiral galaxy (after dgreenheck/webgpu-galaxy) and a field of distant stars, rendered from the hole into a cube map and turning with the simulation clock. Grid: lines of latitude and longitude every 15 degrees about the spin axis, which show how the hole maps the sky.',
+            },
+        ),
+        slider('look.galaxy_gain', 'Sky brightness', 0, 2.5, 0.01, {
+            format: fixed(2),
+            track: 'scenario',
+            help: 'Brightness multiplier for the background sky.',
+        }),
+    ]),
+    ...section(
+        'sky',
+        'Place in the galaxy',
+        [
+            choice(
+                'sky.galaxy.view',
+                'View',
+                options([
+                    ['outside', 'Outside the galaxy'],
+                    ['centre', 'Galactic centre'],
+                    ['disk', 'In the disk'],
+                    ['custom', 'Custom'],
+                ]),
+                {
+                    apply: 'redraw',
+                    track: 'scenario',
+                    set: (value) => selectSkyView(String(value)),
+                    help: 'Where the hole sits in its galaxy. Supermassive holes such as Sgr A* sit at the centre, stellar-mass holes such as Cygnus X-1 in the disk; the scenarios choose accordingly.',
+                },
+            ),
+            ...[
+                slider('sky.galaxy.distance', 'Distance from centre', 0, 6, 0.01, {
+                    unit: 'R_gal',
+                    format: fixed(2),
+                    help: 'Distance of the hole from the galaxy centre in galaxy radii. Below 1 the hole is inside the disk and the galaxy fills the sky.',
+                }),
+                slider('sky.galaxy.inclination', 'Inclination', 0, 90, 0.5, {
+                    format: degrees(1),
+                    help: 'Angle between the galaxy axis and the line of sight from the hole: 0 shows the galaxy face-on, 90 edge-on.',
+                }),
+                slider('sky.galaxy.position_angle', 'Position angle', -180, 180, 1, {
+                    format: degrees(0),
+                    help: 'Roll of the galaxy about the line of sight, from the projected spin axis of the hole.',
+                }),
+                slider('sky.galaxy.longitude', 'Longitude', -180, 180, 1, {
+                    format: degrees(0),
+                    help: 'Direction of the galaxy centre around the spin axis of the hole; the default camera looks towards 90.',
+                }),
+                slider('sky.galaxy.latitude', 'Latitude', -90, 90, 0.5, {
+                    format: degrees(1),
+                    help: 'Direction of the galaxy centre above (positive) or below the equatorial plane of the hole.',
+                }),
+            ].map((draft) => ({
+                ...draft,
+                apply: 'redraw' as const,
+                track: 'scenario' as const,
+                before: leaveNamedView,
+            })),
+        ],
+        galaxySky,
+    ),
+    ...section(
+        'sky',
+        'Galaxy shape',
+        [
+            slider('sky.galaxy.arm_count', 'Spiral arms', 1, 6, 1, {
+                format: fixed(0),
+                help: 'Number of spiral arms.',
+            }),
+            slider('sky.galaxy.spiral_tightness', 'Arm winding', 0, 6, 0.01, {
+                format: fixed(2),
+                help: 'Turns of the arms from the centre to the edge of the disk (in units of a full turn per galaxy radius).',
+            }),
+            slider('sky.galaxy.arm_width', 'Arm width', 0.5, 5, 0.01, {
+                format: fixed(2),
+                help: 'Radial spread of the stars about the arm ridge, in units of the 13-unit disk radius of webgpu-galaxy.',
+            }),
+            slider('sky.galaxy.randomness', 'Arm scatter', 0, 5, 0.01, {
+                format: fixed(2),
+                help: 'Angular spread of the stars about the arm ridge, in radians.',
+            }),
+            slider('sky.galaxy.thickness', 'Disk thickness', 0.1, 8, 0.1, {
+                format: fixed(1),
+                help: 'Thickness of the disk at the centre; it tapers towards the edge.',
+            }),
+            slider('sky.galaxy.bulge', 'Bulge share', 0, 0.6, 0.01, {
+                format: fixed(2),
+                help: 'Fraction of the stars in the central bulge, a flattened Plummer sphere.',
+            }),
+            slider('sky.galaxy.seed', 'Seed', 1, 9999, 1, {
+                format: fixed(0),
+                help: 'Picks another random realisation of the same galaxy.',
+            }),
+        ].map((draft) => ({ ...draft, apply: 'redraw' as const })),
+        galaxySky,
+    ),
+    ...section(
+        'sky',
+        'Galaxy motion',
+        [
+            slider('sky.galaxy.rotation_speed', 'Rotation speed', 0, 1, 0.01, {
+                format: fixed(2),
+                help: 'Angular speed of the galaxy core in radians per unit of simulation time (webgpu-galaxy units). The galaxy turns with the simulation clock, so time dilation near the hole speeds it up, and pausing the clock stops it.',
+            }),
+            choice(
+                'sky.galaxy.arms',
+                'Arm model',
+                options([
+                    ['density_wave', 'Density wave'],
+                    ['winding', 'Winding'],
+                ]),
+                {
+                    control: 'segmented',
+                    help: 'Density wave: stars are born on spiral arms that turn rigidly at the pattern speed and drift away from them as they age, so the arms keep their shape (Lin and Shu 1964). Winding: every star keeps its orbit, so differential rotation winds the arms up, as in webgpu-galaxy.',
+                },
+            ),
+            slider('sky.galaxy.corotation', 'Corotation radius', 0.2, 1.2, 0.01, {
+                unit: 'R_gal',
+                format: fixed(2),
+                visible: densityWave,
+                help: 'Radius at which the stars orbit as fast as the spiral pattern turns; inside it they overtake the arms, outside it the arms overtake them.',
+            }),
+            slider('sky.galaxy.lifetime', 'Young-star lifetime', 0.02, 0.5, 0.01, {
+                unit: 'turns',
+                format: fixed(2),
+                visible: densityWave,
+                help: 'How long a young star shines after it forms in an arm, in turns of the spiral pattern. Short lifetimes keep the arms narrow.',
+            }),
+        ].map((draft) => ({ ...draft, apply: 'redraw' as const })),
+        galaxySky,
+    ),
+    ...section(
+        'sky',
+        'Galaxy appearance',
+        [
+            choice(
+                'sky.galaxy.palette',
+                'Palette',
+                options([
+                    ['vivid', 'Vivid'],
+                    ['stellar', 'Stellar'],
+                ]),
+                {
+                    control: 'segmented',
+                    help: 'Vivid: the colours of webgpu-galaxy. Stellar: blackbody colours of young blue stars in the arms and old red giants between them and in the bulge.',
+                },
+            ),
+            slider('sky.galaxy.star_size', 'Star size', 0.02, 0.3, 0.005, {
+                format: fixed(3),
+                help: 'Size of a star particle, which stands for a cloud of stars.',
+            }),
+            slider('sky.galaxy.star_brightness', 'Star brightness', 0, 2, 0.01, {
+                format: fixed(2),
+                help: 'Brightness of the galaxy stars; their total light does not depend on the particle count of the quality preset.',
+            }),
+            slider('sky.galaxy.cloud_size', 'Cloud size', 0.5, 10, 0.1, {
+                format: fixed(1),
+                help: 'Size of the glowing gas clouds along the arms.',
+            }),
+            slider('sky.galaxy.cloud_opacity', 'Cloud glow', 0, 0.2, 0.001, {
+                format: fixed(3),
+                help: 'Brightness of the gas clouds.',
+            }),
+            slider('sky.galaxy.nebulae', 'H II regions', 0, 0.6, 0.01, {
+                format: fixed(2),
+                help: 'Fraction of the clouds shown as compact pink H II regions, the glow of hydrogen ionised by young stars.',
+            }),
+            slider('sky.galaxy.background_stars', 'Field stars', 0, 3, 0.01, {
+                format: fixed(2),
+                help: 'Brightness of the distant stars all over the sky, whose counts follow N(>F) ~ F^-3/2.',
+            }),
+        ].map((draft) => ({ ...draft, apply: 'redraw' as const })),
+        galaxySky,
+    ),
 
     ...section('render', 'Quality', [
         choice(

@@ -80,7 +80,7 @@
     // The SAMPLE_COUNT jittered rays of a pixel share its footprint. Where the 2x2 quad straddles a
     // capture/escape boundary, or the direction jumps between neighbours, the gradients mean
     // nothing and the lookup falls back to level 0 (LOD guard).
-    vec3 sky_dir = sky_direction(ray);
+    vec3 sky_dir = ray;
     vec3 sky_dx = dFdx(sky_dir);
     vec3 sky_dy = dFdy(sky_dir);
     float sky_jump = max(dot(sky_dx, sky_dx), dot(sky_dy, sky_dy));
@@ -92,8 +92,7 @@
         // Light from static sources at infinity arrives with g = nu_obs / nu_emit = 1 / bg_doppler,
         // and the sky shifts like any other blackbody emitter (no clamp, no D^3).
         float sky_g = 1.0 / max(bg_doppler, 1e-4);
-        vec3 sky_texel =
-            textureGrad(sky_cube, sky_dir, sky_dx * sky_footprint, sky_dy * sky_footprint).rgb;
+        vec3 sky_texel = sky_radiance(sky_dir, sky_dx * sky_footprint, sky_dy * sky_footprint);
         vec3 sky = shifted_sky_radiance(sky_texel, sky_g);
         color.rgb += vol_transmittance * sky * (SKY_BRIGHTNESS * look_galaxy_gain) *
             exp2(log2_look_scale);
