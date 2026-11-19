@@ -1,8 +1,8 @@
 # Physics of the renderer
 
 Development notes on how the ray tracer models light near a black hole: the units, the two
-geodesic solvers, the camera frames, the frequency shifts applied to every emitter, and how the
-results are validated. Equations are written in the shader's units unless stated otherwise.
+geodesic solvers, the camera frames, the frequency shifts applied to every emitter, the emission
+models and the imaging pipeline, and how the results are validated. Equations are written in the shader's units unless stated otherwise.
 
 ## Units and conventions
 
@@ -205,6 +205,159 @@ The Binet modes describe the camera relative to one of two reference observers.
 Static-observer escape cones are a useful check: at `r = 1.5, 1.2, 1.1 r_s` the sky fills a cone
 of half-angle `90, 62.1, 45.4` degrees around the outward direction.
 
+## Emission
+
+Every emitter turns its frequency ratio `g` into colour and brightness by the same rule, so the
+disk, the volumes, the planet and the sky stay consistent under any shift.
+
+### Blackbody colour and luminance
+
+Colours come from the CIE 1931 2-degree colour-matching functions in the multi-lobe Gaussian fit
+of Wyman, Sloan and Shirley (2013). For a Planck spectrum `B_lambda(T)`,
+
+    X = int B_lambda(T) xbar(lambda) dlambda,   Y, Z likewise,
+    L_v = K_m Y,   K_m = 683 lm/W,
+
+and the linear Rec. 709 (sRGB) colour is `M_XYZ->sRGB (X, Y, Z)` with the IEC 61966-2-1 matrix.
+`scripts/generate-emission-lut.js` writes `emission-lut.json`: row 0 holds the unit-luminance
+colour and `log10 L_v` (cd/m^2) at 512 temperatures spaced in `ln T` from 500 K to 1e6 K, and
+continues above 1e6 K with the Rayleigh-Jeans law `L_v ~ T`. Row 1 holds the colour of an
+optically thin power law `F_nu ~ nu^-alpha` for `alpha` in `[-1, 3]`.
+
+Since `I_nu / nu^3` is invariant, a blackbody of temperature `T` seen with ratio `g` is a
+blackbody of temperature `g T`: its colour is the chromaticity at `g T` and its luminance
+`L_v(g T)`, not `g^3` or `g^4` times the rest value, because the visible band slides along the
+spectrum. A colour-corrected photosphere (Shimura and Takahara 1995) radiates
+`f_col^-4 B_nu(f_col T)`, so it looks like a blackbody at `f_col g T` dimmed by `f_col^4`. The
+bolometric model replaces `L_v(g T)` by the efficacy-weighted `sigma (g T)^4 / pi`. The doppler
+and beaming switches set the colour and brightness ratios to 1, which removes the gravitational
+part of `g` as well.
+
+### Thin disk
+
+The Novikov-Thorne disk with the Page and Thorne (1974) flux, in `M = 1` units with
+`x = sqrt(r / M)` and `x_0 = sqrt(r_isco / M)`:
+
+    F(r) = (3 Mdot / (8 pi r^3)) / (x^2 (x^3 - 3x + 2a))
+           * [ x - x_0 - (3a/2) ln(x/x_0)
+               - sum_i 3 (x_i - a)^2 / (x_i (x_i - x_j)(x_i - x_k)) ln((x - x_i)/(x_0 - x_i)) ],
+
+where `x_i` are the roots of `x^3 - 3x + 2a = 0`. The shader receives the spin-only terms and
+evaluates the bracket with three logarithms per hit. The effective temperature is
+`T(r) = T_peak (F / F_max)^(1/4)`.
+
+- Artist scales set `T_peak` directly, or (uniform) put the whole disk at that temperature.
+- The physical scale uses `Mdot = l L_Edd / (eta c^2)` with `L_Edd = 4 pi G M m_p c / sigma_T`
+  and `eta = 1 - E_isco`, so `T_peak ~ M^-1/4`: 1e4-1e5 K around supermassive holes and
+  1e6-1e7 K around stellar-mass ones, both blue-white in the visible.
+- With GRMHD on, a stress term `K x_0` in the bracket lets the disk emit at the ISCO, and the
+  flux continues inward as `(r / r_isco)^1.5` over the plunging region.
+- Limb darkening `L(mu) = c_0 + c_1 mu`, normalised to `2 int L mu dmu = 1`: Chandrasekhar's
+  electron-scattering law (`c_1 / c_0 = 2.06`), Eddington's (`0.5 + 0.75 mu`) or isotropic, with
+  `mu` measured in the fluid frame.
+- The gas moves on prograde circular Kerr orbits, `Omega = 1 / (r^1.5 + a)`, so
+  `g = 1 / (u^t (E - Omega L_z))` for a photon of energy `E` and axial angular momentum `L_z`
+  per camera frequency. Inside the ISCO it plunges with the ISCO energy and angular momentum
+  (Cunningham 1975), which adds `-p_r u^r` to the emitted frequency.
+
+### Synchrotron jets
+
+Jets radiate an optically thin power law. A Doppler shift leaves its colour unchanged and scales
+the specific intensity at a fixed observed frequency by `g^(3 + alpha)`; integrating the
+fluid-frame path `dl / g` of a steady flow leaves `g^(2 + alpha)` (Lind and Blandford 1985).
+For bulk speed `beta` and Lorentz factor `Gamma` at angle `theta` to the line of sight the
+kinematic part is `delta = 1 / (Gamma (1 - beta cos(theta)))`, so a `Gamma = 15` jet seen at
+4 degrees is boosted by `delta = 14.3` and its counter-jet dimmed by `delta = 0.034`.
+
+### Sky
+
+The background is a galactic plate carree of the Milky Way star field (NASA SVS 3895, Wright
+2012), reprojected by `scripts/build-sky.js` to cube faces in galactic coordinates with 3 x 3
+supersampling in linear light and stored at 512, 1024 and 2048 px per face; the quality preset
+picks the size. The ray tracer samples it with `textureGrad`, using the screen-space
+derivatives of the escape direction taken in uniform control flow, so the strongly minified and
+sheared sky near the photon ring reads pre-filtered mip levels with anisotropic taps. Where a
+2x2 pixel quad straddles a capture boundary, or the direction changes by more than 1 rad between
+neighbours (a caustic), the derivatives are meaningless and the lookup falls back to level 0. A
+texel is treated as a blackbody at its correlated colour temperature (McCamy 1992), so the sky
+shifts like every other emitter.
+
+## Imaging
+
+    trace (RGBA16F, pre-exposed linear Rec. 709) -> temporal resolve -> bloom
+        -> white balance -> tone mapping -> sRGB OETF + dither -> canvas
+
+### Exposure
+
+The trace multiplies every radiance by the pre-exposure `H` and clamps it to `[0, 6e4]` below the
+half-float limit, so the HDR target never holds infinities. In the anchored mode the face-on
+luminance `Y_ref` of the reference emitter (the disk at `T_peak`) lands at `0.5 2^EV`:
+`H = 0.5 2^EV / Y_ref`, which keeps the image level when the temperature or radiance model
+changes. The manual mode is the photometric camera `H = 1 / (1.2 2^EV100)` (Lagarde and de
+Rousiers 2014), in which a 4500 K disk and a 1e7 K disk differ by many stops, as they should.
+
+### Temporal resolve and accumulation
+
+Each frame is jittered by a Halton(2, 3) sub-pixel offset. While the view changes, the
+neighbourhood of the new frame clips the history before the blend (Karis 2014; Salvi 2016): in
+YCoCg on `c / (1 + Y)`, which keeps single HDR fireflies from dominating, the history is pulled
+towards the 3x3 mean `mu` into the box `mu +- gamma sigma`, then blended with weight `w`.
+
+While every ray-tracer input stays the same (camera, clock, settings), the history instead
+becomes the running mean `m_n = m_(n-1) + (x_n - m_(n-1)) / n` of frames jittered along the
+unbounded Halton sequence, which converges to the box-filtered pixel integral. A valid TAA
+history seeds it with the `1 / (1 - w)` frames it holds. After `max_frames` frames the trace
+stops and the mean is shown.
+
+### Bloom
+
+The glare follows the dual-filter chain of Call of Duty: Advanced Warfare (Jimenez 2014): a
+13-tap downsample with a Karis average on the first level against fireflies, then 3x3 tent
+upsampling with `U_i = (1 - r) D_i + r tent(U_(i+1))`. Level `i` therefore enters with weight
+`(1 - r) r^i`, and the weights sum to one. The composite `(1 - k) scene + k bloom` moves energy
+instead of adding it, so the mean brightness of the frame does not change with the strength `k`.
+
+### White balance
+
+An optional camera white point adapts a blackbody white at `T_wb` to D65 with the Bradford
+transform (Lindbloom):
+
+    M = M_XYZ->sRGB  B^-1  diag(rho_D65 / rho_wb)  B  M_sRGB->XYZ,
+
+applied to the linear frame before tone mapping. A blackbody at `T_wb` comes out neutral.
+
+### Tone mapping and output
+
+| Mode       | Curve                                                                                     |
+| ---------- | ----------------------------------------------------------------------------------------- |
+| AgX        | Sobotka's AgX (the three.js reference), the default; desaturates highlights towards white |
+| Neutral    | Khronos PBR Neutral: nearly linear up to 0.76, then a hue-preserving shoulder             |
+| ACES       | ACES filmic RRT + ODT fit (three.js `ACESFilmicToneMapping`)                              |
+| Scientific | Inferno colour map on `log2 Y` over 12 stops ending 3 stops above the anchor; no OETF     |
+
+Inferno (van der Walt and Smith 2015) is perceptually uniform, monotonic in lightness and
+readable with the common colour-vision deficiencies, so the Scientific mode doubles as a
+colour-blind-safe false-colour luminance map. The display modes end with the sRGB OETF
+(IEC 61966-2-1), and every mode adds triangular-PDF dither of one 8-bit step from a per-frame
+hash before quantisation, which removes banding in the dark sky and the bloom gradients.
+
+## Presets
+
+| Preset                    | Scale    | Parameters                                                                      |
+| ------------------------- | -------- | ------------------------------------------------------------------------------- |
+| Cygnus X-1                | physical | 21.2 M_sun, a = 0.998, 0.02 L_Edd, f_col 1.7: T_peak 6.1e6 K                    |
+| GRS 1915+105              | physical | 12.4 M_sun, a = 0.98, 0.3 L_Edd: T_peak 1.1e7 K; jets beta 0.92 at 70 degrees   |
+| 3C 273                    | physical | 2.6e8 M_sun, a = 0.9, 0.3 L_Edd: T_peak 1.3e5 K; jet Gamma 15, alpha 0.7        |
+| TON 618                   | physical | 4.07e10 M_sun, a = 0.9, 0.3 L_Edd: T_peak 3.6e4 K; no jet                       |
+| M87\*                     | artist   | 6.5e9 M_sun, a = 0.9, thick torus, jet Gamma 5, viewed 17 degrees from the axis |
+| Sgr A\*                   | artist   | 4.297e6 M_sun, a = 0.5, thick torus                                             |
+| Gargantua-style cinematic | artist   | a = 0.6, uniform 4500 K, no frequency shifts, 6500 K white point, ACES          |
+
+The spins of 3C 273 and TON 618 are unmeasured and their accretion rates illustrative. The quoted
+4-degree viewing angle of the 3C 273 jet assumes a distant observer; from a camera about 11 r_s
+out that line of sight runs inside the jet, so the preset views it from 12 degrees
+(`delta = 2.8`).
+
 ## Validation
 
 - `tests/unit/kerr.test.js` checks the horizon, ISCO, photon-orbit and marginally bound radii
@@ -229,6 +382,19 @@ of half-angle `90, 62.1, 45.4` degrees around the outward direction.
     `b = r sin(psi) / sqrt(1 - r_s/r)`, match the Bardeen curve within 3 % of its width.
     Measured: +1.3 % and -0.6 %, part of which is the `g_t_phi / g_tt ~ 0.03 M` shift of a static
     observer at that distance.
+- `tests/unit/colorimetry.test.js`: the blackbody chromaticity table and CIE illuminant A within
+  the error of the colour-matching fit, band luminance `Y(g T) / Y(T)` instead of `g^3`, the
+  luminous efficacy of a D65-white blackbody, the committed LUT equal to the generator output,
+  unit-luminance in-gamut entries, log-T interpolation and the Rayleigh-Jeans continuation,
+  power-law colours, and white balance that renders the chosen blackbody neutral.
+- `tests/unit/thin-disk.test.js`: Page-Thorne flux maxima at the published radii, the flux at
+  twice the ISCO radius, zero flux at the ISCO and the Newtonian limit `3 M Mdot / (8 pi r^3)`,
+  `eta = 1 - E_isco`, the physical peak temperatures, the face-on ISCO redshift `1 / u^t`,
+  normalised circular and plunging 4-velocities, and `g = 1 / (u^t (E - Omega L_z))`.
+- `tests/unit/emission.test.js`: the per-spin bracket coefficients, the bolometric efficacy, the
+  `f_col^4` dimming at fixed colour and both exposure modes.
+- `tests/e2e/accumulation.spec.js`: a static view accumulates up to `max_frames` and restarts
+  when the view changes.
 
 ## Performance
 
@@ -269,6 +435,15 @@ at mobile, high and cinematic against 20 ms, 510 ms and 1.5 s for the Kerr-inspi
   keeps true except for rays grazing the equatorial plane.
 - The Binet modes trace Schwarzschild photons for spinning holes; their shadow is the
   Schwarzschild one shifted by the heuristic frame-dragging rotation, not the Bardeen curve.
+- The thick torus, slim disk and jets are still emissivity models along the coordinate chord,
+  not covariant radiative transfer; there is no 230 GHz (EHT) false-colour mode, broad-line
+  region or dusty torus.
+- Jet knots are standing reconfinement shocks; moving knots at the retarded time, and with them
+  apparent superluminal motion, are not modelled.
+- The sky's stars are part of the map, so bright stars are blurred to the map resolution instead
+  of being drawn as point sources.
+- Exposure is manual or anchored; there is no automatic exposure with adaptation.
+- Without float render targets the HDR frame falls back to RGBA8 and clips at 1.
 
 ## References
 
@@ -292,3 +467,40 @@ at mobile, high and cinematic against 20 ms, 510 ms and 1.5 s for the Kerr-inspi
   (2015).
 - V. Perlick and O. Yu. Tsupko, "Calculating black hole shadows: review of analytical studies",
   Phys. Rep. 947, 1 (2022).
+- I. D. Novikov and K. S. Thorne, "Astrophysics of black holes", in Black Holes (Les Houches
+  1972), Gordon and Breach (1973).
+- D. N. Page and K. S. Thorne, "Disk-accretion onto a black hole. Time-averaged structure of
+  accretion disk", ApJ 191, 499 (1974).
+- C. T. Cunningham, "The effects of redshifts and focusing on the spectrum of an accretion disk
+  around a Kerr black hole", ApJ 202, 788 (1975).
+- S. Chandrasekhar, Radiative Transfer, Dover (1960).
+- T. Shimura and F. Takahara, "On the spectral hardening factor of the X-ray emission from
+  accretion disks in black hole candidates", ApJ 445, 780 (1995).
+- C. Wyman, P.-P. Sloan and P. Shirley, "Simple analytic approximations to the CIE XYZ color
+  matching functions", JCGT 2(2), 1 (2013).
+- C. S. McCamy, "Correlated color temperature as an explicit function of chromaticity
+  coordinates", Color Res. Appl. 17, 142 (1992).
+- J. C. Lind and R. D. Blandford, "Semidynamical models of radio jets: relativistic beaming and
+  source counts", ApJ 295, 358 (1985).
+- I. F. Mirabel and L. F. Rodriguez, "A superluminal source in the Galaxy", Nature 371, 46
+  (1994).
+- E. Wright, "Deep Star Maps", NASA Scientific Visualization Studio, ID 3895 (2012).
+- B. Karis, "High-quality temporal supersampling", SIGGRAPH Advances in Real-Time Rendering
+  (2014).
+- M. Salvi, "An excursion in temporal supersampling", GDC (2016).
+- J. Jimenez, "Next generation post processing in Call of Duty: Advanced Warfare", SIGGRAPH
+  Advances in Real-Time Rendering (2014).
+- S. Lagarde and C. de Rousiers, "Moving Frostbite to physically based rendering", SIGGRAPH
+  Physically Based Shading course (2014).
+- B. Lindbloom, "Chromatic adaptation" (Bradford transform), brucelindbloom.com.
+- Khronos Group, "PBR Neutral tone mapping" (2024).
+- S. van der Walt and N. Smith, "A better default colormap for Matplotlib", SciPy (2015).
+- GRAVITY Collaboration, "Spatially resolved rotation of the broad-line region of a quasar at
+  sub-parsec scale", Nature 563, 657 (2018).
+- M. L. Lister et al., "MOJAVE XVIII. Kinematics and inner jet evolution of bright radio-loud
+  active galaxies", ApJ 923, 30 (2021).
+- S. Ge et al., "Black hole masses of quasars from C IV", AJ 157, 148 (2019).
+- Event Horizon Telescope Collaboration, "First M87 Event Horizon Telescope results. VI. The
+  shadow and mass of the central black hole", ApJL 875, L6 (2019).
+- J. C. A. Miller-Jones et al., "Cygnus X-1 contains a 21-solar mass black hole", Science 371,
+  1046 (2021).
