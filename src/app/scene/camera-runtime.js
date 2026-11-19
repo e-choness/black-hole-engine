@@ -1,7 +1,7 @@
 // Role: Camera management - initializes the Three.js orbit camera at a default
 //       viewing angle, synchronizes it with the observer's orientation on each
 //       frame, and provides a Frobenius-norm matrix distance helper used by the
-//       animate loop to skip redundant renders.
+//       frame loop to skip redundant renders.
 
 import * as THREE from 'three';
 import { degToRad } from '../core/shader.js';

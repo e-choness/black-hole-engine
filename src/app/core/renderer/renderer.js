@@ -37,7 +37,7 @@ import { initSky } from '../sky.js';
 import {
     DISK_TEMPERATURE_MIN,
     DISK_TEMPERATURE_MAX,
-    container,
+    viewportHost,
     camera,
     scene,
     renderer,
@@ -51,7 +51,7 @@ import {
     baseDevicePixelRatio,
     lastTaaCameraMat,
     updateUniforms,
-    setContainer,
+    setViewportHost,
     setCamera,
     setScene,
     setRenderer,
@@ -88,18 +88,6 @@ function resetTemporalAAHistoryImpl() {
     lastTaaCameraMat.identity();
 }
 
-export function resizeRendererAndPasses() {
-    if (!renderer || !shader) return;
-
-    var scale = clampResolutionScale(shader.parameters.resolution_scale);
-    shader.parameters.resolution_scale = scale;
-
-    renderer.setPixelRatio(baseDevicePixelRatio * scale);
-    renderer.setSize(window.innerWidth, window.innerHeight);
-
-    resizePasses(renderer.domElement.width, renderer.domElement.height);
-}
-
 // The scene target, the TAA history and the bloom chain all run at the drawing-buffer size.
 export function resizePasses(w, h) {
     if (hdrTarget) hdrTarget.setSize(w, h);
@@ -107,31 +95,35 @@ export function resizePasses(w, h) {
     if (taaPass) taaPass.resize(w, h);
 }
 
-function applyRenderScaleFromSettingsImpl() {
-    resizeRendererAndPasses();
+// Resizing the canvas clears it, so the passes follow the new drawing buffer and the next frame is
+// drawn.
+export function onCanvasResize() {
+    if (!renderer || !shader) return;
+    resizePasses(renderer.domElement.width, renderer.domElement.height);
     resetTemporalAAHistoryImpl();
     if (updateUniforms) updateUniforms();
-    if (shader) shader.needsUpdate = true;
+    shader.needsUpdate = true;
 }
 
-export function onWindowResize() {
-    resizeRendererAndPasses();
-    resetTemporalAAHistoryImpl();
-    if (updateUniforms) updateUniforms();
+// The render scale reaches the drawing buffer as the pixel ratio of the React Three Fiber canvas,
+// which resizes it and calls onCanvasResize again when the ratio changes.
+function applyRenderScaleFromSettingsImpl() {
+    if (!renderer || !shader) return;
+    var scale = clampResolutionScale(shader.parameters.resolution_scale);
+    shader.parameters.resolution_scale = scale;
+    viewportHost.setDpr(baseDevicePixelRatio * scale);
+    onCanvasResize();
 }
 
 setApplyRenderScaleFromSettings(applyRenderScaleFromSettingsImpl);
 setResetTemporalAAHistory(resetTemporalAAHistoryImpl);
 
-export function init(glslSource, textures) {
+export function init(glslSource, textures, viewport) {
     setShader(new Shader(glslSource));
 
     applyQualityPresetValues(shader.parameters, initialQualityPreset(), { selectSolver: true });
 
-    var nextContainer = document.createElement('div');
-    document.body.appendChild(nextContainer);
-    setContainer(nextContainer);
-
+    setViewportHost(viewport);
     setScene(new THREE.Scene());
 
     var geometry = new THREE.PlaneGeometry(2, 2);
@@ -411,14 +403,9 @@ export function init(glslSource, textures) {
     fullscreenQuad.frustumCulled = false;
     scene.add(fullscreenQuad);
 
-    // Every pass draws a full-screen quad, so a multisampled canvas would only cost memory.
-    var nextRenderer = new THREE.WebGLRenderer({
-        antialias: false,
-        powerPreference: 'high-performance',
-    });
+    var nextRenderer = viewport.gl;
     nextRenderer.domElement.id = 'bh-canvas';
     nextRenderer.domElement.style.touchAction = 'none';
-    container.appendChild(nextRenderer.domElement);
     setRenderer(nextRenderer);
     initSky(renderer, uniforms, Math.min(16, renderer.capabilities.getMaxAnisotropy()));
 
@@ -447,13 +434,10 @@ export function init(glslSource, textures) {
     setTaaPass(setupTemporalAA(renderer));
     setOutputPass(setupOutputPass());
 
-    var nextCamera = new THREE.PerspectiveCamera(
-        45,
-        window.innerWidth / window.innerHeight,
-        1,
-        80000,
-    );
+    var size = viewport.size();
+    var nextCamera = new THREE.PerspectiveCamera(45, size.width / size.height, 1, 80000);
     setCamera(nextCamera);
+    viewport.setCamera(nextCamera);
     initializeCamera(camera);
 
     var controls = new ObserverControls(camera, renderer.domElement);
@@ -481,7 +465,6 @@ export function init(glslSource, textures) {
     updateCamera();
 
     applyRenderScaleFromSettingsImpl();
-    window.addEventListener('resize', onWindowResize, false);
 
     initEngineActions();
     installWheelZoom(renderer.domElement);

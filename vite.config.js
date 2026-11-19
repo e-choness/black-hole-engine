@@ -58,8 +58,8 @@ export default defineConfig({
         modulePreload: { polyfill: false },
         // three.js is about 770 kB minified because WebGLRenderer pulls in the shader library of
         // every built-in material. It gets a chunk of its own, which also stays cached across app
-        // releases, and the size warning is raised to just above it. React gets one for the
-        // same caching reason.
+        // releases, and the size warning is raised to just above it. React, and React Three Fiber
+        // with its runtime dependencies, get one each for the same caching reason.
         chunkSizeWarningLimit: 800,
         rolldownOptions: {
             output: {
@@ -69,6 +69,10 @@ export default defineConfig({
                         {
                             name: 'react',
                             test: /[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/,
+                        },
+                        {
+                            name: 'react-three-fiber',
+                            test: /[\\/]node_modules[\\/](@react-three[\\/]fiber|its-fine|react-use-measure|suspend-react|zustand|use-sync-external-store)[\\/]/,
                         },
                     ],
                 },

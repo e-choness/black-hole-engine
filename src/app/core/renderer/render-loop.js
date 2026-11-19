@@ -13,7 +13,7 @@ import {
     lastTaaCameraMat,
     rendererContextLost,
     updateUniforms,
-    resetTemporalAAHistory,
+    viewportHost,
 } from '../runtime/runtime-state.js';
 import { diveState, hoverState } from '../scenarios/scenario-state.js';
 import {
@@ -26,7 +26,7 @@ import { updateHover, advanceTimelineDrivenHoverObserverTime } from '../scenario
 import { updateCamera, frobeniusDistance } from '../../scene/camera-runtime.js';
 import { advanceQualityBenchmark } from './renderer-quality.js';
 import { updateAnimationTimelineCaptureFrame } from '../scenarios/animation-capture.js';
-import { resizePasses, resizeRendererAndPasses } from './renderer.js';
+import { onCanvasResize, resizePasses } from './renderer.js';
 import { whiteBalance } from '../physics/emission.js';
 import { registerBlackHoleRuntimeApi } from '../runtime/runtime-registry.js';
 import { isE2eMode, notifyFrameRendered } from '../runtime/test-hooks.js';
@@ -204,12 +204,10 @@ export function stepRendererForOfflineRecording(dt) {
     drawRendererFrame(true);
 }
 
-export function animate() {
-    requestAnimationFrame(animate);
-
-    if (rendererOfflineSteppingActive) {
-        return;
-    }
+// One frame of the interactive view, called by React Three Fiber on every animation frame
+// (src/ui/viewport/Viewport.tsx). Offline recording steps its frames itself.
+export function renderFrame() {
+    if (!renderer || rendererOfflineSteppingActive) return;
 
     var dt = getFrameDuration();
     stepRendererSimulation(dt, false);
@@ -304,10 +302,11 @@ export var blackHoleRendererRuntime = {
     },
     restoreWindowSizeAfterRecording: function () {
         renderer.domElement.style.objectFit = '';
-        resizeRendererAndPasses();
-        resetTemporalAAHistory();
+        viewportHost.restoreSize();
+        onCanvasResize();
         if (camera) {
-            camera.aspect = window.innerWidth / window.innerHeight;
+            var size = viewportHost.size();
+            camera.aspect = size.width / size.height;
             camera.updateProjectionMatrix();
         }
     },

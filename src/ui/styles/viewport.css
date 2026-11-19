@@ -1,0 +1,6 @@
+/* The React Three Fiber canvas fills the window underneath the shell. */
+.viewport {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+}

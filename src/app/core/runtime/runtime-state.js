@@ -4,7 +4,10 @@ import { Observer, bindObserverShader } from '../observer.js';
 export const DISK_TEMPERATURE_MIN = 1000.0;
 export const DISK_TEMPERATURE_MAX = 1.0e7;
 
-export let container = null;
+// The React Three Fiber canvas that hosts the renderer (src/ui/viewport/Viewport.tsx): gl, size()
+// in CSS pixels, setDpr(ratio), setCamera(camera) and restoreSize(), which applies its size and
+// pixel ratio to gl again after an offline recording resized the drawing buffer.
+export let viewportHost = null;
 export let camera = null;
 export let scene = null;
 export let renderer = null;
@@ -26,8 +29,8 @@ export let updateUniforms = function () {};
 export let applyRenderScaleFromSettings = function () {};
 export let resetTemporalAAHistory = function () {};
 
-export function setContainer(value) {
-    container = value;
+export function setViewportHost(value) {
+    viewportHost = value;
 }
 export function setCamera(value) {
     camera = value;

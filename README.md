@@ -122,6 +122,7 @@ src/app/scene/           camera runtime and the mouse and touch observer control
 src/app/sky/             procedural galaxy drawn into the sky cube map
 src/app/ui/              engine actions for the interface, quality presets, colour-bar widget
 src/ui/                  React interface: top bar, mode rail, inspector, time bar and dialogs
+src/ui/viewport/         React Three Fiber canvas that creates the renderer and runs the frame loop
 src/features/            galaxy model, units, clocks, sonification, view links and the offline app
 src/content/             physics notes shown in the app
 src/shaders/raytracer/   GLSL ES 3.00 ray tracer; index.js sets the order the shards are joined in
@@ -146,13 +147,15 @@ Two URL parameters make the app scriptable:
 
 `window.__BH__` is always defined and read-only:
 
-| Property     | Description                                                                 |
-| ------------ | --------------------------------------------------------------------------- |
-| `ready`      | Promise that resolves on the animation frame after the first rendered frame |
-| `frameCount` | Number of frames rendered so far                                            |
-| `params`     | Live shader parameters (`null` before initialisation)                       |
-| `sky`        | Galaxy sky status: cube face size, particle counts, colour format, revision |
-| `probeSky`   | `probeSky(width, height)` reads the sky cube back as equirectangular RGB    |
+| Property            | Description                                                                     |
+| ------------------- | ------------------------------------------------------------------------------- |
+| `ready`             | Promise that resolves on the animation frame after the first rendered frame     |
+| `frameCount`        | Number of frames rendered so far                                                |
+| `params`            | Live shader parameters (`null` before initialisation)                           |
+| `accumulatedFrames` | Frames in the running mean of a static view                                     |
+| `viewport`          | `{ canvas, passes }`: drawing-buffer and scene-target size as `[width, height]` |
+| `sky`               | Galaxy sky status: cube face size, particle counts, colour format, revision     |
+| `probeSky`          | `probeSky(width, height)` reads the sky cube back as equirectangular RGB        |
 
 ```js
 await page.goto('/?quality=mobile&e2e=1');

@@ -1,5 +1,5 @@
 import { QUALITY_PRESETS } from '../../ui/quality-presets.js';
-import { shader, taaPass } from './runtime-state.js';
+import { hdrTarget, renderer, shader, taaPass } from './runtime-state.js';
 import { probeSky, skyStatus } from '../sky.js';
 
 // URL switches used by automated tests and reproducible screenshots:
@@ -35,6 +35,13 @@ window.__BH__ = Object.freeze({
     },
     get accumulatedFrames() {
         return taaPass ? taaPass.accumulatedFrames : 0;
+    },
+    // Drawing-buffer size of the canvas and the size of the scene target the passes render into.
+    get viewport() {
+        return {
+            canvas: renderer ? [renderer.domElement.width, renderer.domElement.height] : null,
+            passes: hdrTarget ? [hdrTarget.width, hdrTarget.height] : null,
+        };
     },
     // Galaxy cube: revision, face size, particle counts and storage format.
     get sky() {

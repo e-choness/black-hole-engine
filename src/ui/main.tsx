@@ -4,19 +4,17 @@ import '@fontsource-variable/inter';
 import '@fontsource-variable/space-grotesk';
 import '@fontsource-variable/jetbrains-mono';
 import './styles/ui.css';
-import { App } from './App';
-import { initParams } from './params/params';
+import type { EngineTextures } from './engine/engine';
+import { Root } from './Root';
 
-// Mounted once the engine has initialised (bootstrap.js), so every control can read it directly.
-export function mountUi(): void {
-    initParams();
+export function mountApp(textures: EngineTextures): void {
     const host = document.createElement('div');
     host.id = 'ui-root';
     host.className = 'bh-ui';
     document.body.appendChild(host);
     createRoot(host).render(
         <StrictMode>
-            <App />
+            <Root textures={textures} />
         </StrictMode>,
     );
 }
