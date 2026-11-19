@@ -169,11 +169,13 @@ function installFakeSavePicker() {
     };
 }
 
-// The timeline editor and its recording dialog are only offered on wide layouts.
-test.describe('recording dialog', () => {
+// The timeline editor is only offered on wide layouts.
+test.describe('timeline editor', () => {
     test.use({ viewport: { width: 1280, height: 800 } });
 
-    test('streams an offline WebM into the picked file', async ({ page }) => {
+    test('renders its timeline through the capture dialog into the picked file', async ({
+        page,
+    }) => {
         const problems = trackPageProblems(page);
         await page.addInitScript(installFakeSavePicker);
         await openSimulation(page);
@@ -183,22 +185,42 @@ test.describe('recording dialog', () => {
         });
 
         await page.locator('#tl-open-btn').click();
-        await page.locator('#tl-btn-rec').click();
-        await page.locator('#tl-rec-quality').selectOption('mobile');
-        await page.locator('#tl-rec-mode').selectOption('offline');
-        await page.locator('#tl-rec-format').selectOption('webm');
-        await page.locator('#tl-rec-resolution').selectOption('current');
-        await page.locator('#tl-rec-fps').fill(String(FPS));
-        await page.locator('#tl-rec-start').click();
-
-        await page.waitForFunction(
-            (frames) =>
-                window.blackHolePresentation.state().recording_offline_frames_done >= frames,
-            MIN_FRAMES,
+        const editor = page.locator('#tl-panel');
+        const timeline = editor.getByRole('combobox', { name: 'Timeline' });
+        await expect(timeline, 'the editor opens on the loaded timeline').toHaveValue(
+            'Orbit Showcase',
         );
-        await page.locator('#tl-rec-stop').click();
-        await page.waitForFunction(() => !window.blackHolePresentation.state().recording);
 
+        // A new timeline of half a second keeps the render short in software WebGL.
+        await timeline.selectOption('');
+        const duration = editor.getByRole('spinbutton', { name: 'Duration in seconds' });
+        await duration.fill('0.5');
+        await duration.press('Enter');
+        await expect
+            .poll(() => page.evaluate(() => window.blackHolePresentation.state().duration))
+            .toBe(0.5);
+
+        await editor.getByRole('button', { name: 'Overlays' }).click();
+        const overlays = editor.getByRole('dialog', { name: 'Overlays' });
+        await expect(overlays.getByRole('checkbox', { name: 'Show annotations' })).toBeChecked();
+        await page.keyboard.press('Escape');
+        await expect(overlays).toBeHidden();
+
+        await editor.getByRole('button', { name: 'Render video' }).click();
+        const dialog = page.getByRole('dialog', { name: 'Capture' });
+        await expect(dialog.getByRole('combobox', { name: /^Source/ })).toContainText(
+            'Timeline · Untitled',
+        );
+        await dialog.getByRole('radio', { name: 'WebM · VP9' }).click();
+        await dialog.getByRole('combobox', { name: /^Resolution/ }).click();
+        await page.getByRole('option', { name: 'Match window', exact: true }).click();
+        await dialog.getByRole('radio', { name: '24' }).click();
+        await dialog.getByRole('combobox', { name: /^Render quality/ }).click();
+        await page.getByRole('option', { name: 'Current preset', exact: true }).click();
+        await expect(dialog).toContainText('Estimated 12 frames');
+        await dialog.getByRole('button', { name: 'Start render' }).click();
+
+        await expect(page.getByText('Video saved')).toBeVisible();
         const saved = await page.evaluate(() => {
             const file = window.__fakeSavedFile;
             return {
@@ -208,14 +230,14 @@ test.describe('recording dialog', () => {
                 bytes: Array.from(file.bytes.subarray(0, file.size)),
             };
         });
-        expect(saved.options.suggestedName).toBe('black-hole-presentation.webm');
+        expect(saved.options.suggestedName).toBe('black-hole-untitled.webm');
         expect(saved.options.types[0].accept).toEqual({ 'video/webm': ['.webm'] });
         expect(saved.closed).toBe(true);
         expect(saved.aborted).toBe(false);
 
         const video = await inspectVideo(new Uint8Array(saved.bytes));
         expect(video.codec).toBe('vp9');
-        expect(video.frames).toBeGreaterThanOrEqual(MIN_FRAMES);
+        expect(video.frames).toBe(12);
         expect(problems).toEqual([]);
     });
 });

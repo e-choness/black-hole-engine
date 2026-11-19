@@ -56,3 +56,18 @@ export async function beginVideo(
         toast.error(error, { id: 'capture' });
     }
 }
+
+// The timeline editor's Render video button asks for this with a window event.
+function renderTimeline(): void {
+    if (captureActive()) {
+        toast('A capture is running; a new one can start once it ends.', { id: 'capture' });
+        return;
+    }
+    useCaptureSettings.getState().setVideo({ source: 'timeline' });
+    openCapture('video');
+}
+
+export function installCaptureRequests(): () => void {
+    window.addEventListener('bh:render-timeline', renderTimeline);
+    return () => window.removeEventListener('bh:render-timeline', renderTimeline);
+}

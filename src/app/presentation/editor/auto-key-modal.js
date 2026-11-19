@@ -10,7 +10,7 @@ export function showAutoKeyChoiceModal(options) {
     var tLabel = t < 0.01 ? 't = 0' : 't = ' + t.toFixed(2) + 's';
     overlay.innerHTML =
         '<div class="tl-modal">' +
-        '<div class="tl-modal-title">Auto Key &#8212; Initial State</div>' +
+        '<div class="tl-modal-title">Auto key: initial state</div>' +
         '<p class="tl-modal-body">First Auto Key capture at <b>' +
         esc(tLabel) +
         '</b>.<br>' +

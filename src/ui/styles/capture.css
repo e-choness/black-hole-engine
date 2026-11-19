@@ -153,6 +153,10 @@
     background: var(--color-panel-solid);
 }
 
+body.has-timeline-panel .capture-progress {
+    bottom: calc(var(--tl-h, 0px) + 16px);
+}
+
 .capture-progress-head {
     display: flex;
     align-items: center;

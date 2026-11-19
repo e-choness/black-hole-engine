@@ -20,6 +20,16 @@
     visibility: hidden;
 }
 
+/* The docked timeline editor takes the bottom of the window: the inspector ends above it and its
+   transport stands in for the time bar. */
+body.has-timeline-panel .shell {
+    padding-bottom: var(--tl-h, 0px);
+}
+
+body.has-timeline-panel .shell-footer {
+    display: none;
+}
+
 .shell-stage {
     grid-area: 2 / 2 / 3 / 3;
     position: relative;

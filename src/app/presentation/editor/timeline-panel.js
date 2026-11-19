@@ -33,9 +33,6 @@ import {
     addParamToHud,
     clearParamHud,
     setParamHudLayout,
-    capturePresentationScreenshot,
-    startPresentationRecording,
-    stopPresentationRecording,
 } from '../runtime/presentation-controller.js';
 import {
     setPresentationAnnotation,
@@ -53,7 +50,7 @@ import {
     areValuesEqual,
     normalizeTimelineDraft,
 } from './timeline-utils.js';
-import { setupRecordingModal } from './recording-modal.js';
+import { setupOverlaysModal } from './overlays-modal.js';
 import { showAutoKeyChoiceModal } from './auto-key-modal.js';
 import { attachTimelineKeyboardShortcuts } from './timeline-keyboard.js';
 import { setupTimelineFileIo } from './timeline-file-io.js';
@@ -92,6 +89,16 @@ var PRESENTATION_EDITOR_COMMON_PATHS = [
 
 export var timelinePanelBinding = null;
 
+// Transport icons on a 24-unit grid, drawn in the button's text colour.
+var ICON_PLAY =
+    '<svg class="tl-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>';
+var ICON_PAUSE =
+    '<svg class="tl-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/></svg>';
+var ICON_STOP =
+    '<svg class="tl-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="6.5" y="6.5" width="11" height="11" rx="1.5"/></svg>';
+var ICON_CLOSE =
+    '<svg class="tl-ico tl-ico--stroke" viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg>';
+
 export function buildTimelinePanel() {
     'use strict';
 
@@ -104,14 +111,20 @@ export function buildTimelinePanel() {
         // ── Transport bar ──
         '<div class="tl-transport">' +
         '<div class="tl-transport-left">' +
-        '<button id="tl-btn-play" class="tl-btn tl-btn--accent" type="button" title="Play">&#9654;</button>' +
-        '<button id="tl-btn-pause" class="tl-btn" type="button" title="Pause">&#10074;&#10074;</button>' +
-        '<button id="tl-btn-stop" class="tl-btn" type="button" title="Stop">&#9632;</button>' +
+        '<button id="tl-btn-play" class="tl-btn tl-btn--icon tl-btn--play" type="button" title="Play" aria-label="Play">' +
+        ICON_PLAY +
+        '</button>' +
+        '<button id="tl-btn-pause" class="tl-btn tl-btn--icon" type="button" title="Pause" aria-label="Pause">' +
+        ICON_PAUSE +
+        '</button>' +
+        '<button id="tl-btn-stop" class="tl-btn tl-btn--icon" type="button" title="Stop" aria-label="Stop">' +
+        ICON_STOP +
+        '</button>' +
         '<span class="tl-transport-sep"></span>' +
         '<span class="tl-time-display">' +
-        '<input id="tl-time-current" class="tl-time-input" type="number" min="0" step="0.01" value="0" title="Current time (editable)">' +
+        '<input id="tl-time-current" class="tl-time-input" type="number" min="0" step="0.01" value="0" title="Current time in seconds" aria-label="Current time in seconds">' +
         '<span class="tl-time-sep">/</span>' +
-        '<input id="tl-time-duration" class="tl-time-input" type="number" min="0.5" step="0.1" value="12" title="Duration (editable)">' +
+        '<input id="tl-time-duration" class="tl-time-input" type="number" min="0.5" step="0.1" value="12" title="Duration in seconds" aria-label="Duration in seconds">' +
         '</span>' +
         '</div>' +
         '<div class="tl-transport-center">' +
@@ -121,22 +134,23 @@ export function buildTimelinePanel() {
         '</div>' +
         '</div>' +
         '<div class="tl-transport-right">' +
-        '<label for="tl-preset-select" class="tl-preset-label">Preset</label>' +
+        '<label for="tl-preset-select" class="tl-preset-label">Timeline</label>' +
         '<select id="tl-preset-select" class="tl-preset-select"></select>' +
-        '<button id="tl-btn-del-preset" class="tl-btn tl-btn--del-preset" type="button" title="Remove this imported preset" style="display:none">&#128465;</button>' +
+        '<button id="tl-btn-del-preset" class="tl-btn tl-btn--del-preset" type="button" title="Remove this imported timeline" style="display:none">Remove</button>' +
         '<span class="tl-transport-sep"></span>' +
-        '<button id="tl-btn-save" class="tl-btn tl-btn--save" type="button" title="Download the current draft with the linked filename">&#128190;&nbsp;SAVE</button>' +
-        '<button id="tl-btn-motion" class="tl-btn tl-btn--motion" type="button" title="Insert a predefined motion function">⊕&nbsp;FX</button>' +
-        '<button id="tl-btn-rec" class="tl-btn tl-btn--rec" type="button" title="Recording settings">&#9679;&nbsp;REC</button>' +
+        '<button id="tl-btn-auto-key" class="tl-btn tl-btn--warn" type="button" title="Auto key: record the changes you make as keyframes. Shift+click to leave the camera out.">Auto key</button>' +
+        '<button id="tl-btn-add-track" class="tl-btn" type="button" title="Add a track">Add track</button>' +
+        '<button id="tl-btn-add-text" class="tl-btn" type="button" title="Add an annotation at the current time">Add text</button>' +
+        '<button id="tl-btn-motion" class="tl-btn" type="button" title="Insert a predefined camera or exposure move">Effects</button>' +
+        '<button id="tl-btn-overlays" class="tl-btn" type="button" aria-expanded="false" aria-controls="tl-ov-modal" title="Annotations, parameter values and looping">Overlays</button>' +
         '<span class="tl-transport-sep"></span>' +
-        '<button id="tl-btn-auto-key" class="tl-btn tl-btn--warn" type="button" title="Auto Keyframe: capture changes. Shift+click to skip camera.">AUTO KEY</button>' +
-        '<button id="tl-btn-add-track" class="tl-btn" type="button" title="Add a new track">+ TRACK</button>' +
-        '<button id="tl-btn-add-text" class="tl-btn tl-btn--text" type="button" title="Add annotation text at current time">&#9998;&nbsp;TEXT</button>' +
-        '<span class="tl-transport-sep"></span>' +
-        '<button id="tl-btn-import" class="tl-btn" type="button" title="Import timeline from JSON file">&#8593; IMPORT</button>' +
-        '<button id="tl-btn-export" class="tl-btn" type="button" title="Export timeline as JSON file">&#8595; EXPORT</button>' +
-        '<span class="tl-transport-sep"></span>' +
-        '<button id="tl-btn-close" class="tl-btn" type="button" title="Close panel">&times;</button>' +
+        '<button id="tl-btn-save" class="tl-btn" type="button" title="Download the current draft with the linked filename">Save</button>' +
+        '<button id="tl-btn-import" class="tl-btn" type="button" title="Import a timeline from a JSON file">Import</button>' +
+        '<button id="tl-btn-export" class="tl-btn" type="button" title="Export the timeline as a JSON file">Export</button>' +
+        '<button id="tl-btn-render" class="tl-btn tl-btn--render" type="button" title="Render this timeline to a video">Render video</button>' +
+        '<button id="tl-btn-close" class="tl-btn tl-btn--icon" type="button" title="Close the timeline editor" aria-label="Close the timeline editor">' +
+        ICON_CLOSE +
+        '</button>' +
         '</div>' +
         '</div>' +
         // ── 3-column body ──
@@ -144,7 +158,7 @@ export function buildTimelinePanel() {
         // Left: track list
         '<div class="tl-tracks">' +
         '<div class="tl-tracks-head">' +
-        '<span class="tl-tracks-title">TRACKS</span>' +
+        '<span class="tl-tracks-title">Tracks</span>' +
         '</div>' +
         '<div id="tl-annot-track-col" class="tl-annot-track-col"></div>' +
         '<div id="tl-track-list" class="tl-track-list"></div>' +
@@ -167,7 +181,7 @@ export function buildTimelinePanel() {
         // Right: key inspector
         '<div class="tl-inspector">' +
         '<div id="tl-key-section">' +
-        '<div class="tl-inspector-title">KEY INSPECTOR</div>' +
+        '<div class="tl-inspector-title">Keyframe</div>' +
         '<div id="tl-insp-summary" class="tl-insp-summary">No keyframe selected.</div>' +
         '<div class="tl-insp-row">' +
         '<label>Path</label>' +
@@ -187,20 +201,20 @@ export function buildTimelinePanel() {
         '<input id="tl-insp-value" type="text" placeholder="11 or true">' +
         '</div>' +
         '<div class="tl-insp-actions">' +
-        '<button id="tl-insp-use-time" class="tl-mini-btn" type="button">USE TIME</button>' +
-        '<button id="tl-insp-capture" class="tl-mini-btn" type="button" title="Capture the current live value into the inspector">LIVE VALUE</button>' +
+        '<button id="tl-insp-use-time" class="tl-mini-btn" type="button">Use time</button>' +
+        '<button id="tl-insp-capture" class="tl-mini-btn" type="button" title="Capture the current live value into the inspector">Live value</button>' +
         '</div>' +
         '<div class="tl-insp-actions">' +
-        '<button id="tl-insp-set" class="tl-mini-btn tl-mini-btn--accent" type="button">SET KEY</button>' +
-        '<button id="tl-insp-del" class="tl-mini-btn tl-mini-btn--danger" type="button">DELETE KEY</button>' +
+        '<button id="tl-insp-set" class="tl-mini-btn tl-mini-btn--accent" type="button">Set key</button>' +
+        '<button id="tl-insp-del" class="tl-mini-btn tl-mini-btn--danger" type="button">Delete key</button>' +
         '</div>' +
         '<datalist id="tl-path-datalist"></datalist>' +
         '</div>' +
         '<div id="tl-ev-section" class="tl-ev-section" style="display:none">' +
-        '<div class="tl-inspector-title">&#9998;&nbsp;TEXT EVENT</div>' +
+        '<div class="tl-inspector-title">Annotation</div>' +
         '<div id="tl-ev-end-banner" class="tl-ev-end-banner" style="display:none">' +
-        '<span id="tl-ev-end-label">&#x23f9; End marker</span>' +
-        '<button id="tl-ev-end-remove" class="tl-mini-btn tl-mini-btn--danger" type="button" title="Remove end marker (annotation becomes permanent)">REMOVE END</button>' +
+        '<span id="tl-ev-end-label">End marker</span>' +
+        '<button id="tl-ev-end-remove" class="tl-mini-btn tl-mini-btn--danger" type="button" title="Remove end marker (annotation becomes permanent)">Remove end</button>' +
         '</div>' +
         '<div id="tl-ev-summary" class="tl-insp-summary">No event selected.</div>' +
         '<div class="tl-insp-row">' +
@@ -243,16 +257,16 @@ export function buildTimelinePanel() {
         '</select>' +
         '</div>' +
         '<div class="tl-insp-actions">' +
-        '<button id="tl-ev-position" class="tl-mini-btn tl-mini-btn--accent" type="button" title="Drag bubble &amp; pointer on screen">&#9995; POSITION</button>' +
-        '<button id="tl-ev-preview" class="tl-mini-btn" type="button" title="Preview this annotation now">&#128065; PREVIEW</button>' +
+        '<button id="tl-ev-position" class="tl-mini-btn" type="button" title="Drag bubble &amp; pointer on screen">Position</button>' +
+        '<button id="tl-ev-preview" class="tl-mini-btn" type="button" title="Preview this annotation now">Preview</button>' +
         '</div>' +
         '<div class="tl-insp-actions">' +
-        '<button id="tl-ev-use-time" class="tl-mini-btn" type="button">USE TIME</button>' +
-        '<button id="tl-ev-new" class="tl-mini-btn" type="button">+ NEW</button>' +
+        '<button id="tl-ev-use-time" class="tl-mini-btn" type="button">Use time</button>' +
+        '<button id="tl-ev-new" class="tl-mini-btn" type="button">New</button>' +
         '</div>' +
         '<div class="tl-insp-actions">' +
-        '<button id="tl-ev-set" class="tl-mini-btn tl-mini-btn--accent" type="button">SET EVENT</button>' +
-        '<button id="tl-ev-del" class="tl-mini-btn tl-mini-btn--danger" type="button">DELETE</button>' +
+        '<button id="tl-ev-set" class="tl-mini-btn tl-mini-btn--accent" type="button">Set annotation</button>' +
+        '<button id="tl-ev-del" class="tl-mini-btn tl-mini-btn--danger" type="button">Delete</button>' +
         '</div>' +
         '</div>' +
         '</div>' +
@@ -260,8 +274,10 @@ export function buildTimelinePanel() {
         // ── Motion Functions modal (floats above panel) ──
         '<div id="tl-motion-modal" class="tl-motion-modal">' +
         '<div class="tl-motion-hdr">' +
-        '<span class="tl-motion-title">MOTION FUNCTION</span>' +
-        '<button id="tl-motion-close" class="tl-btn" type="button" title="Close">&times;</button>' +
+        '<span class="tl-motion-title">Effects</span>' +
+        '<button id="tl-motion-close" class="tl-btn tl-btn--icon" type="button" title="Close" aria-label="Close">' +
+        ICON_CLOSE +
+        '</button>' +
         '</div>' +
         '<div class="tl-motion-row tl-motion-type-row">' +
         '<label>Type</label>' +
@@ -275,71 +291,44 @@ export function buildTimelinePanel() {
         '</div>' +
         '<div id="tl-motion-params" class="tl-motion-params"></div>' +
         '<div class="tl-motion-footer">' +
-        '<button id="tl-motion-apply" class="tl-mini-btn tl-mini-btn--accent" type="button">APPLY</button>' +
+        '<button id="tl-motion-apply" class="tl-mini-btn tl-mini-btn--accent" type="button">Apply</button>' +
         '</div>' +
         '</div>' +
-        // ── REC modal (floats above panel) ──
-        '<div id="tl-rec-modal" class="tl-rec-modal">' +
-        '<div class="tl-rec-hdr">' +
-        '<span class="tl-rec-title">RECORDING</span>' +
-        '<button id="tl-rec-close" class="tl-btn" type="button" title="Close">&times;</button>' +
+        // ── Overlays modal (floats above panel) ──
+        '<div id="tl-ov-modal" class="tl-ov-modal" role="dialog" aria-labelledby="tl-ov-title">' +
+        '<div class="tl-ov-hdr">' +
+        '<span id="tl-ov-title" class="tl-ov-title">Overlays</span>' +
+        '<button id="tl-ov-close" class="tl-btn tl-btn--icon" type="button" title="Close" aria-label="Close">' +
+        ICON_CLOSE +
+        '</button>' +
         '</div>' +
-        '<div class="tl-rec-body">' +
-        '<div class="tl-rec-checks">' +
-        '<label class="tl-rec-check"><input type="checkbox" id="tl-rec-loop"> Loop timeline</label>' +
-        '<label class="tl-rec-check"><input type="checkbox" id="tl-rec-annotations" checked> Show explanations</label>' +
-        '<label class="tl-rec-check"><input type="checkbox" id="tl-rec-annot-record"> Include text in recording</label>' +
-        '<label class="tl-rec-check"><input type="checkbox" id="tl-rec-param-hud-show" checked> Show param values</label>' +
-        '<label class="tl-rec-check"><input type="checkbox" id="tl-rec-param-hud-record"> Include param values in recording</label>' +
-        '<label class="tl-rec-check"><input type="checkbox" id="tl-rec-reset-sim" checked> Reset simulation on rec start</label>' +
+        '<div class="tl-ov-body">' +
+        '<div class="tl-ov-checks">' +
+        '<label class="tl-ov-check"><input type="checkbox" id="tl-ov-loop"> Loop the timeline</label>' +
+        '<label class="tl-ov-check"><input type="checkbox" id="tl-ov-annotations" checked> Show annotations</label>' +
+        '<label class="tl-ov-check"><input type="checkbox" id="tl-ov-annot-record"> Include annotations in videos</label>' +
+        '<label class="tl-ov-check"><input type="checkbox" id="tl-ov-hud-show" checked> Show parameter values</label>' +
+        '<label class="tl-ov-check"><input type="checkbox" id="tl-ov-hud-record"> Include parameter values in videos</label>' +
         '</div>' +
-        '<div class="tl-rec-row" id="tl-hud-layout-row">' +
-        '<label>HUD pos</label>' +
-        '<input id="tl-hud-x" class="tl-rec-num" type="number" min="0" max="1" step="0.01" value="0" title="Horizontal position (0=left, 1=right)">' +
-        '<input id="tl-hud-y" class="tl-rec-num" type="number" min="0" max="1" step="0.01" value="1" title="Vertical position (0=top, 1=bottom)">' +
-        '<label style="margin-left:6px">px</label>' +
-        '<input id="tl-hud-fontsize" class="tl-rec-num" type="number" min="8" max="48" step="1" value="11" title="Font size in px">' +
+        '<div class="tl-ov-row" id="tl-hud-layout-row">' +
+        '<label for="tl-hud-x">Position</label>' +
+        '<input id="tl-hud-x" class="tl-ov-num" type="number" min="0" max="1" step="0.01" value="0" title="Horizontal position, from 0 at the left to 1 at the right">' +
+        '<input id="tl-hud-y" class="tl-ov-num" type="number" min="0" max="1" step="0.01" value="1" title="Vertical position, from 0 at the top to 1 at the bottom" aria-label="Vertical position">' +
+        '<label for="tl-hud-fontsize">Size</label>' +
+        '<input id="tl-hud-fontsize" class="tl-ov-num" type="number" min="8" max="48" step="1" value="11" title="Font size in pixels">' +
         '</div>' +
-        '<div class="tl-rec-section">' +
-        '<div class="tl-rec-section-head">' +
-        '<span class="tl-rec-section-title">Visible params</span>' +
-        '<div class="tl-rec-section-actions">' +
-        '<button id="tl-rec-add-selected" class="tl-mini-btn" type="button">ADD SELECTED</button>' +
-        '<button id="tl-rec-clear-hud" class="tl-mini-btn" type="button">CLEAR</button>' +
-        '</div>' +
-        '</div>' +
-        '<div id="tl-rec-hud-empty" class="tl-rec-empty">Use the HUD buttons in the track list, or add the selected track here.</div>' +
-        '<div id="tl-rec-hud-list" class="tl-rec-hud-list"></div>' +
-        '</div>' +
-        '<div class="tl-rec-row">' +
-        '<label>Quality</label>' +
-        '<select id="tl-rec-quality" class="tl-rec-select"></select>' +
-        '</div>' +
-        '<div class="tl-rec-row">' +
-        '<label>Mode</label>' +
-        '<select id="tl-rec-mode" class="tl-rec-select"></select>' +
-        '</div>' +
-        '<div class="tl-rec-row">' +
-        '<label>Format</label>' +
-        '<select id="tl-rec-format" class="tl-rec-select"></select>' +
-        '</div>' +
-        '<div class="tl-rec-row">' +
-        '<label>Resolution</label>' +
-        '<select id="tl-rec-resolution" class="tl-rec-select"></select>' +
-        '</div>' +
-        '<div class="tl-rec-row">' +
-        '<label>FPS</label>' +
-        '<input id="tl-rec-fps" class="tl-rec-num" type="number" min="24" max="120" step="1" value="60">' +
-        '<label style="margin-left:8px">Mbps</label>' +
-        '<input id="tl-rec-bitrate" class="tl-rec-num" type="number" min="4" max="80" step="1" value="20">' +
+        '<div class="tl-ov-section">' +
+        '<div class="tl-ov-section-head">' +
+        '<span class="tl-ov-section-title">Values shown</span>' +
+        '<div class="tl-ov-section-actions">' +
+        '<button id="tl-ov-add-selected" class="tl-mini-btn" type="button">Add selected track</button>' +
+        '<button id="tl-ov-clear-hud" class="tl-mini-btn" type="button">Clear</button>' +
         '</div>' +
         '</div>' +
-        '<div class="tl-rec-actions">' +
-        '<button id="tl-rec-shot" class="tl-mini-btn" type="button">PNG SNAPSHOT</button>' +
-        '<button id="tl-rec-start" class="tl-mini-btn tl-mini-btn--accent" type="button">&#9679; START REC</button>' +
-        '<button id="tl-rec-stop" class="tl-mini-btn tl-mini-btn--danger" type="button">&#9632; STOP REC</button>' +
+        '<div id="tl-ov-hud-empty" class="tl-ov-empty">Use the HUD buttons in the track list, or add the selected track here.</div>' +
+        '<div id="tl-ov-hud-list" class="tl-ov-hud-list"></div>' +
         '</div>' +
-        '<div id="tl-rec-status" class="tl-rec-status">Idle</div>' +
+        '</div>' +
         '</div>' +
         // ── Status bar ──
         '<div id="tl-status" class="tl-status"></div>';
@@ -384,33 +373,6 @@ export function buildTimelinePanel() {
     var motionTypeEl = panel.querySelector('#tl-motion-type');
     var motionParamsEl = panel.querySelector('#tl-motion-params');
     var motionApplyBtn = panel.querySelector('#tl-motion-apply');
-    var recBtn = panel.querySelector('#tl-btn-rec');
-    var recModal = panel.querySelector('#tl-rec-modal');
-    var recCloseBtn = panel.querySelector('#tl-rec-close');
-    var recLoopCb = panel.querySelector('#tl-rec-loop');
-    var recAnnotCb = panel.querySelector('#tl-rec-annotations');
-    var recAnnotRecordCb = panel.querySelector('#tl-rec-annot-record');
-    var recParamHudShowCb = panel.querySelector('#tl-rec-param-hud-show');
-    var recParamHudRecordCb = panel.querySelector('#tl-rec-param-hud-record');
-    var hudXInput = panel.querySelector('#tl-hud-x');
-    var hudYInput = panel.querySelector('#tl-hud-y');
-    var hudFsInput = panel.querySelector('#tl-hud-fontsize');
-    var hudLayoutRow = panel.querySelector('#tl-hud-layout-row');
-    var recHudEmptyEl = panel.querySelector('#tl-rec-hud-empty');
-    var recHudListEl = panel.querySelector('#tl-rec-hud-list');
-    var recAddSelectedBtn = panel.querySelector('#tl-rec-add-selected');
-    var recClearHudBtn = panel.querySelector('#tl-rec-clear-hud');
-    var recResetSimCb = panel.querySelector('#tl-rec-reset-sim');
-    var recQualitySelect = panel.querySelector('#tl-rec-quality');
-    var recModeSelect = panel.querySelector('#tl-rec-mode');
-    var recFormatSelect = panel.querySelector('#tl-rec-format');
-    var recResSelect = panel.querySelector('#tl-rec-resolution');
-    var recFpsInput = panel.querySelector('#tl-rec-fps');
-    var recBitrateInput = panel.querySelector('#tl-rec-bitrate');
-    var recShotBtn = panel.querySelector('#tl-rec-shot');
-    var recStartBtn = panel.querySelector('#tl-rec-start');
-    var recStopBtn = panel.querySelector('#tl-rec-stop');
-    var recStatusEl = panel.querySelector('#tl-rec-status');
 
     // ── Event (annotation) inspector refs ───────────────────────────────────
     var annotTrackColEl = panel.querySelector('#tl-annot-track-col');
@@ -458,7 +420,6 @@ export function buildTimelinePanel() {
     var syncTimer = null;
     var importedPresets = {}; // { presetName: true } for user-imported presets (removable)
     var linkedFileName = null; // download filename linked to this draft
-    var restoredRecordingUiState = null;
     var PANEL_HEIGHT_KEY = 'black-hole.tl-panel.height';
     var PANEL_STATE_KEY = 'black-hole.tl-panel.state';
     var PANEL_DEFAULT_H = 320;
@@ -535,15 +496,6 @@ export function buildTimelinePanel() {
                 importedData: importedData,
                 linkedFileName: linkedFileName,
                 autoKeySnapshot: autoKeySnapshot ? clonePlain(autoKeySnapshot) : null,
-                recordingUi: {
-                    quality: recQualitySelect ? recQualitySelect.value : '',
-                    mode: recModeSelect ? recModeSelect.value : '',
-                    format: recFormatSelect ? recFormatSelect.value : '',
-                    resolution: recResSelect ? recResSelect.value : '',
-                    fps: recFpsInput ? recFpsInput.value : '',
-                    bitrate: recBitrateInput ? recBitrateInput.value : '',
-                    resetSimulation: recResetSimCb ? !!recResetSimCb.checked : true,
-                },
             };
             sessionStorage.setItem(PANEL_STATE_KEY, JSON.stringify(state));
         } catch (e) {}
@@ -563,72 +515,12 @@ export function buildTimelinePanel() {
         saveState();
     }
 
-    function normalizeRecordingUiState(raw) {
-        if (!raw || typeof raw !== 'object') return null;
-        var out = {};
-        if (typeof raw.quality === 'string') out.quality = raw.quality;
-        if (typeof raw.mode === 'string') out.mode = raw.mode;
-        if (typeof raw.format === 'string') out.format = raw.format;
-        if (typeof raw.resolution === 'string') out.resolution = raw.resolution;
-        if (raw.fps !== undefined) out.fps = String(raw.fps);
-        if (raw.bitrate !== undefined) out.bitrate = String(raw.bitrate);
-        if (typeof raw.resetSimulation === 'boolean') {
-            out.resetSimulation = raw.resetSimulation;
-        }
-        return out;
-    }
-
-    function applySavedRecordingUiState() {
-        if (!restoredRecordingUiState) return;
-        if (
-            recQualitySelect &&
-            restoredRecordingUiState.quality &&
-            recQualitySelect.querySelector(
-                'option[value="' + CSS.escape(restoredRecordingUiState.quality) + '"]',
-            )
-        ) {
-            recQualitySelect.value = restoredRecordingUiState.quality;
-        }
-        if (
-            recModeSelect &&
-            restoredRecordingUiState.mode &&
-            recModeSelect.querySelector(
-                'option[value="' + CSS.escape(restoredRecordingUiState.mode) + '"]',
-            )
-        ) {
-            recModeSelect.value = restoredRecordingUiState.mode;
-        }
-        if (
-            recFormatSelect &&
-            restoredRecordingUiState.format &&
-            recFormatSelect.querySelector(
-                'option[value="' + CSS.escape(restoredRecordingUiState.format) + '"]',
-            )
-        ) {
-            recFormatSelect.value = restoredRecordingUiState.format;
-        }
-        if (
-            recResSelect &&
-            restoredRecordingUiState.resolution &&
-            recResSelect.querySelector(
-                'option[value="' + CSS.escape(restoredRecordingUiState.resolution) + '"]',
-            )
-        ) {
-            recResSelect.value = restoredRecordingUiState.resolution;
-        }
-        if (recFpsInput && restoredRecordingUiState.fps)
-            recFpsInput.value = restoredRecordingUiState.fps;
-        if (recBitrateInput && restoredRecordingUiState.bitrate)
-            recBitrateInput.value = restoredRecordingUiState.bitrate;
-        if (recResetSimCb && typeof restoredRecordingUiState.resetSimulation === 'boolean') {
-            recResetSimCb.checked = restoredRecordingUiState.resetSimulation;
-        }
-    }
-
     // ── Panel open/close ──────────────────────────────────────────────────────
+    // The height the docked panel takes from the bottom of the window, its margin included.
     function updatePushedOffset() {
         var h = panel.getBoundingClientRect().height;
-        document.body.style.setProperty('--tl-h', Math.round(h + 10) + 'px');
+        var bottom = parseFloat(getComputedStyle(panel).bottom) || 0;
+        document.body.style.setProperty('--tl-h', Math.round(h + bottom) + 'px');
     }
 
     function setPanelOpen(open) {
@@ -655,9 +547,13 @@ export function buildTimelinePanel() {
                     }
                 }
                 if (saved.linkedFileName) linkedFileName = saved.linkedFileName;
-                restoredRecordingUiState = normalizeRecordingUiState(saved.recordingUi);
             }
             populatePresets();
+            // A timeline loaded elsewhere, such as a preset picked for a render, takes precedence
+            // over the draft saved when the editor was last closed.
+            var loadedState =
+                typeof getPresentationState === 'function' ? getPresentationState() : null;
+            var runtimeLoaded = !!(loadedState && loadedState.loaded);
             if (saved) {
                 // Restore persisted state (saved.preset may be '' for the "new empty" option)
                 if (
@@ -666,7 +562,10 @@ export function buildTimelinePanel() {
                 ) {
                     presetSelect.value = saved.preset;
                 }
-                if (saved.draft) {
+                if (runtimeLoaded) {
+                    syncFromRuntime();
+                    selectLoadedPreset(loadedState.name);
+                } else if (saved.draft) {
                     draft = normalizeTL(saved.draft);
                     if (typeof setPresentationTimeline === 'function') {
                         applyingDraft = true;
@@ -715,6 +614,9 @@ export function buildTimelinePanel() {
                 }
                 rebuildAll();
                 updateDelPresetBtn();
+            } else if (runtimeLoaded) {
+                syncFromRuntime();
+                selectLoadedPreset(loadedState.name);
             } else {
                 // No saved state — default to a fresh empty timeline
                 presetSelect.value = '';
@@ -902,13 +804,13 @@ export function buildTimelinePanel() {
         // "New (empty)" option
         var emptyOpt = document.createElement('option');
         emptyOpt.value = '';
-        emptyOpt.textContent = '\u2014 new empty \u2014';
+        emptyOpt.textContent = 'New timeline';
         presetSelect.appendChild(emptyOpt);
 
         for (var i = 0; i < names.length; i++) {
             var opt = document.createElement('option');
             opt.value = names[i];
-            opt.textContent = (importedPresets[names[i]] ? '\u2606 ' : '') + names[i];
+            opt.textContent = names[i] + (importedPresets[names[i]] ? ' (imported)' : '');
             presetSelect.appendChild(opt);
         }
 
@@ -924,6 +826,13 @@ export function buildTimelinePanel() {
                 presetSelect.value = '';
             }
         }
+        updateDelPresetBtn();
+    }
+
+    // The preset menu names the loaded timeline when it is one of the presets.
+    function selectLoadedPreset(name) {
+        var known = name && presetSelect.querySelector('option[value="' + CSS.escape(name) + '"]');
+        presetSelect.value = known ? name : '';
         updateDelPresetBtn();
     }
 
@@ -1023,7 +932,7 @@ export function buildTimelinePanel() {
 
         var leftHtml =
             '<div class="tl-ann-hdr">' +
-            '<span class="tl-ann-hdr-title">&#9998;&nbsp;ANNOTATIONS</span>' +
+            '<span class="tl-ann-hdr-title">Annotations</span>' +
             '<button class="tl-ann-add-btn" id="tl-annot-add-ch" title="Add annotation track" type="button">+</button>' +
             '</div>';
         var rightHtml = '<div class="tl-ann-hdr-spacer"></div>';
@@ -1796,7 +1705,7 @@ export function buildTimelinePanel() {
             updateTimeInputs();
             updateScrubber();
             updatePlayheads();
-            recordingModal.sync();
+            overlaysModal.sync();
             // Auto-scroll to keep playhead visible during playback
             if (tlZoom > 1.0) {
                 var pst =
@@ -2015,7 +1924,7 @@ export function buildTimelinePanel() {
     function rebuildTrackList() {
         if (!draft || !draft.tracks.length) {
             trackListEl.innerHTML =
-                '<div class="tl-empty">No tracks. Load a preset or add a track.</div>';
+                '<div class="tl-empty">No tracks yet. Choose a timeline or add a track.</div>';
             return;
         }
         var html = '';
@@ -2041,8 +1950,8 @@ export function buildTimelinePanel() {
                 '" data-hud-path="' +
                 esc(tr.path) +
                 '" title="' +
-                (hudActive ? 'Hide value from' : 'Show value in') +
-                ' the recording HUD">HUD</span>' +
+                (hudActive ? 'Hide this value from' : 'Show this value in') +
+                ' the on-screen values">HUD</span>' +
                 '</span>' +
                 '<span class="tl-track-keycount">' +
                 tr.keys.length +
@@ -2062,7 +1971,7 @@ export function buildTimelinePanel() {
             var path = hudBtn.getAttribute('data-hud-path');
             if (typeof toggleParamInHud === 'function') toggleParamInHud(path, path);
             rebuildTrackList();
-            recordingModal.sync();
+            overlaysModal.sync();
             rememberState();
             return;
         }
@@ -2360,8 +2269,9 @@ export function buildTimelinePanel() {
             if (selectedKeys.length === 1) fillInspector(track, ki);
         }
 
-        // Collect all selected keys with their original positions
-        var rect = lanesEl.getBoundingClientRect();
+        // Collect all selected keys with their original positions. Times are fractions of a lane,
+        // which is narrower than the scrolling list around it.
+        var rect = (lanesEl.querySelector('.tl-lane') || lanesEl).getBoundingClientRect();
         var dur = getDuration();
         var dragKeys = [];
         for (var s = 0; s < selectedKeys.length; s++) {
@@ -2487,7 +2397,7 @@ export function buildTimelinePanel() {
                 ' track' +
                 (pathCount > 1 ? 's' : '') +
                 ')';
-            inspDel.textContent = 'DELETE KEY';
+            inspDel.textContent = 'Delete key';
             inspDel.title = '';
             inspPath.value = '';
             inspTime.value = '';
@@ -2529,12 +2439,12 @@ export function buildTimelinePanel() {
             var liveVal = captureLivePathValue(track.path);
             inspValue.value = typeof liveVal !== 'undefined' ? formatValue(liveVal) : '';
         }
-        inspDel.textContent = 'DELETE TRACK';
+        inspDel.textContent = 'Delete track';
         inspDel.title = 'Delete the entire track (all keys)';
     }
 
     function fillInspector(track, ki) {
-        inspDel.textContent = 'DELETE KEY';
+        inspDel.textContent = 'Delete key';
         inspDel.title = '';
         var key = track.keys[ki];
         if (!key) return;
@@ -3382,13 +3292,10 @@ export function buildTimelinePanel() {
         getPresentationPathValue: getPresentationPathValue,
     });
 
-    // Recording modal extracted into a dedicated helper so this file stays focused
-    // on timeline/editor state instead of modal implementation details.
-    var recordingModal = setupRecordingModal({
+    var overlaysModal = setupOverlaysModal({
         panel: panel,
         esc: esc,
         rememberState: rememberState,
-        applySavedRecordingUiState: applySavedRecordingUiState,
         rebuildTrackList: rebuildTrackList,
         getSelectedTrack: function () {
             return selectedTrack;
@@ -3406,37 +3313,24 @@ export function buildTimelinePanel() {
         addParamToHud: addParamToHud,
         clearParamHud: clearParamHud,
         setParamHudLayout: setParamHudLayout,
-        capturePresentationScreenshot: capturePresentationScreenshot,
-        startPresentationRecording: startPresentationRecording,
-        stopPresentationRecording: stopPresentationRecording,
         elements: {
-            recBtn: recBtn,
-            recModal: recModal,
-            recCloseBtn: recCloseBtn,
-            recLoopCb: recLoopCb,
-            recAnnotCb: recAnnotCb,
-            recAnnotRecordCb: recAnnotRecordCb,
-            recParamHudShowCb: recParamHudShowCb,
-            recParamHudRecordCb: recParamHudRecordCb,
-            hudXInput: hudXInput,
-            hudYInput: hudYInput,
-            hudFsInput: hudFsInput,
-            hudLayoutRow: hudLayoutRow,
-            recHudEmptyEl: recHudEmptyEl,
-            recHudListEl: recHudListEl,
-            recAddSelectedBtn: recAddSelectedBtn,
-            recClearHudBtn: recClearHudBtn,
-            recResetSimCb: recResetSimCb,
-            recQualitySelect: recQualitySelect,
-            recModeSelect: recModeSelect,
-            recFormatSelect: recFormatSelect,
-            recResSelect: recResSelect,
-            recFpsInput: recFpsInput,
-            recBitrateInput: recBitrateInput,
-            recShotBtn: recShotBtn,
-            recStartBtn: recStartBtn,
-            recStopBtn: recStopBtn,
-            recStatusEl: recStatusEl,
+            overlaysBtn: panel.querySelector('#tl-btn-overlays'),
+            renderBtn: panel.querySelector('#tl-btn-render'),
+            modal: panel.querySelector('#tl-ov-modal'),
+            closeBtn: panel.querySelector('#tl-ov-close'),
+            loopCb: panel.querySelector('#tl-ov-loop'),
+            annotCb: panel.querySelector('#tl-ov-annotations'),
+            annotRecordCb: panel.querySelector('#tl-ov-annot-record'),
+            hudShowCb: panel.querySelector('#tl-ov-hud-show'),
+            hudRecordCb: panel.querySelector('#tl-ov-hud-record'),
+            hudXInput: panel.querySelector('#tl-hud-x'),
+            hudYInput: panel.querySelector('#tl-hud-y'),
+            hudFsInput: panel.querySelector('#tl-hud-fontsize'),
+            hudLayoutRow: panel.querySelector('#tl-hud-layout-row'),
+            hudEmptyEl: panel.querySelector('#tl-ov-hud-empty'),
+            hudListEl: panel.querySelector('#tl-ov-hud-list'),
+            addSelectedBtn: panel.querySelector('#tl-ov-add-selected'),
+            clearHudBtn: panel.querySelector('#tl-ov-clear-hud'),
         },
     });
 
@@ -3530,7 +3424,6 @@ export function buildTimelinePanel() {
         },
         sync: syncFromRuntime,
         loadPreset: loadPresetByName,
-        syncRecState: recordingModal.sync,
         insertAnimationCapture: insertAnimationCapture,
     };
     if (typeof registerBlackHoleUiBinding === 'function') {

@@ -9,6 +9,7 @@ import { ModeRail } from './components/ModeRail';
 import { Notices } from './components/Notices';
 import { ShortcutSheet } from './components/ShortcutSheet';
 import { TopBar } from './components/TopBar';
+import { installCaptureRequests } from './state/capture-actions';
 import { startViewStateSync } from './state/share';
 import { installShortcuts } from './state/shortcuts';
 import { useUi } from './state/ui-store';
@@ -18,6 +19,7 @@ export function App() {
     const inspectorOpen = useUi((state) => state.inspectorOpen);
     useEffect(startViewStateSync, []);
     useEffect(installShortcuts, []);
+    useEffect(installCaptureRequests, []);
     return (
         <Tooltip.Provider delayDuration={400}>
             <div className="shell" data-ui-hidden={uiHidden} data-inspector-open={inspectorOpen}>
