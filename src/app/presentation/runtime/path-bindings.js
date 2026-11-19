@@ -4,7 +4,6 @@ import {
     shader,
     cameraControls,
     cameraPan,
-    distanceController,
     refreshAllControllersGlobal,
 } from '../../core/runtime/runtime-state.js';
 import { diveState, hoverState } from '../../core/scenarios/scenario-state.js';
@@ -96,16 +95,6 @@ export function refreshPresentationUiBindings() {
             : refreshAllControllersGlobal;
     if (typeof refreshControllers === 'function') {
         refreshControllers();
-    }
-
-    var observerDistanceBinding =
-        typeof getBlackHoleUiBinding === 'function'
-            ? getBlackHoleUiBinding('observerDistance')
-            : typeof distanceController !== 'undefined'
-              ? distanceController
-              : null;
-    if (observerDistanceBinding && typeof observerDistanceBinding.updateDisplay === 'function') {
-        observerDistanceBinding.updateDisplay();
     }
 }
 

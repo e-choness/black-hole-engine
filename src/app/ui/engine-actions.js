@@ -313,6 +313,20 @@ export function setSimulationPaused(paused) {
     notifyEngineChanged();
 }
 
+// The speed the simulation runs at when playing, also while it is paused.
+export function getPlaybackSpeed() {
+    const p = params();
+    return p.time_scale === 0 ? pausedTimeScale || 1 : p.time_scale;
+}
+
+export function setPlaybackSpeed(speed) {
+    const p = params();
+    if (p.time_scale === 0) pausedTimeScale = speed;
+    else p.time_scale = speed;
+    shader.needsUpdate = true;
+    notifyEngineChanged();
+}
+
 export function stepSimulation(seconds) {
     observer.time = Math.max(0, observer.time + seconds);
     shader.needsUpdate = true;

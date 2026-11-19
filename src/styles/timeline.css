@@ -36,10 +36,6 @@ body.has-timeline-panel .link-bar {
     bottom: var(--tl-h, 330px);
     transition: bottom 0.22s ease;
 }
-body.has-timeline-panel #axes-gizmo-container {
-    bottom: var(--tl-h, 330px);
-    transition: bottom 0.22s ease;
-}
 
 body.tl-resizing,
 body.tl-resizing * {

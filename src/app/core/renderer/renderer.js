@@ -8,7 +8,7 @@ import { setupBloom } from '../../graphics/bloom.js';
 import { setupOutputPass } from '../../graphics/output-pass.js';
 import { createRenderTarget } from '../../graphics/post-processing.js';
 import { setupTemporalAA } from './temporal-aa.js';
-import { setupGUI } from '../../ui/gui.js';
+import { buildTimelinePanel } from '../../presentation/editor/timeline-panel.js';
 import {
     initEngineActions,
     installWheelZoom,
@@ -495,55 +495,6 @@ export function init(glslSource, textures) {
 
     initEngineActions();
     installWheelZoom(renderer.domElement);
-    setupGUI();
+    buildTimelinePanel();
     beginQualityBenchmarkIfNeeded();
-}
-
-export function updateAxesGizmo() {
-    var canvas = document.getElementById('axes-gizmo');
-    if (!canvas) return;
-    var ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    var w = canvas.width;
-    var h = canvas.height;
-    var cx = w * 0.5;
-    var cy = h * 0.5;
-    var len = 26;
-
-    ctx.clearRect(0, 0, w, h);
-
-    var e = observer.orientation.elements;
-    var axes = [
-        { name: 'X', color: '#ff4444', sx: e[0], sy: -e[3], depth: e[6] },
-        { name: 'Y', color: '#44ff44', sx: e[1], sy: -e[4], depth: e[7] },
-        { name: 'Z', color: '#4488ff', sx: e[2], sy: -e[5], depth: e[8] },
-    ];
-
-    axes.sort(function (a, b) {
-        return a.depth - b.depth;
-    });
-
-    for (var i = 0; i < axes.length; i++) {
-        var ax = axes[i];
-        var ex = cx + ax.sx * len;
-        var ey = cy + ax.sy * len;
-        ctx.globalAlpha = ax.depth > 0 ? 1.0 : 0.3;
-
-        ctx.beginPath();
-        ctx.moveTo(cx, cy);
-        ctx.lineTo(ex, ey);
-        ctx.strokeStyle = ax.color;
-        ctx.lineWidth = 2;
-        ctx.stroke();
-
-        ctx.beginPath();
-        ctx.arc(ex, ey, 3, 0, 2 * Math.PI);
-        ctx.fillStyle = ax.color;
-        ctx.fill();
-
-        ctx.font = 'bold 11px monospace';
-        ctx.fillStyle = ax.color;
-        ctx.fillText(ax.name, ex + 5, ey + 4);
-        ctx.globalAlpha = 1.0;
-    }
 }

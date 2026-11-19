@@ -21,5 +21,9 @@ test('the interface has no serious or critical accessibility violations', async 
         await page.getByRole('tab', { name: tab }).click();
         expect(await blockingViolations(page), tab).toEqual([]);
     }
+
+    await page.getByRole('radio', { name: 'Dive' }).click();
+    await expect(page.getByRole('slider', { name: 'Dive progress' })).toBeVisible();
+    expect(await blockingViolations(page), 'dive').toEqual([]);
     expect(problems).toEqual([]);
 });

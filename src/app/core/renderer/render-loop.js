@@ -26,7 +26,7 @@ import { updateHover, advanceTimelineDrivenHoverObserverTime } from '../scenario
 import { updateCamera, frobeniusDistance } from '../../scene/camera-runtime.js';
 import { advanceQualityBenchmark } from './renderer-quality.js';
 import { updateAnimationTimelineCaptureFrame } from '../scenarios/animation-capture.js';
-import { resizePasses, resizeRendererAndPasses, updateAxesGizmo } from './renderer.js';
+import { resizePasses, resizeRendererAndPasses } from './renderer.js';
 import { whiteBalance } from '../physics/emission.js';
 import { registerBlackHoleRuntimeApi } from '../runtime/runtime-registry.js';
 import { isE2eMode, notifyFrameRendered } from '../runtime/test-hooks.js';
@@ -271,7 +271,6 @@ function render() {
         whiteBalance: whiteBalance(shader.parameters.look),
     });
     updateScientificLegend(shader.parameters, shaderUniforms.log2_exposure.value);
-    updateAxesGizmo();
     notifyFrameRendered();
 }
 

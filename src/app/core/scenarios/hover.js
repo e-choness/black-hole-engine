@@ -52,13 +52,11 @@ export function startHover(options) {
     if (!restartRequested && hoverState.active && !hoverState.paused) {
         hoverState.paused = true;
         hoverState.timelineDriven = false;
-        updateHoverUI();
         return;
     }
     if (!restartRequested && hoverState.paused) {
         hoverState.paused = false;
         hoverState.timelineDriven = false;
-        updateHoverUI();
         return;
     }
     if (restartRequested && hoverState.active) {
@@ -108,7 +106,6 @@ export function startHover(options) {
 
     scene.updateShader();
     updateCamera();
-    updateHoverUI();
     refreshRendererUiBindings();
 }
 
@@ -130,7 +127,6 @@ export function resetHover() {
     scene.updateShader();
     updateCamera();
     shader.needsUpdate = true;
-    updateHoverUI();
     refreshRendererUiBindings();
 }
 
@@ -149,7 +145,6 @@ export function seekHover(targetR, options) {
 
     shader.needsUpdate = true;
     updateCamera();
-    updateHoverUI();
 }
 
 export function updateHover(dt) {
@@ -158,7 +153,6 @@ export function updateHover(dt) {
     var r = hoverState.currentR;
     if (r <= hoverState.minR) {
         hoverState.paused = true;
-        updateHoverUI();
         return;
     }
 
@@ -177,82 +171,28 @@ export function updateHover(dt) {
     observer.time += (dt * shader.parameters.time_scale) / timeDilation;
 
     shader.needsUpdate = true;
-    updateHoverUI();
 }
 
-export function updateHoverUI() {
-    var radiusEl = document.getElementById('hover-radius');
-    var blueshiftEl = document.getElementById('hover-blueshift');
-    var accelEl = document.getElementById('hover-accel');
-    var statusEl = document.getElementById('hover-status');
-    var btnEl = document.getElementById('hover-start-btn');
-    var resetBtn = document.getElementById('hover-reset-btn');
-    var horizonBar = document.getElementById('hover-horizon-bar');
-
-    if (!radiusEl) return;
-
+// State of the hover for the interface: radius in r_s, the gravitational blueshift of incoming
+// light, the proper acceleration needed to hover in c^2/r_s, a phase for the status line and the
+// progress from the start radius startR towards r = 0, which stops at minR.
+export function hoverReadout() {
     var r = hoverState.currentR;
-    var gravFactor = hoverClockRate(r);
-    var blueshift = 1.0 / gravFactor;
-    var properAccel = staticAcceleration(hoverPoint(r), hoverSpin());
-
-    radiusEl.innerHTML = 'r = ' + r.toFixed(3) + ' r<sub>s</sub>';
-    blueshiftEl.innerHTML = 'D<sub>grav</sub> = ' + blueshift.toFixed(2) + '\u00d7';
-    accelEl.innerHTML =
-        'a = ' +
-        (properAccel < 100 ? properAccel.toFixed(2) : properAccel.toFixed(0)) +
-        ' c\u00b2/r<sub>s</sub>';
-
-    if (horizonBar) {
-        var progress = Math.max(
-            0,
-            Math.min(100, (1.0 - r / Math.max(hoverState.prevDistance, 1)) * 100),
-        );
-        horizonBar.style.width = progress + '%';
-        if (r < 1.5) {
-            horizonBar.className = 'hover-horizon-fill near';
-        } else {
-            horizonBar.className = 'hover-horizon-fill normal';
-        }
-    }
-
-    var speedEl = document.getElementById('hover-speed-val');
-    if (speedEl && hoverState.active) {
-        var effectiveSpeed = hoverState.speed;
-        speedEl.textContent =
-            (effectiveSpeed < 0.1 ? effectiveSpeed.toFixed(2) : effectiveSpeed.toFixed(1)) +
-            '\u00d7';
-    }
-
-    if (!hoverState.active) {
-        statusEl.textContent = 'Ready';
-        statusEl.className = 'hover-status ready';
-        btnEl.textContent = '\u25b6 START HOVER';
-        btnEl.disabled = false;
-    } else if (hoverState.paused && r <= hoverState.minR + 0.01) {
-        statusEl.textContent = '\u26a0 Minimum hover radius';
-        statusEl.className = 'hover-status min-radius';
-        btnEl.textContent = '\u25b6 START HOVER';
-        btnEl.disabled = true;
-    } else if (hoverState.paused) {
-        statusEl.textContent = '\u23f8 Hovering at r = ' + r.toFixed(2);
-        statusEl.className = 'hover-status paused';
-        btnEl.textContent = '\u25b6 RESUME';
-    } else if (r > 3.0) {
-        statusEl.textContent = '\u2193 Descending - mild blueshift';
-        statusEl.className = 'hover-status descending';
-        btnEl.textContent = '\u23f8 PAUSE';
-    } else if (r > 1.5) {
-        statusEl.textContent = '\u26a1 Strong blueshift zone';
-        statusEl.className = 'hover-status strong';
-        btnEl.textContent = '\u23f8 PAUSE';
-    } else {
-        statusEl.textContent = '\ud83d\udca0 Extreme blueshift!';
-        statusEl.className = 'hover-status extreme';
-        btnEl.textContent = '\u23f8 PAUSE';
-    }
-
-    if (resetBtn) {
-        resetBtn.disabled = !hoverState.active;
-    }
+    var phase;
+    if (!hoverState.active) phase = 'ready';
+    else if (hoverState.paused && r <= hoverState.minR + 0.01) phase = 'minimum';
+    else if (hoverState.paused) phase = 'paused';
+    else if (r > 3.0) phase = 'descending';
+    else if (r > 1.5) phase = 'strong';
+    else phase = 'extreme';
+    return {
+        r: r,
+        blueshift: 1.0 / hoverClockRate(r),
+        acceleration: staticAcceleration(hoverPoint(r), hoverSpin()),
+        phase: phase,
+        speed: hoverState.speed,
+        progress: Math.max(0, Math.min(1, 1.0 - r / Math.max(hoverState.prevDistance, 1))),
+        startR: Math.max(hoverState.prevDistance, 1),
+        minR: hoverState.minR,
+    };
 }

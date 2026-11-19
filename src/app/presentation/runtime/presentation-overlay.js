@@ -525,15 +525,8 @@ function getPresentationOverlaySafeMargins(viewWidth) {
         }
     }
 
-    var animPanel = document.getElementById('anim-panel');
-    if (animPanel && !animPanel.classList.contains('sp-panel--collapsed')) {
-        includeRect(animPanel.getBoundingClientRect());
-    }
-
-    var guiPanel = document.getElementById('controls-panel');
-    if (guiPanel && !guiPanel.classList.contains('sp-panel--collapsed')) {
-        includeRect(guiPanel.getBoundingClientRect());
-    }
+    var inspector = document.getElementById('inspector');
+    if (inspector) includeRect(inspector.getBoundingClientRect());
 
     return safe;
 }

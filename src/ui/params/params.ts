@@ -18,7 +18,7 @@ import { PARAMS, TABS, type ParamDef, type ParamValue, type SliderDef } from './
 const reference = new Map<string, ParamValue>();
 
 export function readParam(def: ParamDef): ParamValue {
-    return getPathValue(def.path) as ParamValue;
+    return def.get ? def.get() : (getPathValue(def.path) as ParamValue);
 }
 
 function captureReference(kind?: PresetKind): void {

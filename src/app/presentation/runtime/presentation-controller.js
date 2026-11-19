@@ -11,8 +11,8 @@ import {
 } from '../../core/runtime/runtime-state.js';
 import { diveState, hoverState } from '../../core/scenarios/scenario-state.js';
 import { initializeCamera } from '../../scene/camera-runtime.js';
-import { startDive, resetDive, updateDiveUI } from '../../core/scenarios/dive.js';
-import { startHover, resetHover, updateHoverUI } from '../../core/scenarios/hover.js';
+import { startDive, resetDive } from '../../core/scenarios/dive.js';
+import { startHover, resetHover } from '../../core/scenarios/hover.js';
 import {
     PRESENTATION_PRESETS,
     PRESENTATION_PRESET_ORDER,
@@ -400,7 +400,6 @@ function executePresentationEvent(event) {
             if (diveState.active) {
                 diveState.paused = true;
                 diveState.timelineDriven = false;
-                updateDiveUI();
             }
             break;
         case 'startHover':
@@ -420,7 +419,6 @@ function executePresentationEvent(event) {
             if (hoverState.active) {
                 hoverState.paused = true;
                 hoverState.timelineDriven = false;
-                updateHoverUI();
             }
             break;
         case 'updateShader':

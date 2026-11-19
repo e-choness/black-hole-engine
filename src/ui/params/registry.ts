@@ -12,8 +12,10 @@ import {
     planetAvailable,
     qualityPresetLabels,
     resetTurbulenceClock,
+    setCaptureSmoothing,
     setObserverDistance,
     setObserverMotion,
+    timelineCapture,
     type ApplyKind,
     type EngineParams,
     type KerrMode,
@@ -53,7 +55,8 @@ interface BaseDef {
     available?: () => boolean;
     // Runs before the value is written (e.g. restart a clock).
     before?: () => void;
-    // Replaces the generic write, tracking and apply step.
+    // Replace the generic read, and the generic write, tracking and apply step.
+    get?: () => ParamValue;
     set?: (value: ParamValue) => void;
 }
 
@@ -497,7 +500,31 @@ export const PARAMS: ParamDef[] = [
             unit: '×',
             format: fixed(2),
             apply: 'redraw',
-            help: 'Simulation clock multiplier.',
+            help: 'Simulated time per second, in light-crossing times r_s/c; the time bar shows the physical duration. 0 pauses the simulation.',
+        }),
+    ]),
+    ...section('observer', 'Dive and hover', [
+        slider('dive.speed', 'Fall speed', 0.01, 5, 0.01, {
+            unit: '×',
+            format: fixed(2),
+            apply: 'redraw',
+            help: 'Playback speed of the free-fall dive, on top of the simulation speed.',
+        }),
+        toggle('dive.cinematic', 'Slow down near the horizon', {
+            apply: 'redraw',
+            help: 'Slows the dive near the photon sphere and the horizon, where the view changes fastest.',
+        }),
+        slider('hover.speed', 'Descent speed', 0.01, 2, 0.01, {
+            unit: '×',
+            format: fixed(2),
+            apply: 'redraw',
+            help: 'How fast the hovering observer lowers itself towards the horizon, on top of the simulation speed.',
+        }),
+        toggle('capture.smoothing', 'Smooth recorded camera', {
+            apply: 'redraw',
+            get: () => timelineCapture.cameraSmoothingEnabled,
+            set: (value) => setCaptureSmoothing(value as boolean),
+            help: 'Smooths the orbit and pan moves that the time bar records from a dive or hover into the timeline.',
         }),
     ]),
     ...section('observer', 'Relativistic effects', [

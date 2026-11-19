@@ -75,8 +75,9 @@ export interface ClockReading {
     speed: number | null;
     lorentzFactor: number | null;
     redshift: { gravitational: number; kinematic: number; total: number } | null;
+    properTimeRemaining: number | null;
     properTimeToHorizon: number | null;
-    events: string[];
+    events: readonly string[];
 }
 
 export interface ClockInput {
@@ -90,7 +91,8 @@ export interface ClockInput {
 
 export interface ObserverClock {
     advance: (input: ClockInput, dTau: number) => ClockReading;
-    reset?: () => void;
+    reset: (start?: { tau?: number; t?: number; tKS?: number }) => void;
+    setSpin: (spin: number) => void;
 }
 
 export const createObserverClock = observerClock.createObserverClock as unknown as (options: {
@@ -105,6 +107,7 @@ export interface ClockText {
     speed: string;
     lorentzFactor: string;
     gravitationalRedshift: string;
+    properTimeRemaining: string | null;
     properTimeToHorizon: string | null;
     speech: {
         tau: string;

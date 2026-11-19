@@ -184,10 +184,6 @@ a:hover {
         border-color: #5a86bc !important;
         color: #d0eaff !important;
     }
-    .sp-open-btn--left {
-        left: 10px !important;
-        right: auto !important;
-    }
     .sp-open-btn--right {
         right: 10px !important;
         left: auto !important;
@@ -205,30 +201,9 @@ a:hover {
     body.has-timeline-panel .link-bar {
         bottom: 6px;
     }
-    body.has-timeline-panel #axes-gizmo-container {
-        bottom: auto !important;
-    }
-
-    #axes-gizmo-container {
-        left: 4px !important;
-        right: auto !important;
-        top: auto !important;
-        bottom: 96px !important;
-        transform: scale(0.9) !important;
-        transform-origin: left bottom !important;
-        z-index: 145 !important;
-        pointer-events: auto !important;
-    }
-    #observer-orbit-shell {
-        pointer-events: auto !important;
-    }
 }
 
 @media screen and (max-width: 520px) {
-    #axes-gizmo-container {
-        transform: scale(0.84) !important;
-    }
-
     /* Extra-small screens: compact side buttons */
     .sp-open-btn {
         padding: 0 12px !important;
@@ -237,9 +212,6 @@ a:hover {
         line-height: 36px !important;
         bottom: calc(env(safe-area-inset-bottom, 0px) + 46px) !important;
         letter-spacing: 0.4px !important;
-    }
-    .sp-open-btn--left {
-        left: 6px !important;
     }
     .sp-open-btn--right {
         right: 6px !important;

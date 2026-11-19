@@ -2,7 +2,10 @@ import { expect, test, vi } from 'vitest';
 
 // The registry reaches the engine only through src/ui/engine/engine.ts, which is replaced here by
 // a stand-in that resolves paths against a fresh Shader's parameters.
-const engine = vi.hoisted(() => ({ parameters: {} as Record<string, unknown> }));
+const engine = vi.hoisted(() => ({
+    parameters: {} as Record<string, unknown>,
+    capture: { cameraSmoothingEnabled: false },
+}));
 
 function resolve(path: string): { parent: Record<string, unknown>; key: string } {
     const parts = path.split('.');
@@ -18,6 +21,10 @@ vi.mock('../../src/ui/engine/engine', () => ({
     planetAvailable: () => true,
     qualityPresetLabels: { Custom: 'custom', 'Mobile (fastest)': 'mobile', High: 'high' },
     resetTurbulenceClock: () => {},
+    setCaptureSmoothing: (enabled: boolean) => {
+        engine.capture.cameraSmoothingEnabled = enabled;
+    },
+    timelineCapture: engine.capture,
     setObserverDistance: () => {},
     setObserverMotion: () => {},
     blackHolePresets: {},
@@ -46,8 +53,11 @@ engine.parameters = new (
         parameters: Record<string, unknown>;
     }
 )('').parameters;
+const scenarios = await import('../../src/app/core/scenarios/scenario-state.js');
+engine.parameters.dive = { ...scenarios.diveState };
+engine.parameters.hover = { ...scenarios.hoverState };
 const { PARAMS } = await import('../../src/ui/params/registry');
-const { clampSlider, initParams, isModified, resetParam, setParam } =
+const { clampSlider, initParams, isModified, readParam, resetParam, setParam } =
     await import('../../src/ui/params/params');
 const { parseNumber, editableNumber } = await import('../../src/ui/lib/number-input');
 
@@ -136,6 +146,10 @@ const LEGACY_INSPECTOR_PATHS = [
     'time_scale',
     'observer.distance',
     'observer.motion',
+    'dive.speed',
+    'dive.cinematic',
+    'hover.speed',
+    'capture.smoothing',
 ];
 
 test('every legacy parameter control has an inspector row', () => {
@@ -146,8 +160,7 @@ test('every legacy parameter control has an inspector row', () => {
 
 test('registry entries match the engine parameters they edit', () => {
     for (const def of PARAMS) {
-        const { parent, key } = resolve(def.path);
-        const value = parent[key];
+        const value = readParam(def);
         if (def.control === 'slider') {
             expect(typeof value, def.path).toBe('number');
             expect(def.min, def.path).toBeLessThan(def.max);

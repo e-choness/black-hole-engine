@@ -12,7 +12,6 @@ export let cameraControls = null;
 export let shader = null;
 export const observer = new Observer();
 export const cameraPan = new THREE.Vector2(0, 0);
-export let distanceController = null;
 export let refreshAllControllersGlobal = null;
 export let bloomPass = null;
 export let taaPass = null;
@@ -46,9 +45,6 @@ export function setCameraControls(value) {
 export function setShader(value) {
     shader = value;
     bindObserverShader(value);
-}
-export function setDistanceController(value) {
-    distanceController = value;
 }
 export function setRefreshAllControllersGlobal(value) {
     refreshAllControllersGlobal = value;

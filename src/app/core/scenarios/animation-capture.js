@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { camera, cameraPan, observer, shader } from '../runtime/runtime-state.js';
 import { diveState, hoverState, animationTimelineCaptureState } from './scenario-state.js';
 import { getTimelinePanelBinding } from '../runtime/ui-bindings.js';
-import { startDive, updateDiveUI } from './dive.js';
-import { startHover, updateHoverUI } from './hover.js';
+import { startDive } from './dive.js';
+import { startHover } from './hover.js';
 import {
     getPresentationState,
     pausePresentation,
@@ -148,51 +148,12 @@ export function setAnimationTimelineCaptureCameraSmoothingEnabled(enabled) {
             animationTimelineCaptureState.cameraSmoothingEnabled ? '1' : '0',
         );
     } catch (e) {}
-    updateAnimationTimelineCaptureUi();
 }
 
 function setAnimationTimelineCaptureFeedback(mode, text, tone) {
     if (!animationTimelineCaptureState.feedback[mode]) return;
     animationTimelineCaptureState.feedback[mode].text = text || 'Idle';
     animationTimelineCaptureState.feedback[mode].tone = tone || '';
-}
-
-export function updateAnimationTimelineCaptureUi() {
-    function syncMode(mode, btnId, statusId) {
-        var btn = document.getElementById(btnId);
-        var status = document.getElementById(statusId);
-        var smoothToggle = document.getElementById(mode + '-capture-smooth');
-        var isActive =
-            animationTimelineCaptureState.active && animationTimelineCaptureState.mode === mode;
-        var otherActive =
-            animationTimelineCaptureState.active && animationTimelineCaptureState.mode !== mode;
-        var feedback = animationTimelineCaptureState.feedback[mode] || { text: 'Idle', tone: '' };
-
-        if (btn) {
-            btn.classList.toggle('is-recording', isActive);
-            btn.disabled = otherActive;
-            btn.innerHTML = isActive ? '&#9632; STOP &amp; SAVE' : '&#9679; RECORD TO TIMELINE';
-        }
-        if (status) {
-            var text = feedback.text || 'Idle';
-            var tone = feedback.tone || '';
-            if (isActive) {
-                text = 'Recording ' + animationTimelineCaptureState.lastElapsed.toFixed(2) + 's';
-                tone = 'is-recording';
-            } else if (otherActive) {
-                text = 'Other capture active';
-                tone = 'is-warning';
-            }
-            status.textContent = text;
-            status.className = 'anim-capture-status' + (tone ? ' ' + tone : '');
-        }
-        if (smoothToggle) {
-            smoothToggle.checked = !!animationTimelineCaptureState.cameraSmoothingEnabled;
-        }
-    }
-
-    syncMode('dive', 'dive-capture-btn', 'dive-capture-status');
-    syncMode('hover', 'hover-capture-btn', 'hover-capture-status');
 }
 
 export function readAnimationCaptureAnchorPosition(rawPosition) {
@@ -334,7 +295,6 @@ export function finalizeAnimationTimelineCapture(mode) {
         );
     }
 
-    updateAnimationTimelineCaptureUi();
     return !!(result && result.ok);
 }
 
@@ -345,7 +305,6 @@ export function startAnimationTimelineCapture(mode) {
             return finalizeAnimationTimelineCapture(mode);
         }
         setAnimationTimelineCaptureFeedback(mode, 'Stop the current capture first', 'is-warning');
-        updateAnimationTimelineCaptureUi();
         return false;
     }
 
@@ -353,7 +312,6 @@ export function startAnimationTimelineCapture(mode) {
         typeof getPresentationState === 'function' ? getPresentationState() : null;
     if (presentationRuntimeState && presentationRuntimeState.recording) {
         setAnimationTimelineCaptureFeedback(mode, 'Stop timeline recording first', 'is-warning');
-        updateAnimationTimelineCaptureUi();
         return false;
     }
     if (
@@ -373,11 +331,9 @@ export function startAnimationTimelineCapture(mode) {
         } else if (diveState.paused) {
             diveState.timelineDriven = false;
             diveState.paused = false;
-            updateDiveUI();
         }
         if (!diveState.active) {
             setAnimationTimelineCaptureFeedback(mode, 'Unable to start live dive', 'is-warning');
-            updateAnimationTimelineCaptureUi();
             return false;
         }
     } else {
@@ -386,11 +342,9 @@ export function startAnimationTimelineCapture(mode) {
         } else if (hoverState.paused) {
             hoverState.timelineDriven = false;
             hoverState.paused = false;
-            updateHoverUI();
         }
         if (!hoverState.active) {
             setAnimationTimelineCaptureFeedback(mode, 'Unable to start live hover', 'is-warning');
-            updateAnimationTimelineCaptureUi();
             return false;
         }
     }
@@ -422,7 +376,6 @@ export function startAnimationTimelineCapture(mode) {
 
     setAnimationTimelineCaptureFeedback(mode, 'Recording 0.00s', 'is-recording');
     pushAnimationTimelineCaptureSample(mode, 0.0, true);
-    updateAnimationTimelineCaptureUi();
     return true;
 }
 
@@ -452,6 +405,5 @@ export function updateAnimationTimelineCaptureFrame() {
     );
     if (elapsed + 1e-6 >= animationTimelineCaptureState.nextSampleTime) {
         pushAnimationTimelineCaptureSample(mode, elapsed, false);
-        updateAnimationTimelineCaptureUi();
     }
 }

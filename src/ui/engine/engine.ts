@@ -9,9 +9,17 @@ import {
     QUALITY_PRESET_LABELS,
     QUALITY_PRESETS,
 } from '../../app/ui/quality-presets.js';
-import { diveState, hoverState } from '../../app/core/scenarios/scenario-state.js';
-import { resetDive, startDive } from '../../app/core/scenarios/dive.js';
-import { resetHover, startHover } from '../../app/core/scenarios/hover.js';
+import {
+    animationTimelineCaptureState,
+    diveState,
+    hoverState,
+} from '../../app/core/scenarios/scenario-state.js';
+import { diveReadout, resetDive, seekDive, startDive } from '../../app/core/scenarios/dive.js';
+import { hoverReadout, resetHover, seekHover, startHover } from '../../app/core/scenarios/hover.js';
+import {
+    setAnimationTimelineCaptureCameraSmoothingEnabled,
+    toggleAnimationTimelineCapture,
+} from '../../app/core/scenarios/animation-capture.js';
 import { getTimelinePanelBinding } from '../../app/core/runtime/ui-bindings.js';
 import { frameStats } from '../../app/core/runtime/frame-stats.js';
 import {
@@ -19,8 +27,6 @@ import {
     setPresentationPathValue,
 } from '../../app/presentation/runtime/path-bindings.js';
 import { getPresentationState } from '../../app/presentation/runtime/presentation-controller.js';
-import { seekDive } from '../../app/core/scenarios/dive.js';
-import { seekHover } from '../../app/core/scenarios/hover.js';
 import { updateCamera } from '../../app/scene/camera-runtime.js';
 import { OBSERVER_DISTANCE_MIN, OBSERVER_ORBIT_MIN } from '../../app/core/observer.js';
 
@@ -216,3 +222,68 @@ export function currentMode(): ObserverMode {
 export function timelinePanel(): TimelinePanelBinding | null {
     return getTimelinePanelBinding() as TimelinePanelBinding | null;
 }
+
+export const playbackSpeed = actions.getPlaybackSpeed as () => number;
+export const setPlaybackSpeed = actions.setPlaybackSpeed as (speed: number) => void;
+
+// startDive() and startHover() start the scenario, or pause and resume it once it runs.
+export function toggleScenario(mode: 'dive' | 'hover'): void {
+    if (mode === 'dive') startDive();
+    else startHover();
+}
+
+export function restartScenario(mode: 'dive' | 'hover'): void {
+    if (mode === 'dive') startDive({ restart: true });
+    else startHover({ restart: true });
+}
+
+export type DivePhase =
+    | 'ready'
+    | 'paused'
+    | 'approaching'
+    | 'near-horizon'
+    | 'inside'
+    | 'near-singularity'
+    | 'singularity'
+    | 'inner-horizon';
+
+export type HoverPhase = 'ready' | 'minimum' | 'paused' | 'descending' | 'strong' | 'extreme';
+
+interface ScenarioReadout {
+    r: number;
+    speed: number;
+    progress: number;
+    startR: number;
+}
+
+export interface DiveReadout extends ScenarioReadout {
+    phase: DivePhase;
+    rate: number;
+    spinning: boolean;
+    rHorizon: number;
+}
+
+export interface HoverReadout extends ScenarioReadout {
+    phase: HoverPhase;
+    blueshift: number;
+    acceleration: number;
+    minR: number;
+}
+
+export const readDive = diveReadout as () => DiveReadout;
+export const readHover = hoverReadout as () => HoverReadout;
+
+interface TimelineCaptureState {
+    active: boolean;
+    mode: string;
+    cameraSmoothingEnabled: boolean;
+    feedback: Record<string, { text: string; tone: string }>;
+}
+
+export const timelineCapture = animationTimelineCaptureState as unknown as TimelineCaptureState;
+export const toggleTimelineCapture = toggleAnimationTimelineCapture as (
+    mode: 'dive' | 'hover',
+) => boolean;
+export const setCaptureSmoothing = setAnimationTimelineCaptureCameraSmoothingEnabled as (
+    enabled: boolean,
+) => void;

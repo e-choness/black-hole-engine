@@ -22,11 +22,14 @@ test('inspector edits reach the engine and survive a reload through the view lin
         inspector.getByRole('button', { name: /^Reset Peak temperature to/ }),
     ).toBeVisible();
 
+    const hash = () => page.evaluate(() => window.location.hash);
+    await expect.poll(hash).toContain('dt');
+    const withTemperature = await hash();
+
     await inspector.getByRole('tab', { name: 'Jets' }).click();
     await inspector.getByRole('switch', { name: 'Relativistic jets' }).click();
     await expect.poll(() => page.evaluate(() => window.__BH__.params.jet.enabled)).toBe(true);
-
-    await expect.poll(() => page.evaluate(() => window.location.hash)).toContain('dt');
+    await expect.poll(hash).not.toBe(withTemperature);
     await page.reload();
     await page.waitForFunction(() => window.__BH__ !== undefined);
     await page.evaluate(() => window.__BH__.ready);

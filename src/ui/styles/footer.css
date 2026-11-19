@@ -1,0 +1,343 @@
+/* Footer: observer readouts on the left, the camera hint and the time bar in the middle, centred
+   while the readouts leave room for it. The bottom padding clears the link bar until the help
+   sheet replaces it. */
+.shell-footer {
+    grid-area: 3 / 2 / 4 / 4;
+    container: footer / inline-size;
+    padding: 0 16px 40px;
+    pointer-events: none;
+}
+
+.footer-layout {
+    display: grid;
+    grid-template-columns: minmax(312px, 1fr) auto minmax(0, 1fr);
+    align-items: end;
+    gap: 16px;
+    pointer-events: none;
+}
+
+.shell[data-inspector-open='true'] .shell-footer {
+    grid-column-end: 3;
+}
+
+.footer-layout > *,
+.footer-center > * {
+    pointer-events: auto;
+}
+
+.footer-center {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    pointer-events: none;
+}
+
+.hud {
+    justify-self: start;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 312px;
+    padding: 12px 14px;
+    border-radius: var(--radius-lg);
+}
+
+.hud-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 28px;
+}
+
+.gizmo {
+    width: 40px;
+    height: 40px;
+    overflow: visible;
+}
+
+.gizmo line {
+    stroke-width: 2;
+    stroke-linecap: round;
+}
+
+.gizmo text {
+    font: 600 7px var(--font-num);
+}
+
+.gizmo-X line {
+    stroke: var(--color-danger);
+}
+
+.gizmo-X text {
+    fill: var(--color-danger);
+}
+
+.gizmo-Y line {
+    stroke: var(--color-ok);
+}
+
+.gizmo-Y text {
+    fill: var(--color-ok);
+}
+
+.gizmo-Z line {
+    stroke: var(--color-doppler);
+}
+
+.gizmo-Z text {
+    fill: var(--color-doppler);
+}
+
+.hud-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px 12px;
+    margin: 0;
+}
+
+.hud-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+}
+
+.hud-cell dt {
+    color: var(--color-text-3);
+    font-size: 11px;
+}
+
+.hud-cell dd {
+    margin: 0;
+    overflow: hidden;
+    color: var(--color-text);
+    font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.hud-redshift {
+    color: var(--color-redshift) !important;
+}
+
+.hud-status {
+    margin: 0;
+    padding-top: 8px;
+    border-top: 1px solid var(--color-hairline);
+    color: var(--color-text-2);
+    font-size: 12px;
+}
+
+.hud-status[data-tone='warn'] {
+    color: var(--color-accent);
+}
+
+.hud-status[data-tone='danger'] {
+    color: var(--color-danger);
+}
+
+.hint {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 4px 4px 12px;
+    border-radius: var(--radius-pill);
+    color: var(--color-text-2);
+    font-size: 12px;
+}
+
+.timebar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 56px;
+    padding: 0 8px;
+    border-radius: var(--radius-lg);
+}
+
+.play-btn {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-pill);
+    background: var(--color-accent);
+    color: var(--color-on-accent);
+}
+
+.play-btn:hover {
+    filter: brightness(1.08);
+}
+
+.speed-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    height: 40px;
+    margin-left: 4px;
+    padding: 0 10px;
+    border: 1px solid var(--color-hairline);
+    border-radius: var(--radius-sm);
+    background: rgb(255 255 255 / 0.03);
+    color: var(--color-text);
+    font-size: 13px;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.speed-btn:hover,
+.speed-btn[data-state='open'] {
+    border-color: rgb(255 255 255 / 0.16);
+}
+
+.speed-equivalent {
+    color: var(--color-text-3);
+    font-size: 10.5px;
+}
+
+.speed-menu {
+    min-width: 200px;
+    padding: 4px;
+}
+
+.menu-item.speed-item {
+    display: grid;
+    grid-template-columns: 52px minmax(0, 1fr) 16px;
+    align-items: center;
+}
+
+/* In a dive or hover the progress slider runs along the top of the time bar, like a scrubber;
+   its width follows the controls below it. */
+.timebar-scenario {
+    contain: inline-size;
+    display: flex;
+    flex: 1 0 100%;
+    order: -1;
+    align-items: center;
+    gap: 6px;
+    padding-top: 6px;
+}
+
+.timebar-progress {
+    flex: 1;
+}
+
+.icon-btn.capture-btn {
+    color: var(--color-danger);
+}
+
+.icon-btn.capture-btn[aria-pressed='true'] {
+    background: rgb(255 107 107 / 0.16);
+    color: var(--color-danger);
+}
+
+.timebar-divider {
+    width: 1px;
+    height: 30px;
+    margin: 0 6px;
+    background: var(--color-hairline);
+}
+
+.clock {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    padding: 0 6px;
+    white-space: nowrap;
+}
+
+.clock-label {
+    color: var(--color-text-3);
+    font-size: 10.5px;
+}
+
+.clock-note {
+    color: var(--color-redshift);
+}
+
+.clock-value {
+    min-width: 92px;
+    color: var(--color-text);
+    font-size: 13px;
+}
+
+.clock-value--own {
+    color: var(--color-accent);
+}
+
+.clock--rate {
+    gap: 4px;
+    min-width: 92px;
+    padding-right: 8px;
+}
+
+.clock-rate {
+    color: var(--color-text);
+}
+
+.clock-bar {
+    display: block;
+    height: 4px;
+    border-radius: var(--radius-pill);
+    background: rgb(255 255 255 / 0.08);
+    overflow: hidden;
+}
+
+.clock-bar > span {
+    display: block;
+    width: 0;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--color-accent);
+}
+
+/* When the readouts and the time bar do not fit side by side, the readouts go above the time bar,
+   which wraps its clocks onto a second line when needed. */
+@container footer (max-width: 900px) {
+    .footer-layout {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    .footer-center {
+        align-items: flex-start;
+        max-width: 100%;
+    }
+
+    .timebar {
+        padding: 6px 8px;
+    }
+
+    .hint {
+        display: none;
+    }
+}
+
+/* Until the compact mobile time bar exists, phones show the time bar alone, centred. */
+@media (max-width: 760px) {
+    .shell-footer,
+    .shell[data-inspector-open='true'] .shell-footer {
+        grid-area: 3 / 1 / 4 / 2;
+        padding: 0 8px 34px;
+    }
+
+    .footer-layout,
+    .footer-center {
+        align-items: stretch;
+    }
+
+    .hud {
+        display: none;
+    }
+
+    .timebar-divider {
+        display: none;
+    }
+}

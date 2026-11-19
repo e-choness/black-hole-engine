@@ -1,6 +1,6 @@
 /* Inspector: tabs, filter, parameter rows, derived quantities and footer actions. */
 .inspector {
-    grid-area: 2 / 3 / 3 / 4;
+    grid-area: 2 / 3 / 4 / 4;
     display: flex;
     flex-direction: column;
     min-height: 0;
@@ -408,7 +408,7 @@
 /* Until the mobile bottom sheet exists, narrow screens dock the inspector at the bottom. */
 @media (max-width: 760px) {
     .inspector {
-        grid-area: 3 / 1 / 4 / 2;
+        grid-area: 4 / 1 / 5 / 2;
         max-height: 46dvh;
         margin: 0 8px calc(8px + env(safe-area-inset-bottom));
     }

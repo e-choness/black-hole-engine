@@ -53,13 +53,11 @@ export function startDive(options) {
     if (!restartRequested && diveState.active && !diveState.paused) {
         diveState.paused = true;
         diveState.timelineDriven = false;
-        updateDiveUI();
         return;
     }
     if (!restartRequested && diveState.paused) {
         diveState.paused = false;
         diveState.timelineDriven = false;
-        updateDiveUI();
         return;
     }
     if (restartRequested && (diveState.active || diveState.reachedSingularity)) {
@@ -121,7 +119,6 @@ export function startDive(options) {
 
     scene.updateShader();
     updateCamera();
-    updateDiveUI();
     refreshRendererUiBindings();
 }
 
@@ -151,8 +148,6 @@ export function resetDive() {
     scene.updateShader();
     updateCamera();
     shader.needsUpdate = true;
-    updateDiveUI();
-    updateDiveFade();
     refreshRendererUiBindings();
 }
 
@@ -187,7 +182,6 @@ export function seekDive(targetR, options) {
 
     shader.needsUpdate = true;
     updateCamera();
-    updateDiveUI();
 }
 
 export function updateDive(dt) {
@@ -197,7 +191,6 @@ export function updateDive(dt) {
     var floor = diveFloor();
     if (r <= floor) {
         diveState.reachedSingularity = true;
-        updateDiveUI();
         return;
     }
 
@@ -221,95 +214,31 @@ export function updateDive(dt) {
     observer.time += dt * effectiveSpeed * shader.parameters.time_scale;
 
     shader.needsUpdate = true;
-    updateDiveUI();
 }
 
-export function updateDiveUI() {
-    var radiusEl = document.getElementById('dive-radius');
-    var velocityEl = document.getElementById('dive-velocity');
-    var statusEl = document.getElementById('dive-status');
-    var btnEl = document.getElementById('dive-start-btn');
-    var resetBtn = document.getElementById('dive-reset-btn');
-    var horizonBar = document.getElementById('dive-horizon-bar');
-
-    if (!radiusEl) return;
-
+// State of the dive for the interface: radius in r_s, fall rate in c, the horizon radius, the
+// playback speed after the cinematic slow-down near the horizon, a phase for the status line and
+// the progress from the start radius startR towards r = 0.
+export function diveReadout() {
     var r = diveState.currentR;
-    var rate = fallRate(r);
     var spinning = diveSpin() !== 0.0;
     var rHorizon = horizonRadius(diveSpin());
-
-    radiusEl.innerHTML = 'r = ' + r.toFixed(3) + ' r<sub>s</sub>';
-    velocityEl.textContent =
-        r > 1.0 && !spinning
-            ? 'v = ' + rate.toFixed(3) + ' c relative to a static observer'
-            : 'dr/dτ = -' +
-              rate.toFixed(3) +
-              ' c' +
-              (spinning ? '' : ' (no static observers inside)');
-
-    var speedEl = document.getElementById('dive-speed-val');
-    if (speedEl && diveState.active) {
-        var effectiveSpeed = diveState.cinematic
-            ? diveState.speed * cinematicFactor(r)
-            : diveState.speed;
-        speedEl.textContent =
-            (effectiveSpeed < 0.1 ? effectiveSpeed.toFixed(2) : effectiveSpeed.toFixed(1)) + 'x';
-    }
-
-    if (horizonBar) {
-        var progress = Math.max(
-            0,
-            Math.min(100, (1.0 - r / Math.max(diveState.prevDistance, 1)) * 100),
-        );
-        horizonBar.style.width = progress + '%';
-        if (r < rHorizon) {
-            horizonBar.className = 'dive-horizon-fill inside';
-        } else {
-            horizonBar.className = 'dive-horizon-fill outside';
-        }
-    }
-
-    if (diveState.reachedSingularity) {
-        statusEl.textContent = spinning
-            ? '\u26a0 Inner horizon reached'
-            : '\u26a0 Singularity reached';
-        statusEl.className = 'dive-status singularity';
-        btnEl.textContent = '\u25b6 START DIVE';
-        btnEl.disabled = true;
-    } else if (!diveState.active) {
-        statusEl.textContent = 'Ready';
-        statusEl.className = 'dive-status ready';
-        btnEl.textContent = '\u25b6 START DIVE';
-        btnEl.disabled = false;
-    } else if (diveState.paused) {
-        statusEl.textContent = '\u23f8 Paused at r = ' + r.toFixed(2);
-        statusEl.className = 'dive-status paused';
-        btnEl.textContent = '\u25b6 RESUME';
-    } else if (r > 1.5 * rHorizon) {
-        statusEl.textContent = '\u2193 Approaching horizon';
-        statusEl.className = 'dive-status approaching';
-        btnEl.textContent = '\u23f8 PAUSE';
-    } else if (r > rHorizon) {
-        statusEl.textContent = '\u26a1 Near event horizon!';
-        statusEl.className = 'dive-status near-horizon';
-        btnEl.textContent = '\u23f8 PAUSE';
-    } else if (spinning || r > 0.3) {
-        statusEl.textContent = '\u26a1 INSIDE event horizon';
-        statusEl.className = 'dive-status inside';
-        btnEl.textContent = '\u23f8 PAUSE';
-    } else {
-        statusEl.textContent = '\ud83c\udf00 Approaching singularity';
-        statusEl.className = 'dive-status deep';
-        btnEl.textContent = '\u23f8 PAUSE';
-    }
-
-    if (resetBtn) {
-        resetBtn.disabled = !diveState.active && !diveState.reachedSingularity;
-    }
-    updateDiveFade();
-}
-
-export function updateDiveFade() {
-    // The interior darkening is driven by the actual ray tracing result.
+    var phase;
+    if (diveState.reachedSingularity) phase = spinning ? 'inner-horizon' : 'singularity';
+    else if (!diveState.active) phase = 'ready';
+    else if (diveState.paused) phase = 'paused';
+    else if (r > 1.5 * rHorizon) phase = 'approaching';
+    else if (r > rHorizon) phase = 'near-horizon';
+    else if (spinning || r > 0.3) phase = 'inside';
+    else phase = 'near-singularity';
+    return {
+        r: r,
+        rate: fallRate(r),
+        spinning: spinning,
+        rHorizon: rHorizon,
+        phase: phase,
+        speed: diveState.cinematic ? diveState.speed * cinematicFactor(r) : diveState.speed,
+        progress: Math.max(0, Math.min(1, 1.0 - r / Math.max(diveState.prevDistance, 1))),
+        startR: Math.max(diveState.prevDistance, 1),
+    };
 }
