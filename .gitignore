@@ -14,9 +14,9 @@ playwright-report/
 # Local agent configuration (never committed)
 .claude/
 CLAUDE.md
-
-# Only the legal notice is tracked under docs/
-docs/*
+docs/
+docs/LEGAL.md
 
 # Local caches and tool state (all caches live here, never on C:)
 .cache/
+
