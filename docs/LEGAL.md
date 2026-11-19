@@ -128,3 +128,10 @@ in this repository by `scripts/generate-emission-lut.js` from the CIE 1931 colou
 function fit of Wyman, Sloan and Shirley (2013) and carries no third-party rights. It replaces the
 former `spectra.png`; the procedural `stars.png` was removed because the sky map contains the
 real star field.
+
+The Scientific tone mapper uses matplotlib's Inferno colour map by Stéfan van der Walt and
+Nathaniel Smith, whose data in the [BIDS colormap repository](https://github.com/BIDS/colormap) is
+dedicated to the public domain under CC0 1.0. `src/app/graphics/output-pass.js` evaluates it, in
+the shader and in the on-screen colour bar, with the polynomial coefficients fitted to that data
+in [Shadertoy WlfXRN](https://www.shadertoy.com/view/WlfXRN), which are also published under
+CC0 1.0.
