@@ -88,7 +88,7 @@ export function setupRenderingFolder(options) {
         name: 'TAA (stable)',
         trackQualityPreset: true,
         onChange: onTaaEnabledChange,
-        help: 'Temporal anti-aliasing with aggressive history clamping to avoid ghosting/details loss.',
+        help: 'Temporal anti-aliasing on the HDR frame: sub-pixel jitter and a history rectified by YCoCg variance clipping.',
     });
     var taaHistoryWeightCtrl = addControl(renderFolder, parameters.taa, 'history_weight', {
         min: 0.0,
@@ -99,14 +99,14 @@ export function setupRenderingFolder(options) {
         onChange: onTaaSettingChange,
         help: 'Higher = steadier image but more trailing risk. Lower = cleaner motion.',
     });
-    var taaClipBoxCtrl = addControl(renderFolder, parameters.taa, 'clip_box', {
-        min: 0.01,
-        max: 0.5,
-        step: 0.01,
-        name: 'taa clip box',
+    var taaClipGammaCtrl = addControl(renderFolder, parameters.taa, 'clip_gamma', {
+        min: 0.25,
+        max: 4.0,
+        step: 0.05,
+        name: 'taa clip gamma',
         trackQualityPreset: true,
         onChange: onTaaSettingChange,
-        help: 'History clamp size. Lower values reject stale history more aggressively.',
+        help: 'Half-width of the history clipping box, in standard deviations of the 3x3 neighbourhood. Lower values reject stale history more aggressively.',
     });
     var taaMotionRejectCtrl = addControl(renderFolder, parameters.taa, 'motion_rejection', {
         min: 0.0,
@@ -126,15 +126,6 @@ export function setupRenderingFolder(options) {
         onChange: onTaaSettingChange,
         help: 'Hard camera-motion cutoff where TAA history is fully discarded.',
     });
-    var taaMotionClipCtrl = addControl(renderFolder, parameters.taa, 'motion_clip_scale', {
-        min: 0.0,
-        max: 2.0,
-        step: 0.01,
-        name: 'taa motion clip',
-        trackQualityPreset: true,
-        onChange: onTaaSettingChange,
-        help: 'Extra clamp expansion with motion. Higher values reduce ghosting further in movement.',
-    });
     addControl(renderFolder, parameters, 'rk4_integration', {
         name: 'RK4 integration',
         trackQualityPreset: true,
@@ -149,9 +140,8 @@ export function setupRenderingFolder(options) {
         qualityPresetController: qualityPresetController,
         taaEnabledCtrl: taaEnabledCtrl,
         taaHistoryWeightCtrl: taaHistoryWeightCtrl,
-        taaClipBoxCtrl: taaClipBoxCtrl,
+        taaClipGammaCtrl: taaClipGammaCtrl,
         taaMotionRejectCtrl: taaMotionRejectCtrl,
         taaMaxDeltaCtrl: taaMaxDeltaCtrl,
-        taaMotionClipCtrl: taaMotionClipCtrl,
     };
 }

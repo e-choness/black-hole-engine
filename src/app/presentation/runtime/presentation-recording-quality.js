@@ -13,13 +13,7 @@ export function capturePresentationQualitySnapshot() {
         rk4_integration: p.rk4_integration,
         resolution_scale: p.resolution_scale,
         taa_enabled: p.taa_enabled,
-        taa: {
-            history_weight: p.taa.history_weight,
-            clip_box: p.taa.clip_box,
-            motion_rejection: p.taa.motion_rejection,
-            max_camera_delta: p.taa.max_camera_delta,
-            motion_clip_scale: p.taa.motion_clip_scale,
-        },
+        taa: Object.assign({}, p.taa),
     };
 }
 
@@ -33,11 +27,7 @@ export function restorePresentationQualitySnapshot(snapshot) {
     p.rk4_integration = snapshot.rk4_integration;
     p.resolution_scale = snapshot.resolution_scale;
     p.taa_enabled = snapshot.taa_enabled;
-    p.taa.history_weight = snapshot.taa.history_weight;
-    p.taa.clip_box = snapshot.taa.clip_box;
-    p.taa.motion_rejection = snapshot.taa.motion_rejection;
-    p.taa.max_camera_delta = snapshot.taa.max_camera_delta;
-    p.taa.motion_clip_scale = snapshot.taa.motion_clip_scale;
+    Object.assign(p.taa, snapshot.taa);
 
     if (typeof applyRenderScaleFromSettings === 'function') {
         applyRenderScaleFromSettings();

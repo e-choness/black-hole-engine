@@ -1,3 +1,9 @@
+// Temporal anti-aliasing on the HDR frame. The trace jitters every pixel by a Halton(2, 3)
+// sub-pixel offset; the resolve blends the new frame into an exponential history after
+// rectifying the history against the 3x3 neighbourhood of the new frame (Karis 2014; Salvi 2016).
+// Without motion vectors the camera motion only lowers the history weight, and the clipping
+// removes most of the ghosting it leaves.
+
 import * as THREE from 'three';
 import { FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 import {
@@ -6,7 +12,9 @@ import {
     renderPass,
 } from '../../graphics/post-processing.js';
 
-export function halton(index, base) {
+const JITTER_PHASES = 16;
+
+function halton(index, base) {
     var f = 1.0;
     var r = 0.0;
     var i = index;
@@ -18,48 +26,79 @@ export function halton(index, base) {
     return r;
 }
 
-const BLEND_FRAGMENT_SHADER = /* glsl */ `
+// Statistics and blending run in YCoCg on c / (1 + Y), the tonemapped weighting that keeps single
+// HDR fireflies from dominating the neighbourhood moments and the resolve. The history is clipped
+// towards the neighbourhood mean mu into the box mu +- gamma sigma.
+const RESOLVE_FRAGMENT_SHADER = /* glsl */ `
 uniform sampler2D tCurrent;
 uniform sampler2D tHistory;
+uniform vec2 texel;
 uniform float historyWeight;
-uniform float historyValid;
-uniform float clipBox;
+uniform float clipGamma;
 in vec2 vUv;
 out vec4 fragColor;
 
+vec3 compress(vec3 rgb) {
+    vec3 c = vec3(
+        dot(rgb, vec3(0.25, 0.5, 0.25)),
+        dot(rgb, vec3(0.5, 0.0, -0.5)),
+        dot(rgb, vec3(-0.25, 0.5, -0.25))
+    );
+    return c / (1.0 + c.x);
+}
+
+vec3 expand(vec3 c) {
+    c /= max(1.0 - c.x, 1e-4);
+    return vec3(c.x + c.y - c.z, c.x + c.z, c.x - c.y - c.z);
+}
+
+vec3 clip_towards_mean(vec3 mu, vec3 extent, vec3 history) {
+    vec3 v = history - mu;
+    vec3 units = abs(v) / max(extent, vec3(1e-6));
+    float m = max(units.x, max(units.y, units.z));
+    return m > 1.0 ? mu + v / m : history;
+}
+
 void main() {
-    vec3 current = texture(tCurrent, vUv).rgb;
-    vec3 history = texture(tHistory, vUv).rgb;
-    history = clamp(history, current - vec3(clipBox), current + vec3(clipBox));
-    float lumaCurrent = dot(current, vec3(0.299, 0.587, 0.114));
-    float lumaHistory = dot(history, vec3(0.299, 0.587, 0.114));
-    float reactive = clamp(1.0 - abs(lumaCurrent - lumaHistory) * 5.0, 0.0, 1.0);
-    float w = historyWeight * historyValid * reactive;
-    fragColor = vec4(mix(current, history, w), 1.0);
+    vec3 m1 = vec3(0.0);
+    vec3 m2 = vec3(0.0);
+    vec3 current = vec3(0.0);
+    for (int y = -1; y <= 1; y++) {
+        for (int x = -1; x <= 1; x++) {
+            vec3 s = compress(texture(tCurrent, vUv + vec2(float(x), float(y)) * texel).rgb);
+            if (x == 0 && y == 0) current = s;
+            m1 += s;
+            m2 += s * s;
+        }
+    }
+    vec3 mu = m1 / 9.0;
+    vec3 sigma = sqrt(max(m2 / 9.0 - mu * mu, vec3(0.0)));
+    vec3 history = clip_towards_mean(mu, clipGamma * sigma, compress(texture(tHistory, vUv).rgb));
+    fragColor = vec4(max(expand(mix(current, history, historyWeight)), vec3(0.0)), 1.0);
 }
 `;
 
-export function setupTemporalAA(renderer) {
-    function createTarget(w, h) {
-        return createRenderTarget(renderer, w, h);
-    }
+function clampSetting(value, fallback, min, max) {
+    var v = value !== undefined ? value : fallback;
+    return Math.max(min, Math.min(max, v));
+}
 
-    var blendMat = createPassMaterial(
+export function setupTemporalAA(renderer) {
+    var resolveMat = createPassMaterial(
         {
             tCurrent: { value: null },
             tHistory: { value: null },
+            texel: { value: new THREE.Vector2() },
             historyWeight: { value: 0.0 },
-            historyValid: { value: 0.0 },
-            clipBox: { value: 0.08 },
+            clipGamma: { value: 1.25 },
         },
-        BLEND_FRAGMENT_SHADER,
+        RESOLVE_FRAGMENT_SHADER,
     );
 
     var pass = {
         quad: new FullScreenQuad(),
-        blendMat: blendMat,
-        historyRT: createTarget(1, 1),
-        outputRT: createTarget(1, 1),
+        historyRT: createRenderTarget(renderer, 1, 1),
+        outputRT: createRenderTarget(renderer, 1, 1),
         historyValid: false,
         frameIndex: 0,
         jitter: new THREE.Vector2(0, 0),
@@ -72,64 +111,34 @@ export function setupTemporalAA(renderer) {
         resize: function (w, h) {
             this.historyRT.dispose();
             this.outputRT.dispose();
-            this.historyRT = createTarget(w, h);
-            this.outputRT = createTarget(w, h);
+            this.historyRT = createRenderTarget(renderer, w, h);
+            this.outputRT = createRenderTarget(renderer, w, h);
             this.reset();
         },
 
         nextJitter: function () {
-            var idx = (this.frameIndex % 8) + 1;
+            var idx = (this.frameIndex % JITTER_PHASES) + 1;
             this.jitter.set(halton(idx, 2) - 0.5, halton(idx, 3) - 0.5);
             this.frameIndex++;
             return this.jitter;
         },
 
+        // Returns the resolved HDR texture.
         render: function (rdr, currentTarget, cameraDelta, taaSettings) {
             var settings = taaSettings || {};
-            var baseHistoryWeight = Math.max(
-                0.0,
-                Math.min(
-                    0.98,
-                    settings.history_weight !== undefined ? settings.history_weight : 0.88,
-                ),
-            );
-            var baseClip = Math.max(
-                0.01,
-                Math.min(0.5, settings.clip_box !== undefined ? settings.clip_box : 0.06),
-            );
-            var motionRejection = Math.max(
-                0.0,
-                Math.min(
-                    20.0,
-                    settings.motion_rejection !== undefined ? settings.motion_rejection : 8.0,
-                ),
-            );
-            var maxCameraDelta = Math.max(
-                0.005,
-                Math.min(
-                    0.5,
-                    settings.max_camera_delta !== undefined ? settings.max_camera_delta : 0.08,
-                ),
-            );
-            var motionClipScale = Math.max(
-                0.0,
-                Math.min(
-                    2.0,
-                    settings.motion_clip_scale !== undefined ? settings.motion_clip_scale : 0.6,
-                ),
-            );
-
+            var baseWeight = clampSetting(settings.history_weight, 0.9, 0.0, 0.98);
+            var motionRejection = clampSetting(settings.motion_rejection, 8.0, 0.0, 20.0);
+            var maxCameraDelta = clampSetting(settings.max_camera_delta, 0.08, 0.005, 0.5);
             var useHistory = this.historyValid && cameraDelta < maxCameraDelta;
-            var motionAttenuation = Math.max(0.0, 1.0 - cameraDelta * motionRejection);
-            var historyWeight = useHistory ? baseHistoryWeight * motionAttenuation : 0.0;
-            var clip = baseClip + Math.min(cameraDelta * motionClipScale, 0.5);
+            var attenuation = Math.max(0.0, 1.0 - cameraDelta * motionRejection);
 
-            this.blendMat.uniforms.tCurrent.value = currentTarget.texture;
-            this.blendMat.uniforms.tHistory.value = this.historyRT.texture;
-            this.blendMat.uniforms.historyWeight.value = historyWeight;
-            this.blendMat.uniforms.historyValid.value = useHistory ? 1.0 : 0.0;
-            this.blendMat.uniforms.clipBox.value = clip;
-            renderPass(rdr, this.quad, this.blendMat, this.outputRT);
+            var u = resolveMat.uniforms;
+            u.tCurrent.value = currentTarget.texture;
+            u.tHistory.value = this.historyRT.texture;
+            u.texel.value.set(1 / currentTarget.width, 1 / currentTarget.height);
+            u.historyWeight.value = useHistory ? baseWeight * attenuation : 0.0;
+            u.clipGamma.value = clampSetting(settings.clip_gamma, 1.25, 0.25, 4.0);
+            renderPass(rdr, this.quad, resolveMat, this.outputRT);
 
             var tmp = this.historyRT;
             this.historyRT = this.outputRT;

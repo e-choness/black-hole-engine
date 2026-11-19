@@ -218,10 +218,9 @@ function normalizePresentationTimeline(timeline) {
         resolution_scale: true,
         taa_enabled: true,
         'taa.history_weight': true,
-        'taa.clip_box': true,
+        'taa.clip_gamma': true,
         'taa.motion_rejection': true,
         'taa.max_camera_delta': true,
-        'taa.motion_clip_scale': true,
     };
     function normalizeExcludedTimelinePath(path) {
         if (typeof path !== 'string') return '';

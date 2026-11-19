@@ -167,11 +167,7 @@ export function setupGUI() {
         p.rk4_integration = state.rk4_integration;
         p.resolution_scale = state.resolution_scale;
         p.taa_enabled = state.taa_enabled;
-        p.taa.history_weight = state.taa.history_weight;
-        p.taa.clip_box = state.taa.clip_box;
-        p.taa.motion_rejection = state.taa.motion_rejection;
-        p.taa.max_camera_delta = state.taa.max_camera_delta;
-        p.taa.motion_clip_scale = state.taa.motion_clip_scale;
+        Object.assign(p.taa, state.taa);
     }
 
     function captureBlackHolePresetState() {
@@ -404,10 +400,9 @@ export function setupGUI() {
     qualityPresetController = renderingFolder.qualityPresetController;
     var taaEnabledCtrl = renderingFolder.taaEnabledCtrl;
     var taaHistoryWeightCtrl = renderingFolder.taaHistoryWeightCtrl;
-    var taaClipBoxCtrl = renderingFolder.taaClipBoxCtrl;
+    var taaClipGammaCtrl = renderingFolder.taaClipGammaCtrl;
     var taaMotionRejectCtrl = renderingFolder.taaMotionRejectCtrl;
     var taaMaxDeltaCtrl = renderingFolder.taaMaxDeltaCtrl;
-    var taaMotionClipCtrl = renderingFolder.taaMotionClipCtrl;
 
     applyQualityPreset(p.quality);
     blackHoleCustomState = captureBlackHolePresetState();
@@ -604,13 +599,7 @@ export function setupGUI() {
         var taaEnabled = !!p.taa_enabled;
         setControlVisible(taaEnabledCtrl, true);
         setControlsVisible(
-            [
-                taaHistoryWeightCtrl,
-                taaClipBoxCtrl,
-                taaMotionRejectCtrl,
-                taaMaxDeltaCtrl,
-                taaMotionClipCtrl,
-            ],
+            [taaHistoryWeightCtrl, taaClipGammaCtrl, taaMotionRejectCtrl, taaMaxDeltaCtrl],
             taaEnabled,
         );
     };

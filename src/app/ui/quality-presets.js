@@ -16,11 +16,10 @@ export var QUALITY_PRESETS = {
         resolution_scale: 0.55,
         taa_enabled: true,
         taa: {
-            history_weight: 0.82,
-            clip_box: 0.08,
+            history_weight: 0.9,
+            clip_gamma: 1.0,
             motion_rejection: 10.0,
             max_camera_delta: 0.07,
-            motion_clip_scale: 0.8,
         },
         hide_planet_controls: true,
     },
@@ -37,11 +36,10 @@ export var QUALITY_PRESETS = {
         resolution_scale: 1.0,
         taa_enabled: false,
         taa: {
-            history_weight: 0.88,
-            clip_box: 0.06,
+            history_weight: 0.9,
+            clip_gamma: 1.25,
             motion_rejection: 8.0,
             max_camera_delta: 0.08,
-            motion_clip_scale: 0.6,
         },
         hide_planet_controls: false,
     },
@@ -59,11 +57,10 @@ export var QUALITY_PRESETS = {
         resolution_scale: 1.0,
         taa_enabled: false,
         taa: {
-            history_weight: 0.88,
-            clip_box: 0.06,
+            history_weight: 0.9,
+            clip_gamma: 1.25,
             motion_rejection: 8.0,
             max_camera_delta: 0.08,
-            motion_clip_scale: 0.6,
         },
         hide_planet_controls: false,
     },
@@ -80,11 +77,10 @@ export var QUALITY_PRESETS = {
         resolution_scale: 0.8,
         taa_enabled: true,
         taa: {
-            history_weight: 0.82,
-            clip_box: 0.08,
+            history_weight: 0.9,
+            clip_gamma: 1.0,
             motion_rejection: 10.0,
             max_camera_delta: 0.07,
-            motion_clip_scale: 0.8,
         },
         hide_planet_controls: false,
     },
@@ -102,11 +98,10 @@ export var QUALITY_PRESETS = {
         resolution_scale: 1.0,
         taa_enabled: false,
         taa: {
-            history_weight: 0.88,
-            clip_box: 0.06,
+            history_weight: 0.9,
+            clip_gamma: 1.25,
             motion_rejection: 8.0,
             max_camera_delta: 0.08,
-            motion_clip_scale: 0.6,
         },
         hide_planet_controls: false,
     },
@@ -124,11 +119,10 @@ export var QUALITY_PRESETS = {
         resolution_scale: 1.0,
         taa_enabled: false,
         taa: {
-            history_weight: 0.88,
-            clip_box: 0.06,
+            history_weight: 0.9,
+            clip_gamma: 1.25,
             motion_rejection: 8.0,
             max_camera_delta: 0.08,
-            motion_clip_scale: 0.6,
         },
         hide_planet_controls: false,
     },
@@ -172,11 +166,7 @@ export function applyQualityPresetValues(parameters, presetName, options) {
     if (modeValues.kerr_rtol !== undefined) parameters.kerr_rtol = modeValues.kerr_rtol;
     parameters.resolution_scale = preset.resolution_scale;
     parameters.taa_enabled = preset.taa_enabled;
-    parameters.taa.history_weight = preset.taa.history_weight;
-    parameters.taa.clip_box = preset.taa.clip_box;
-    parameters.taa.motion_rejection = preset.taa.motion_rejection;
-    parameters.taa.max_camera_delta = preset.taa.max_camera_delta;
-    parameters.taa.motion_clip_scale = preset.taa.motion_clip_scale;
+    Object.assign(parameters.taa, preset.taa);
 
     return preset;
 }

@@ -17,11 +17,10 @@ export function Shader(mustacheTemplate) {
         resolution_scale: 1.0,
         taa_enabled: false,
         taa: {
-            history_weight: 0.88,
-            clip_box: 0.06,
+            history_weight: 0.9,
+            clip_gamma: 1.25,
             motion_rejection: 8.0,
             max_camera_delta: 0.08,
-            motion_clip_scale: 0.6,
         },
         max_revolutions: 2.0,
         rk4_integration: false,
