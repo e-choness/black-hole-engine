@@ -18,6 +18,8 @@ import {
 import { updateObserverDistanceBinding } from '../runtime/ui-bindings.js';
 import { isE2eMode, requestedQualityPreset } from '../runtime/test-hooks.js';
 import { diveState, hoverState } from '../scenarios/scenario-state.js';
+import { SHADER_MASS, iscoRadius } from '../physics/kerr.js';
+import { kerrCameraFrame } from '../physics/kerr-camera.js';
 import {
     DISK_TEMPERATURE_MIN,
     DISK_TEMPERATURE_MAX,
@@ -121,7 +123,7 @@ export function init(glslSource, textures) {
 
     var storedQualityPreset = isE2eMode ? null : readStoredQualityPreset();
     var initialQualityPreset = requestedQualityPreset || storedQualityPreset || 'optimal';
-    applyQualityPresetValues(shader.parameters, initialQualityPreset);
+    applyQualityPresetValues(shader.parameters, initialQualityPreset, { selectSolver: true });
 
     var nextContainer = document.createElement('div');
     document.body.appendChild(nextContainer);
@@ -145,6 +147,12 @@ export function init(glslSource, textures) {
         taa_jitter: { value: new THREE.Vector2() },
         interior_mode: { value: 0.0 },
         cam_rain: { value: 0.0 },
+        cam_pos_ks: { value: new THREE.Vector3() },
+        cam_u_cov: { value: new THREE.Vector4(0, 0, 0, -1) },
+        cam_e1_cov: { value: new THREE.Vector4(1, 0, 0, 0) },
+        cam_e2_cov: { value: new THREE.Vector4(0, 1, 0, 0) },
+        cam_e3_cov: { value: new THREE.Vector4(0, 0, 1, 0) },
+        cam_doppler: { value: new THREE.Vector4(0, 0, 0, 1) },
         planet_distance: { value: 0.0 },
         planet_radius: { value: 0.0 },
         disk_temperature: { value: 10000.0 },
@@ -193,18 +201,6 @@ export function init(glslSource, textures) {
     };
     setShaderUniforms(uniforms);
 
-    function calculateISCO(chi, isPrograde) {
-        var chi2 = chi * chi;
-        var cbrt1MinusChi2 = Math.pow(Math.max(1 - chi2, 0), 1 / 3);
-        var cbrt1PlusChi = Math.pow(1 + Math.abs(chi), 1 / 3);
-        var cbrt1MinusChi = Math.pow(Math.max(1 - Math.abs(chi), 0), 1 / 3);
-        var z1 = 1 + cbrt1MinusChi2 * (cbrt1PlusChi + cbrt1MinusChi);
-        var z2 = Math.sqrt(3 * chi2 + z1 * z1);
-        var sign = isPrograde ? -1 : 1;
-        var iscoRg = 3 + z2 + sign * Math.sqrt((3 - z1) * (3 + z1 + 2 * z2));
-        return iscoRg * 0.5;
-    }
-
     function updateUniformsImpl() {
         shader.parameters.disk_temperature = Math.max(
             DISK_TEMPERATURE_MIN,
@@ -224,7 +220,9 @@ export function init(glslSource, textures) {
         var spin = shader.parameters.black_hole.spin;
         var spinEnabled = shader.parameters.black_hole.spin_enabled;
         var spinMagnitude = Math.abs(spin);
-        uniforms.accretion_inner_r.value = spinEnabled ? calculateISCO(spinMagnitude, true) : 3.0;
+        uniforms.accretion_inner_r.value = spinEnabled
+            ? iscoRadius(spinMagnitude * SHADER_MASS)
+            : 3.0;
 
         uniforms.bh_spin.value = shader.parameters.black_hole.spin;
         uniforms.bh_spin_strength.value = shader.parameters.black_hole.spin_strength;
@@ -317,6 +315,34 @@ export function init(glslSource, textures) {
         uniforms.grav_blueshift_factor.value = rainFrame
             ? 1.0
             : Math.sqrt(Math.max(1.0 - 1.0 / Math.max(obsR, 1.0), 1e-6));
+
+        if (shader.parameters.kerr_mode === 'full_kerr') {
+            var frame = kerrCameraFrame({
+                position: [observer.position.x, observer.position.y, observer.position.z],
+                velocity: [observer.velocity.x, observer.velocity.y, observer.velocity.z],
+                right: [e[0], e[1], e[2]],
+                up: [e[3], e[4], e[5]],
+                forward: [e[6], e[7], e[8]],
+                a: spinEnabled ? spin * SHADER_MASS : 0.0,
+                rain: rainFrame,
+                orbiting: !!shader.parameters.observer.motion,
+                aberration: shader.parameters.aberration
+                    ? Math.max(shader.parameters.look.aberration_strength, 0.0)
+                    : 0.0,
+            });
+            var tetrad = frame.tetrad;
+            uniforms.cam_pos_ks.value.set(frame.pos[0], frame.pos[1], frame.pos[2]);
+            [
+                ['cam_u_cov', tetrad.uLower],
+                ['cam_e1_cov', tetrad.e1Lower],
+                ['cam_e2_cov', tetrad.e2Lower],
+                ['cam_e3_cov', tetrad.e3Lower],
+                ['cam_doppler', frame.doppler],
+            ].forEach(function (entry) {
+                var v = entry[1];
+                uniforms[entry[0]].value.set(v[1], v[2], v[3], v[0]);
+            });
+        }
 
         updateEffectLabels();
     }

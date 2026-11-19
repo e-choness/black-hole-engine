@@ -10,12 +10,36 @@ import {
     finalizeAnimationTimelineCapture,
 } from './animation-capture.js';
 import { resetHover } from './hover.js';
+import { SHADER_MASS, horizonRadius, innerHorizonRadius, rainRadialRate } from '../physics/kerr.js';
+
+// Spin of the traced spacetime in r_s units: Kerr for the Full Kerr solver, Schwarzschild for the
+// Binet modes.
+function diveSpin() {
+    var hole = shader.parameters.black_hole;
+    return shader.parameters.kerr_mode === 'full_kerr' && hole.spin_enabled
+        ? hole.spin * SHADER_MASS
+        : 0.0;
+}
+
+// -dr/dtau of the rain observer, sqrt(r_s/r) without spin and sqrt(2 M r (r^2 + a^2)) / rho^2 for
+// Kerr, where it falls at constant theta.
+function fallRate(r) {
+    var cosTheta = diveState.direction ? diveState.direction.z : 0.0;
+    return -rainRadialRate(Math.max(r, 0.01), cosTheta, diveSpin());
+}
+
+// The dive stops at r = 0.08 r_s without spin and just above the Kerr inner (Cauchy) horizon,
+// beyond which the Kerr-Schild interior is no longer a faithful model.
+function diveFloor() {
+    var a = diveSpin();
+    return a !== 0.0 ? Math.max(0.08, 1.05 * innerHorizonRadius(a)) : 0.08;
+}
 
 export function advanceTimelineDrivenDiveObserverTime(dt) {
     if (!isFinite(dt) || dt <= 0 || !diveState.active || diveState.reachedSingularity) {
         return;
     }
-    var r = Math.max(diveState.currentR, 0.08);
+    var r = Math.max(diveState.currentR, diveFloor());
     var effectiveSpeed = diveState.cinematic
         ? diveState.speed * cinematicFactor(r)
         : diveState.speed;
@@ -142,22 +166,23 @@ function cinematicFactor(r) {
 export function seekDive(targetR, options) {
     options = options || {};
     if (!diveState.active && !diveState.reachedSingularity) return;
-    targetR = Math.max(0.08, Math.min(diveState.prevDistance, targetR));
+    var floor = diveFloor();
+    targetR = Math.max(floor, Math.min(diveState.prevDistance, targetR));
 
-    if (diveState.reachedSingularity && targetR > 0.12) {
+    if (diveState.reachedSingularity && targetR > floor + 0.04) {
         diveState.reachedSingularity = false;
         diveState.active = true;
     }
 
     diveState.currentR = targetR;
-    if (targetR <= 0.09) {
+    if (targetR <= floor + 0.01) {
         diveState.reachedSingularity = true;
     }
     diveState.paused = true;
     diveState.timelineDriven = !!options.timelineDriven;
 
     observer.position.copy(diveState.direction.clone().multiplyScalar(targetR));
-    observer.velocity.copy(diveState.direction.clone().multiplyScalar(-Math.sqrt(1.0 / targetR)));
+    observer.velocity.copy(diveState.direction.clone().multiplyScalar(-fallRate(targetR)));
     shader.parameters.observer.distance = targetR;
 
     shader.needsUpdate = true;
@@ -169,7 +194,8 @@ export function updateDive(dt) {
     if (!diveState.active || diveState.paused || diveState.reachedSingularity) return;
 
     var r = diveState.currentR;
-    if (r < 0.08) {
+    var floor = diveFloor();
+    if (r <= floor) {
         diveState.reachedSingularity = true;
         updateDiveUI();
         return;
@@ -179,17 +205,17 @@ export function updateDive(dt) {
         ? diveState.speed * cinematicFactor(r)
         : diveState.speed;
     var fallDt = dt * effectiveSpeed * shader.parameters.time_scale;
-    var k1 = -Math.sqrt(1.0 / r) * fallDt;
+    var k1 = -fallRate(r) * fallDt;
     var rMid = Math.max(r + k1 * 0.5, 0.01);
-    var k2 = -Math.sqrt(1.0 / rMid) * fallDt;
-    var newR = Math.max(r + k2, 0.08);
+    var k2 = -fallRate(rMid) * fallDt;
+    var newR = Math.max(r + k2, floor);
 
     diveState.currentR = newR;
     observer.position.copy(diveState.direction.clone().multiplyScalar(newR));
 
-    // dr/dtau of the rain observer; it equals the speed relative to the static observer
-    // outside the horizon and keeps growing inside, where no static observer exists.
-    observer.velocity.copy(diveState.direction.clone().multiplyScalar(-Math.sqrt(1.0 / newR)));
+    // dr/dtau of the rain observer; without spin it equals the speed relative to the static
+    // observer outside the horizon and keeps growing inside, where no static observer exists.
+    observer.velocity.copy(diveState.direction.clone().multiplyScalar(-fallRate(newR)));
 
     shader.parameters.observer.distance = newR;
     observer.time += dt * effectiveSpeed * shader.parameters.time_scale;
@@ -209,13 +235,18 @@ export function updateDiveUI() {
     if (!radiusEl) return;
 
     var r = diveState.currentR;
-    var fallRate = Math.sqrt(1.0 / Math.max(r, 0.01));
+    var rate = fallRate(r);
+    var spinning = diveSpin() !== 0.0;
+    var rHorizon = horizonRadius(diveSpin());
 
     radiusEl.innerHTML = 'r = ' + r.toFixed(3) + ' r<sub>s</sub>';
     velocityEl.textContent =
-        r > 1.0
-            ? 'v = ' + fallRate.toFixed(3) + ' c relative to a static observer'
-            : 'dr/dτ = -' + fallRate.toFixed(3) + ' c (no static observers inside)';
+        r > 1.0 && !spinning
+            ? 'v = ' + rate.toFixed(3) + ' c relative to a static observer'
+            : 'dr/dτ = -' +
+              rate.toFixed(3) +
+              ' c' +
+              (spinning ? '' : ' (no static observers inside)');
 
     var speedEl = document.getElementById('dive-speed-val');
     if (speedEl && diveState.active) {
@@ -232,7 +263,7 @@ export function updateDiveUI() {
             Math.min(100, (1.0 - r / Math.max(diveState.prevDistance, 1)) * 100),
         );
         horizonBar.style.width = progress + '%';
-        if (r < 1.0) {
+        if (r < rHorizon) {
             horizonBar.className = 'dive-horizon-fill inside';
         } else {
             horizonBar.className = 'dive-horizon-fill outside';
@@ -240,7 +271,9 @@ export function updateDiveUI() {
     }
 
     if (diveState.reachedSingularity) {
-        statusEl.textContent = '\u26a0 Singularity reached';
+        statusEl.textContent = spinning
+            ? '\u26a0 Inner horizon reached'
+            : '\u26a0 Singularity reached';
         statusEl.className = 'dive-status singularity';
         btnEl.textContent = '\u25b6 START DIVE';
         btnEl.disabled = true;
@@ -253,15 +286,15 @@ export function updateDiveUI() {
         statusEl.textContent = '\u23f8 Paused at r = ' + r.toFixed(2);
         statusEl.className = 'dive-status paused';
         btnEl.textContent = '\u25b6 RESUME';
-    } else if (r > 1.5) {
+    } else if (r > 1.5 * rHorizon) {
         statusEl.textContent = '\u2193 Approaching horizon';
         statusEl.className = 'dive-status approaching';
         btnEl.textContent = '\u23f8 PAUSE';
-    } else if (r > 1.0) {
+    } else if (r > rHorizon) {
         statusEl.textContent = '\u26a1 Near event horizon!';
         statusEl.className = 'dive-status near-horizon';
         btnEl.textContent = '\u23f8 PAUSE';
-    } else if (r > 0.3) {
+    } else if (spinning || r > 0.3) {
         statusEl.textContent = '\u26a1 INSIDE event horizon';
         statusEl.className = 'dive-status inside';
         btnEl.textContent = '\u23f8 PAUSE';

@@ -70,6 +70,12 @@
                     : j_eff_s * path_len_s;
 
                 // Keplerian velocity outside ISCO, capped inside
+                {{#full_kerr}}
+                float transfer_factor_s = max(kerr_orbit_frequency(pos,
+                    kerr_kepler_omega(cyl_r_s, kerr_a, disk_rotation_sign()),
+                    kerr_pt, kerr_pphi, kerr_a) / kerr_nu, 0.05);
+                {{/full_kerr}}
+                {{^full_kerr}}
                 vec3 accretion_v_s;
                 {{#kerr_fast_mode}}
                 float v_kep_s = 1.0 / sqrt(2.0 * max(cyl_r_s - 1.0, 0.01));
@@ -88,6 +94,7 @@
                 gamma = 1.0/sqrt(max(1.0-dot(accretion_v_s,accretion_v_s), 0.0001));
                 float doppler_factor_s = gamma*(1.0+dot(ray/ray_l,accretion_v_s));
                 float transfer_factor_s = max(ray_doppler_factor*doppler_factor_s, 0.05);
+                {{/full_kerr}}
 
                 float slim_intensity = source_contrib;
                 {{#beaming}}

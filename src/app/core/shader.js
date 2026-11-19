@@ -28,6 +28,7 @@ export function Shader(mustacheTemplate) {
         cinematic_tonemap: true,
         quality: 'high',
         kerr_mode: 'kerr_inspired_disk_velocity',
+        kerr_rtol: 1e-4,
         accretion_disk: true,
         accretion_mode: 'thin_disk',
         disk_self_irradiation: true,
@@ -138,16 +139,17 @@ export function Shader(mustacheTemplate) {
     };
 
     this.compile = function () {
+        // Older scenes name the exact solver by its former internal mode.
         if (that.parameters.kerr_mode === 'realtime_full_kerr_core') {
-            that.parameters.kerr_mode = 'kerr_inspired_disk_velocity';
+            that.parameters.kerr_mode = 'full_kerr';
         }
 
         var kerrInspiredMode = that.parameters.kerr_mode === 'kerr_inspired_disk_velocity';
 
         that.parameters.kerr_fast_mode = that.parameters.kerr_mode === 'fast';
         that.parameters.kerr_inspired_mode = kerrInspiredMode;
-        that.parameters.kerr_full_geodesic = false;
         that.parameters.kerr_inspired_velocity = kerrInspiredMode;
+        that.parameters.full_kerr = that.parameters.kerr_mode === 'full_kerr';
 
         var accMode = that.parameters.accretion_mode;
         var diskOn = that.parameters.accretion_disk;
@@ -161,6 +163,11 @@ export function Shader(mustacheTemplate) {
             that.parameters.jet.enabled && that.parameters.jet.mode === 'physical';
         that.parameters.grmhd_enabled = !!that.parameters.grmhd.enabled;
         that.parameters.disk_self_irradiation_enabled = !!that.parameters.disk_self_irradiation;
+        that.parameters.kerr_volume_steps =
+            that.parameters.full_kerr &&
+            (that.parameters.accretion_thick_torus ||
+                that.parameters.accretion_slim_disk ||
+                that.parameters.jet_enabled);
 
         return Mustache.render(mustacheTemplate, that.parameters);
     };

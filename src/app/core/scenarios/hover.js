@@ -10,11 +10,32 @@ import {
     finalizeAnimationTimelineCapture,
 } from './animation-capture.js';
 import { resetDive } from './dive.js';
+import {
+    SHADER_MASS,
+    cksPosition,
+    clockRate,
+    staticAcceleration,
+    staticVelocity,
+} from '../physics/kerr.js';
 
-// dtau/dt of the hovering (static) observer, sqrt(1 - r_s/r). The floor only guards r <= r_s;
-// at hoverState.minR the exact value 0.014 is used.
+// Spin of the traced spacetime in r_s units: Kerr for the Full Kerr solver, Schwarzschild for the
+// Binet modes.
+function hoverSpin() {
+    var hole = shader.parameters.black_hole;
+    return shader.parameters.kerr_mode === 'full_kerr' && hole.spin_enabled
+        ? hole.spin * SHADER_MASS
+        : 0.0;
+}
+
+function hoverPoint(r) {
+    var d = hoverState.direction || { x: 1, y: 0, z: 0 };
+    return cksPosition(r, [d.x, d.y, d.z], hoverSpin());
+}
+
+// dtau/dt of the hovering (static) observer, sqrt(1 - f), which is sqrt(1 - r_s/r) without spin.
+// Static observers exist down to hoverState.minR for every spin; the floor only guards below.
 function hoverClockRate(r) {
-    return Math.max(Math.sqrt(Math.max(1.0 - 1.0 / r, 0.0)), 1e-3);
+    return Math.max(clockRate(staticVelocity(hoverPoint(r), hoverSpin())), 1e-3);
 }
 
 export function advanceTimelineDrivenHoverObserverTime(dt) {
@@ -173,7 +194,7 @@ export function updateHoverUI() {
     var r = hoverState.currentR;
     var gravFactor = hoverClockRate(r);
     var blueshift = 1.0 / gravFactor;
-    var properAccel = 0.5 / (r * r * gravFactor);
+    var properAccel = staticAcceleration(hoverPoint(r), hoverSpin());
 
     radiusEl.innerHTML = 'r = ' + r.toFixed(3) + ' r<sub>s</sub>';
     blueshiftEl.innerHTML = 'D<sub>grav</sub> = ' + blueshift.toFixed(2) + '\u00d7';

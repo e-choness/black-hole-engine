@@ -50,6 +50,13 @@ uniform float cam_rain; // 1.0 while the camera rides the rain frame of the dive
 // kinematic Doppler are applied consistently.
 uniform float grav_blueshift_factor;
 
+// Full Kerr camera: Cartesian Kerr-Schild position, covariant tetrad legs (x, y, z, t) of the
+// observer the rays are launched from, and the physical camera's 4-velocity components in that
+// tetrad stored as (c1, c2, c3, c0).
+uniform vec3 cam_pos_ks;
+uniform vec4 cam_u_cov, cam_e1_cov, cam_e2_cov, cam_e3_cov;
+uniform vec4 cam_doppler;
+
 uniform float planet_distance, planet_radius;
 uniform float disk_temperature;
 uniform float bh_spin, bh_spin_strength, bh_rotation_enabled;
@@ -80,6 +87,14 @@ uniform sampler2D galaxy_texture, star_texture,
 const int NSTEPS = {{n_steps}};
 const int SAMPLE_COUNT = {{sample_count}};
 const float MAX_REVOLUTIONS = float({{max_revolutions}});
+
+{{#full_kerr}}
+// Full Kerr integrator: relative tolerance of the quality preset, absolute tolerance in r_s, and
+// the step length, as a fraction of r, inside volumetric emitters.
+const float KERR_RTOL = {{kerr_rtol}};
+const float KERR_ATOL = 1e-6;
+const float KERR_VOLUME_STEP = 0.06;
+{{/full_kerr}}
 
 // ACCRETION_MIN_R is now a uniform (accretion_inner_r) that varies with black hole spin
 // Using ISCO from Bardeen-Press-Teukolsky formula: r_ISCO = 3 r_s for Schwarzschild

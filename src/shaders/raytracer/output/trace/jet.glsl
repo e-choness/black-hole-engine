@@ -47,6 +47,13 @@
                     // Doppler factor: δ = 1 / (Γ(1 - β·n̂))
                     vec3 ray_dir = ray / max(ray_l, 1e-6);
                     float doppler_jet = gamma_jet * (1.0 + dot(ray_dir, v_jet));
+                    {{#full_kerr}}
+                    // Full Kerr: the jet speed is taken relative to the local zero-angular-
+                    // momentum frame, whose frequency ratio to the camera is exact.
+                    doppler_jet *= kerr_orbit_frequency(pos, kerr_zamo_omega(length(pos),
+                        pos.z*pos.z / max(dot(pos, pos), 1e-8), kerr_a),
+                        kerr_pt, kerr_pphi, kerr_a) / kerr_nu;
+                    {{/full_kerr}}
 
                     // Synchrotron beaming: I_obs = δ^(2+α) * I_em
                     // α ≈ 0.7 for typical synchrotron spectral index

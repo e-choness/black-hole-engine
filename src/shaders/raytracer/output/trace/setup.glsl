@@ -5,15 +5,73 @@
 
 vec4 trace_ray(vec3 ray) {
     vec3 pos = cam_pos;
-
-    // initial conditions
     float u = 1.0 / length(pos), old_u;
-    float u0 = u;
-    vec3 normal_vec = normalize(pos);
 
     float ray_intensity = 1.0;
     float doppler_boost = clamp(look_doppler_boost, 0.0, 2.5);
     float gamma = 1.0;
+    float ray_doppler_factor = 1.0;
+    float step = 0.01;
+    vec4 color = vec4(0.0,0.0,0.0,1.0);
+    float vol_transmittance = 1.0; // volumetric ray transmittance (Beer-Lambert)
+
+    float t = time;
+    float turb_t = loopable_turbulence_time(time + turbulence_time_offset);
+    float dt = 1.0;
+    bool shadow_capture = false;
+    bool escaped = false;
+
+    {{^light_travel_time}}
+    float planet_ang0 = t * PLANET_ORBITAL_ANG_VEL;
+    vec3 planet_pos0 = vec3(cos(planet_ang0), sin(planet_ang0), 0)*PLANET_DISTANCE;
+    {{/light_travel_time}}
+
+    {{#full_kerr}}
+    // The CPU supplies the orthonormal tetrad (u, e1, e2, e3) of the traced observer with e1, e2
+    // and e3 along cam_x, cam_y and cam_z. For the look direction d the backward photon covector
+    // is p = -u + d^i e_i, so the traced observer measures unit frequency and the camera
+    // nu_cam = c0 + c.d, where c are the camera's 4-velocity components in the tetrad.
+    float kerr_a = kerr_spin_a();
+    vec3 look = vec3(dot(ray, cam_x), dot(ray, cam_y), dot(ray, cam_z));
+    vec4 p_cov = -cam_u_cov + look.x*cam_e1_cov + look.y*cam_e2_cov + look.z*cam_e3_cov;
+    float kerr_pt = p_cov.w;
+    vec3 kerr_p = p_cov.xyz;
+    vec4 kerr_x = vec4(cam_pos_ks, 0.0);
+    float kerr_pphi = kerr_x.x*kerr_p.y - kerr_x.y*kerr_p.x;
+    float kerr_nu = max(cam_doppler.w + dot(cam_doppler.xyz, look), 1e-6);
+    // nu_infinity / nu_camera, the frequency ratio of light arriving from the sky.
+    ray_doppler_factor = kerr_pt / kerr_nu;
+
+    vec4 kerr_dx;
+    vec3 kerr_dp;
+    kerr_rhs(kerr_x, kerr_p, kerr_pt, kerr_a, kerr_dx, kerr_dp);
+    vec4 kerr_x_old = kerr_x;
+    vec4 kerr_dx_old = kerr_dx;
+    float kerr_r = ks_radius(kerr_x.xyz, kerr_a);
+    float kerr_rdot = dot(ks_radius_gradient(kerr_x.xyz, kerr_r, kerr_a), kerr_dx.xyz);
+    float kerr_rplus = kerr_horizon_radius(kerr_a);
+    float kerr_r_escape = max(500.0, 4.0*kerr_r);
+    float kerr_h = 0.02*kerr_r / max(length(kerr_dx.xyz), 1e-6);
+    float kerr_h_used = 0.0;
+    {{#kerr_volume_steps}}
+    float kerr_volume_extent = {{#jet_enabled}}max(40.0, 1.2*jet_length){{/jet_enabled}}{{^jet_enabled}}40.0{{/jet_enabled}};
+    {{/kerr_volume_steps}}
+    pos = ks_to_bl_position(kerr_x.xyz, kerr_r, kerr_a);
+    u = 1.0 / kerr_r;
+    // Kerr-Schild time is regular at the future horizon, so every camera retards emitters.
+    bool light_travel_offset = true;
+
+    // Inside the horizon a backward ray leaves through the future horizon only if the photon can
+    // cross it inward, p.(d_t + Omega_H d_phi) >= 0 with Omega_H = a / (r_+^2 + a^2); otherwise it
+    // came from the white-hole region and the pixel stays dark.
+    if (kerr_r < kerr_rplus &&
+            kerr_pt + kerr_a / (kerr_rplus*kerr_rplus + kerr_a*kerr_a)*kerr_pphi <= 0.0) {
+        shadow_capture = true;
+    }
+    {{/full_kerr}}
+    {{^full_kerr}}
+    float u0 = u;
+    vec3 normal_vec = normalize(pos);
 
     // The camera is either referenced to the static observer (static, orbiting and free
     // cameras; cam_vel is its velocity relative to that observer) or rides the rain frame of
@@ -27,7 +85,6 @@ vec4 trace_ray(vec3 ray) {
     //                 radial component into Schwarzschild r;
     //   rain frame:   radial_rate = d_r + beta with beta = sqrt(r_s/r), from E = eps (1 + beta d_r)
     //                 and b = r d_t / (1 + beta d_r) (Painleve-Gullstrand form of the metric).
-    float ray_doppler_factor = 1.0;
     float radial_rate;
     float rain_beta = sqrt(u);
     float photon_energy = 1.0; // E / eps, the photon energy at infinity per camera frequency
@@ -53,24 +110,6 @@ vec4 trace_ray(vec3 ray) {
         ray_doppler_factor = gamma*(1.0 - dot(ray_cam, cam_vel));
         radial_rate = dot(ray, normal_vec) * sqrt(max(1.0 - u, 0.0));
     }
-    {{#beaming}}
-    {{#physical_beaming}}
-    // Observer beaming is already accounted for via transfer_factor
-    // in each emission source. The temperature shift of blackbody sources
-    // captures the full Doppler effect. No additional ray_intensity scaling.
-    {{/physical_beaming}}
-    {{^physical_beaming}}
-    float beaming_factor = clamp(ray_doppler_factor, 0.84, 1.16);
-    ray_intensity /= pow(beaming_factor, 0.65 + 0.75*doppler_boost);
-    {{/physical_beaming}}
-    {{/beaming}}
-    {{^doppler_shift}}
-    ray_doppler_factor = 1.0;
-    {{/doppler_shift}}
-
-    float step = 0.01;
-    vec4 color = vec4(0.0,0.0,0.0,1.0);
-    float vol_transmittance = 1.0; // volumetric ray transmittance (Beer-Lambert)
 
     // Tangential component of ray (perpendicular to radial direction).
     // For near-radial rays the cross product is tiny → degenerate tangent_vec.
@@ -105,44 +144,9 @@ vec4 trace_ray(vec3 ray) {
 
     float phi = 0.0;
 
-    float t = time;
-    float turb_t = loopable_turbulence_time(time + turbulence_time_offset);
-    float dt = 1.0;
-    bool shadow_capture = false;
     // Schwarzschild t is singular at the horizon, so cameras inside the photon sphere do not
     // retard emitters by the light travel time.
     bool light_travel_offset = u0 < 2.0/3.0;
-
-    {{^light_travel_time}}
-    float planet_ang0 = t * PLANET_ORBITAL_ANG_VEL;
-    vec3 planet_pos0 = vec3(cos(planet_ang0), sin(planet_ang0), 0)*PLANET_DISTANCE;
-    {{/light_travel_time}}
-
-    vec3 old_pos = pos;
-
-    // ── Kerr state variables ──
-    // Experimental true Kerr geodesics exist in the codebase but are not
-    // exposed publicly. User-facing spin modes still trace photons with the
-    // Schwarzschild Binet solver plus perturbative frame dragging.
-    float kerr_a_phys = kerr_spin_a();
-    {{#kerr_full_geodesic}}
-    bool use_kerr = (abs(kerr_a_phys) > 0.001 && interior_mode < 0.5);
-    {{/kerr_full_geodesic}}
-    {{^kerr_full_geodesic}}
-    bool use_kerr = false;
-    {{/kerr_full_geodesic}}
-    float kerr_r = 0.0, kerr_cth = 0.0, kerr_phi = 0.0;
-    float kerr_pr = 0.0, kerr_pcth = 0.0;
-    float kerr_xi = 0.0, kerr_eta = 0.0;
-    float kerr_r_horizon = 1.0;
-
-    if (use_kerr) {
-        kerr_init(pos, ray, kerr_a_phys,
-            kerr_xi, kerr_eta,
-            kerr_r, kerr_cth, kerr_phi,
-            kerr_pr, kerr_pcth);
-        kerr_r_horizon = kerr_horizon_radius(kerr_a_phys);
-    }
 
     // Inside the photon sphere the escape test is analytic. The Binet invariant
     // (du/dφ)² + u² − u³ = 1/b² must exceed its barrier value 4/27 (b < b_c) and the backward
@@ -157,67 +161,83 @@ vec4 trace_ray(vec3 ray) {
     }
 
     // Asymptotic azimuth of the orbit plane at which the backward ray reaches infinity.
-    bool escaped = false;
     float phi_inf = 0.0;
+    {{/full_kerr}}
+
+    {{#beaming}}
+    {{#physical_beaming}}
+    // Observer beaming is already accounted for via transfer_factor
+    // in each emission source. The temperature shift of blackbody sources
+    // captures the full Doppler effect. No additional ray_intensity scaling.
+    {{/physical_beaming}}
+    {{^physical_beaming}}
+    float beaming_factor = clamp(ray_doppler_factor, 0.84, 1.16);
+    ray_intensity /= pow(beaming_factor, 0.65 + 0.75*doppler_boost);
+    {{/physical_beaming}}
+    {{/beaming}}
+    {{^doppler_shift}}
+    ray_doppler_factor = 1.0;
+    {{/doppler_shift}}
+
+    vec3 old_pos = pos;
 
     for (int j=0; j < NSTEPS; j++) {
         if (shadow_capture) break;  // pre-classified capture → skip loop
 
-        if (use_kerr) {
-        // ── True Kerr geodesic integration ─────────────────────────────
-        step = MAX_REVOLUTIONS * 2.0*M_PI / float(NSTEPS);
-
-        // Convert angular budget to Mino-time step: dσ ≈ dφ / |dφ/dσ|.
-        // At large r the azimuthal rate dφ/dσ scales with r, so without
-        // this each Mino step would cover huge angles.  Near the horizon
-        // dφ/dσ → ∞ (BL coordinate singularity) but the actual radial
-        // traversal in Mino time is finite, so cap the scaling to prevent
-        // the step from collapsing to zero before the photon can capture.
-        float dphi_dsigma = abs(kerr_phi_dot(kerr_r, kerr_cth, kerr_a_phys, kerr_xi));
-        float mino_scale = clamp(dphi_dsigma, 1.0, 40.0);
-        step /= mino_scale;
-
-        // Adaptive refinement near photon sphere for shadow accuracy
-        float ps_dist = kerr_r - 1.5;
-        step *= 1.0 - 0.5 * exp(-12.0*ps_dist*ps_dist);
-
-        // Limit radial change per step to 30% of current r
-        float dr_per_step = abs(kerr_pr) * step;
-        if (dr_per_step > kerr_r * 0.3 && abs(kerr_pr) > 0.001) {
-            step = kerr_r * 0.3 / abs(kerr_pr);
+        {{#full_kerr}}
+        // DP5 error control plus caps: about 0.2 rad of azimuth per step, at most a tripling of
+        // r, half the remaining gap to the horizon while falling in, and short steps through the
+        // volumetric emitters. Rejected trials cost an iteration without moving the ray.
+        float kerr_speed = max(length(kerr_dx.xyz), 1e-12);
+        float h = min(kerr_h,
+            0.2*kerr_r*kerr_r / max(length(cross(kerr_x.xyz, kerr_dx.xyz)), 1e-12));
+        h = min(h, 2.0*kerr_r / kerr_speed);
+        if (kerr_rdot < 0.0 && kerr_r > kerr_rplus) {
+            h = min(h, 0.5*(kerr_r - kerr_rplus) / -kerr_rdot);
         }
-        step = max(step, 1e-6);
+        {{#kerr_volume_steps}}
+        if (kerr_r < kerr_volume_extent) h = min(h, KERR_VOLUME_STEP*kerr_r / kerr_speed);
+        {{/kerr_volume_steps}}
+
+        vec4 x_new, dx_new;
+        vec3 p_new, dp_new;
+        float err = kerr_dp45_step(kerr_x, kerr_p, kerr_dx, kerr_dp, h, kerr_pt, kerr_a,
+            x_new, p_new, dx_new, dp_new);
+        // Standard controller h_next = 0.9 h err^(-1/5), limited to a factor of 0.2..5 per step.
+        float h_scale = err <= 1e30 ? 0.9*pow(max(err, 1e-12), -0.2) : 0.2;
+        if (!(err <= 1.0)) {
+            kerr_h = h*clamp(h_scale, 0.2, 0.9);
+            continue;
+        }
+        kerr_h = h*min(h_scale, 5.0);
+        kerr_h_used = h;
+        kerr_x_old = kerr_x;
+        kerr_dx_old = kerr_dx;
+        kerr_x = x_new;
+        kerr_p = p_new;
+        kerr_dx = dx_new;
+        kerr_dp = dp_new;
+        dt = kerr_x_old.w - kerr_x.w;
 
         old_u = u;
         old_pos = pos;
+        kerr_r = ks_radius(kerr_x.xyz, kerr_a);
+        kerr_rdot = dot(ks_radius_gradient(kerr_x.xyz, kerr_r, kerr_a), kerr_dx.xyz);
+        u = 1.0 / kerr_r;
+        pos = ks_to_bl_position(kerr_x.xyz, kerr_r, kerr_a);
 
-        integrate_kerr_step(kerr_r, kerr_cth, kerr_phi,
-            kerr_pr, kerr_pcth,
-            step, kerr_a_phys, kerr_xi, kerr_eta);
-
-        // Capture: photon reached the event horizon
-        if (kerr_r <= kerr_r_horizon + 0.02 || kerr_r < 0.01) {
+        // Backward rays falling onto the hole pile up against the past horizon, so capture just
+        // outside r_+; escape far out, where the remaining deflection is about r_s / r.
+        if (kerr_rdot < 0.0 && kerr_r < 1.01*kerr_rplus) {
             shadow_capture = true;
             break;
         }
-
-        // Reconstruct 3D Cartesian position from Boyer-Lindquist (r, θ, φ)
-        // MUST happen before escape check so `pos` is valid for background ray
-        float sth_k = sqrt(max(1.0 - kerr_cth*kerr_cth, 0.0));
-        float rho_perp = sqrt(kerr_r*kerr_r + kerr_a_phys*kerr_a_phys) * sth_k;
-        pos = vec3(rho_perp * cos(kerr_phi),
-                   rho_perp * sin(kerr_phi),
-                   kerr_r * kerr_cth);
-        u = 1.0 / max(kerr_r, 0.001);
-
-        // Escape: photon past observer and heading outward
-        if (kerr_r > length(cam_pos) * 1.1 && kerr_pr > 0.0) {
+        if (kerr_rdot > 0.0 && kerr_r > kerr_r_escape) {
+            escaped = true;
             break;
         }
-
-        } else {
-        // ── Public Schwarzschild Binet integration (all exposed modes;
-        //    also reused inside the horizon) ────────────────────────────
+        {{/full_kerr}}
+        {{^full_kerr}}
         step = MAX_REVOLUTIONS * 2.0*M_PI / float(NSTEPS);
 
         // adaptive step size based on rate of change
@@ -285,12 +305,13 @@ vec4 trace_ray(vec3 ray) {
         frame_drag_phase += frame_drag_step;
 
         pos = rotate_about_z(planar_pos, frame_drag_phase);
-        } // end if (use_kerr) / else
+        {{/full_kerr}}
 
         ray = pos-old_pos;
         float solid_isec_t = 2.0;
         float ray_l = length(ray);
 
+        {{^full_kerr}}
         {{#light_travel_time}}
         {{#gravitational_time_dilation}}
         float ltt_mix = light_travel_offset ? smooth_step(1.0/u, 8.0) : 1.0;
@@ -300,6 +321,7 @@ vec4 trace_ray(vec3 ray) {
         dt = ray_l;
         {{/gravitational_time_dilation}}
         {{/light_travel_time}}
+        {{/full_kerr}}
 
         {{#planetEnabled}}
         if (
@@ -316,8 +338,17 @@ vec4 trace_ray(vec3 ray) {
             vec3 planet_pos0 = vec3(cos(planet_ang0), sin(planet_ang0), 0)*PLANET_DISTANCE;
             {{/light_travel_time}}
 
+            {{#full_kerr}}
+            // Frequency ratio of the zero-angular-momentum frame on the planet's orbit, in which
+            // planet_intersection applies the planet's own motion.
+            float planet_frame_doppler = kerr_orbit_frequency(vec3(PLANET_DISTANCE, 0.0, 0.0),
+                kerr_zamo_omega(PLANET_DISTANCE, 0.0, kerr_a), kerr_pt, kerr_pphi, kerr_a) / kerr_nu;
+            {{/full_kerr}}
+            {{^full_kerr}}
+            float planet_frame_doppler = ray_doppler_factor;
+            {{/full_kerr}}
             vec4 planet_isec = planet_intersection(old_pos, ray, t, dt,
-                    planet_pos0, ray_doppler_factor);
+                    planet_pos0, planet_frame_doppler);
             if (planet_isec.w > 0.0) {
                 solid_isec_t = planet_isec.w;
                 planet_isec.w = 1.0;

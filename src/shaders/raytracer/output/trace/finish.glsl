@@ -2,9 +2,15 @@
         if (light_travel_offset) t -= dt;
         {{/light_travel_time}}
 
+        {{#full_kerr}}
+        if (solid_isec_t <= 1.0) {
+            shadow_capture = true; // the planet is opaque
+            break;
+        }
+        {{/full_kerr}}
+        {{^full_kerr}}
         if (solid_isec_t <= 1.0) u = 100.0; // break (exceeds both exterior and interior thresholds)
 
-        if (!use_kerr) {
         {{#kerr_fast_mode}}
         if (interior_mode < 0.5) {
             float capture_u = 1.0 + photon_spin_lensing_scale *
@@ -27,16 +33,19 @@
             break;
         }
         {{/kerr_inspired_mode}}
-        {{#kerr_full_geodesic}}
-        // Full Kerr geodesic fallback (Binet): interior capture
-        if (interior_mode > 0.5 && u >= 20.0) {
-            shadow_capture = true;
-            break;
-        }
-        {{/kerr_full_geodesic}}
-        } // end if (!use_kerr)
+        {{/full_kerr}}
     }
 
+    {{#full_kerr}}
+    // Out of iterations: rays that are already far out and receding go to the sky.
+    if (!shadow_capture && !escaped) escaped = kerr_r > 10.0 && kerr_rdot > 0.0;
+    if (escaped && !shadow_capture) {
+        // CKS coordinates are asymptotically Cartesian, so dx/dl points at the sky position.
+        ray = normalize(kerr_dx.xyz);
+        // ray_doppler_factor already is the full ratio nu_infinity / nu_camera.
+        float bg_doppler = ray_doppler_factor;
+    {{/full_kerr}}
+    {{^full_kerr}}
     // Background sky for rays that reached the far field.
     if (!shadow_capture && !forced_capture && u < 1.0) {
 
@@ -54,13 +63,14 @@
             ray = normalize(pos - old_pos);
         }
 
-        vec2 tex_coord = sphere_map(ray * BG_COORDS);
-        float t_coord;
-
         // bg_doppler = nu_infinity/nu_camera: the static-frame blueshift
         // 1/sqrt(1 - r_s/r) through grav_blueshift_factor times the camera's Doppler
         // factor, or the full rain-frame ratio 1 + beta d_r during a dive.
         float bg_doppler = ray_doppler_factor * grav_blueshift_factor;
+    {{/full_kerr}}
+
+        vec2 tex_coord = sphere_map(ray * BG_COORDS);
+        float t_coord;
 
         // Liouville invariant (I_nu / nu^3 = const along a ray):
         // D = f_obs/f_emit = 1/bg_doppler is the TOTAL frequency ratio

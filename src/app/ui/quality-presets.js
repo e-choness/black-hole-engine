@@ -6,6 +6,13 @@ export var QUALITY_PRESETS = {
     mobile: {
         standard: { n_steps: 28, sample_count: 1, max_revolutions: 1.4, rk4_integration: false },
         kerr: { n_steps: 120, sample_count: 1, max_revolutions: 2.0, rk4_integration: false },
+        full_kerr: {
+            n_steps: 96,
+            sample_count: 1,
+            max_revolutions: 2.0,
+            rk4_integration: false,
+            kerr_rtol: 1e-3,
+        },
         cinematic_tonemap: true,
         resolution_scale: 0.55,
         taa_enabled: true,
@@ -21,6 +28,13 @@ export var QUALITY_PRESETS = {
     medium: {
         standard: { n_steps: 100, sample_count: 1, max_revolutions: 2.0, rk4_integration: false },
         kerr: { n_steps: 400, sample_count: 3, max_revolutions: 3.0, rk4_integration: true },
+        full_kerr: {
+            n_steps: 256,
+            sample_count: 3,
+            max_revolutions: 3.0,
+            rk4_integration: true,
+            kerr_rtol: 1e-4,
+        },
         cinematic_tonemap: true,
         resolution_scale: 1.0,
         taa_enabled: false,
@@ -36,6 +50,14 @@ export var QUALITY_PRESETS = {
     high: {
         standard: { n_steps: 320, sample_count: 4, max_revolutions: 3.2, rk4_integration: true },
         kerr: { n_steps: 520, sample_count: 4, max_revolutions: 3.5, rk4_integration: true },
+        full_kerr: {
+            n_steps: 384,
+            sample_count: 4,
+            max_revolutions: 3.5,
+            rk4_integration: true,
+            kerr_rtol: 1e-4,
+        },
+        prefer_full_kerr: true,
         cinematic_tonemap: true,
         resolution_scale: 1.0,
         taa_enabled: false,
@@ -51,6 +73,13 @@ export var QUALITY_PRESETS = {
     optimal: {
         standard: { n_steps: 100, sample_count: 1, max_revolutions: 2.0, rk4_integration: false },
         kerr: { n_steps: 400, sample_count: 1, max_revolutions: 3.5, rk4_integration: true },
+        full_kerr: {
+            n_steps: 160,
+            sample_count: 1,
+            max_revolutions: 3.5,
+            rk4_integration: true,
+            kerr_rtol: 3e-4,
+        },
         cinematic_tonemap: true,
         resolution_scale: 0.8,
         taa_enabled: true,
@@ -66,6 +95,14 @@ export var QUALITY_PRESETS = {
     ultra: {
         standard: { n_steps: 600, sample_count: 4, max_revolutions: 4, rk4_integration: true },
         kerr: { n_steps: 1400, sample_count: 6, max_revolutions: 6, rk4_integration: true },
+        full_kerr: {
+            n_steps: 768,
+            sample_count: 6,
+            max_revolutions: 6,
+            rk4_integration: true,
+            kerr_rtol: 1e-5,
+        },
+        prefer_full_kerr: true,
         cinematic_tonemap: true,
         resolution_scale: 1.0,
         taa_enabled: false,
@@ -81,6 +118,14 @@ export var QUALITY_PRESETS = {
     cinematic: {
         standard: { n_steps: 600, sample_count: 6, max_revolutions: 4, rk4_integration: true },
         kerr: { n_steps: 1400, sample_count: 12, max_revolutions: 8, rk4_integration: true },
+        full_kerr: {
+            n_steps: 1024,
+            sample_count: 12,
+            max_revolutions: 8,
+            rk4_integration: true,
+            kerr_rtol: 1e-5,
+        },
+        prefer_full_kerr: true,
         cinematic_tonemap: true,
         resolution_scale: 1.0,
         taa_enabled: false,
@@ -95,16 +140,34 @@ export var QUALITY_PRESETS = {
     },
 };
 
-export function applyQualityPresetValues(parameters, presetName) {
+// High, ultra and cinematic trace spinning holes with the Full Kerr solver by default. The other
+// presets, and every preset at a = 0 where the Binet solver is exact and cheaper, default to the
+// Kerr-inspired mode; an explicit choice of the fast Binet mode is kept.
+function presetSolverMode(parameters, preset) {
+    var hole = parameters.black_hole || {};
+    var spinning = !!hole.spin_enabled && Math.abs(hole.spin || 0) > 1e-4;
+    if (parameters.kerr_mode === 'fast') return 'fast';
+    return preset.prefer_full_kerr && spinning ? 'full_kerr' : 'kerr_inspired_disk_velocity';
+}
+
+// options.selectSolver also applies the preset's default solver (see presetSolverMode).
+export function applyQualityPresetValues(parameters, presetName, options) {
     if (!parameters) return null;
 
     var preset = QUALITY_PRESETS[presetName];
     if (!preset) return null;
 
-    var isKerr =
-        parameters.kerr_mode === 'kerr_inspired_disk_velocity' ||
-        parameters.kerr_mode === 'realtime_full_kerr_core';
-    var modeValues = isKerr ? preset.kerr : preset.standard;
+    if (options && options.selectSolver) {
+        parameters.kerr_mode = presetSolverMode(parameters, preset);
+    }
+
+    var fullKerr =
+        parameters.kerr_mode === 'full_kerr' || parameters.kerr_mode === 'realtime_full_kerr_core';
+    var modeValues = fullKerr
+        ? preset.full_kerr
+        : parameters.kerr_mode === 'kerr_inspired_disk_velocity'
+          ? preset.kerr
+          : preset.standard;
     if (!modeValues) return null;
 
     parameters.quality = presetName;
@@ -112,6 +175,7 @@ export function applyQualityPresetValues(parameters, presetName) {
     parameters.sample_count = modeValues.sample_count;
     parameters.max_revolutions = modeValues.max_revolutions;
     parameters.rk4_integration = modeValues.rk4_integration;
+    if (modeValues.kerr_rtol !== undefined) parameters.kerr_rtol = modeValues.kerr_rtol;
     parameters.cinematic_tonemap = preset.cinematic_tonemap;
     parameters.resolution_scale = preset.resolution_scale;
     parameters.taa_enabled = preset.taa_enabled;
@@ -137,4 +201,5 @@ export var QUALITY_PRESET_LABELS = {
 export var KERR_MODE_LABELS = {
     'Fast (Binet lensing)': 'fast',
     'Kerr-inspired disk velocities': 'kerr_inspired_disk_velocity',
+    'Full Kerr': 'full_kerr',
 };

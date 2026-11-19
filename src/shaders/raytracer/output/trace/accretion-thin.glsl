@@ -23,10 +23,24 @@
                 continue;
             }
             float acc_isec_t = -sub_old.z / sub_ray_z;
+            {{#full_kerr}}
+            // The DP5 end points carry dx/dl, so the cubic Hermite interpolant of the step puts
+            // the crossing on the curved path; on the equator r = sqrt(x^2 + y^2 - a^2).
+            acc_isec_t = kerr_hermite_root(kerr_x_old.z, kerr_x.z,
+                kerr_h_used*kerr_dx_old.z, kerr_h_used*kerr_dx.z);
+            vec3 kerr_isec = kerr_hermite(kerr_x_old.xyz, kerr_x.xyz,
+                kerr_h_used*kerr_dx_old.xyz, kerr_h_used*kerr_dx.xyz, acc_isec_t);
+            {{/full_kerr}}
             if (acc_isec_t < solid_isec_t) {
+                {{#full_kerr}}
+                float r = sqrt(max(dot(kerr_isec.xy, kerr_isec.xy) - kerr_a*kerr_a, 1e-8));
+                vec3 isec = vec3(kerr_isec.xy * (r / sqrt(r*r + kerr_a*kerr_a)), 0.0);
+                {{/full_kerr}}
+                {{^full_kerr}}
                 vec3 isec = sub_old + sub_ray*acc_isec_t;
 
                 float r = length(isec);
+                {{/full_kerr}}
                 {{#grmhd_enabled}}
                 // GRMHD: magnetic stress allows emission inside ISCO
                 // (Noble+ 2010, Penna+ 2010: plunging region contributes ~10-30%)
@@ -93,6 +107,12 @@
                     float cos_emission_angle = abs(ray.z) / max(ray_l, 1e-6);
                     accretion_intensity *= 0.4 + 0.6 * cos_emission_angle;
 
+                    {{#full_kerr}}
+                    float transfer_factor = max(kerr_orbit_frequency(isec,
+                        kerr_kepler_omega(r, kerr_a, disk_rotation_sign()),
+                        kerr_pt, kerr_pphi, kerr_a) / kerr_nu, 0.05);
+                    {{/full_kerr}}
+                    {{^full_kerr}}
                     vec3 accretion_v;
                     {{#kerr_fast_mode}}
                     accretion_v = disk_rotation_sign() *
@@ -112,6 +132,7 @@
                     gamma = 1.0/sqrt(max(1.0-dot(accretion_v,accretion_v), 0.0001));
                     float doppler_factor = gamma*(1.0+dot(ray/ray_l,accretion_v));
                     float transfer_factor = max(ray_doppler_factor*doppler_factor, 0.05);
+                    {{/full_kerr}}
                     {{#beaming}}
                     {{#physical_beaming}}
                     // Liouville invariant: I_obs = D³ · I_emit.

@@ -329,13 +329,13 @@ export function setupGUI() {
         });
     }
 
-    function applyQualityPresetInternal(value) {
+    function applyQualityPresetInternal(value, selectSolver) {
         setPlanetControlsVisible(true);
 
         if (value === 'custom') {
             restoreQualityPresetState(qualityCustomState);
         } else {
-            var preset = applyQualityPresetValues(p, value);
+            var preset = applyQualityPresetValues(p, value, { selectSolver: !!selectSolver });
             if (!preset) return;
 
             if (preset.hide_planet_controls) {
@@ -355,7 +355,7 @@ export function setupGUI() {
     }
 
     function applyQualityPreset(value) {
-        applyQualityPresetInternal(value);
+        applyQualityPresetInternal(value, true);
         if (value === 'custom') {
             qualityCustomState = captureQualityPresetState();
         }
@@ -580,7 +580,8 @@ export function setupGUI() {
 
         var spinEnabled = !!p.black_hole.spin_enabled;
         setControlVisible(spinCtrl, spinEnabled);
-        setControlVisible(spinStrengthCtrl, spinEnabled);
+        // The heuristic spin strength only scales the Binet modes' frame-dragging terms.
+        setControlVisible(spinStrengthCtrl, spinEnabled && p.kerr_mode !== 'full_kerr');
 
         var bloomEnabled = !!p.bloom.enabled;
         setControlsVisible([bloomStrengthCtrl, bloomThresholdCtrl, bloomRadiusCtrl], bloomEnabled);

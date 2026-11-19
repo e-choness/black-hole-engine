@@ -74,6 +74,12 @@
                 float step_T = exp(-tau_step);
 
                 // Sub-Keplerian gas velocity (ADAF: ~50% of Keplerian)
+                {{#full_kerr}}
+                float transfer_factor_t = max(kerr_orbit_frequency(pos,
+                    0.5*kerr_kepler_omega(cyl_r_t, kerr_a, disk_rotation_sign()),
+                    kerr_pt, kerr_pphi, kerr_a) / kerr_nu, 0.05);
+                {{/full_kerr}}
+                {{^full_kerr}}
                 vec3 accretion_v_t;
                 {{#kerr_fast_mode}}
                 float v_kep_t = 1.0 / sqrt(2.0 * max(cyl_r_t - 1.0, 0.01));
@@ -93,6 +99,7 @@
                 gamma = 1.0/sqrt(max(1.0-dot(accretion_v_t,accretion_v_t), 0.0001));
                 float doppler_factor_t = gamma*(1.0+dot(ray/ray_l,accretion_v_t));
                 float transfer_factor_t = max(ray_doppler_factor*doppler_factor_t, 0.05);
+                {{/full_kerr}}
 
                 float torus_intensity = j_eff * path_len;
                 {{#beaming}}

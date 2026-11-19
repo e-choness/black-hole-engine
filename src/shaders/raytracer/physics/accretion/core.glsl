@@ -120,7 +120,13 @@ float gravitational_shift_static(float emission_radius) {
     // The observer side is grav_blueshift_factor = nu_infinity/nu_static at the camera, which
     // is 1 for the rain frame of a dive because its ray_doppler_factor already holds the full
     // camera-to-infinity ratio.
+    {{#full_kerr}}
+    // Full Kerr folds the gravitational shift into each emitter's exact p.u transfer factor.
+    return 1.0;
+    {{/full_kerr}}
+    {{^full_kerr}}
     float r_emit = max(emission_radius, 1.0001);
     float emission_term = max(abs(1.0 - 1.0 / r_emit), 0.0001);
     return sqrt(emission_term) / max(grav_blueshift_factor, 1e-3);
+    {{/full_kerr}}
 }
