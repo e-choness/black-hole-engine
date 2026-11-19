@@ -10,6 +10,7 @@
     height: 100dvh;
     padding-top: env(safe-area-inset-top);
     pointer-events: none;
+    container: shell / size;
 }
 
 .shell > * {
@@ -289,8 +290,9 @@ body.has-timeline-panel .shell-footer {
     background: rgb(255 255 255 / 0.1);
 }
 
-/* Short windows get a denser rail, which scrolls only when even that does not fit. */
-@media (max-height: 720px) {
+/* Short windows, or the room left above a docked timeline editor (the shell's bottom padding),
+   get a denser rail, which scrolls only when even that does not fit. */
+@container shell (max-height: 720px) {
     .rail-btn {
         gap: 2px;
         padding: 5px 0 4px;
