@@ -157,8 +157,7 @@ export function seekDive(targetR, options) {
     diveState.timelineDriven = !!options.timelineDriven;
 
     observer.position.copy(diveState.direction.clone().multiplyScalar(targetR));
-    var velocity = Math.min(Math.sqrt(1.0 / targetR), 0.998);
-    observer.velocity.copy(diveState.direction.clone().multiplyScalar(-velocity));
+    observer.velocity.copy(diveState.direction.clone().multiplyScalar(-Math.sqrt(1.0 / targetR)));
     shader.parameters.observer.distance = targetR;
 
     shader.needsUpdate = true;
@@ -188,15 +187,12 @@ export function updateDive(dt) {
     diveState.currentR = newR;
     observer.position.copy(diveState.direction.clone().multiplyScalar(newR));
 
-    var velocity = Math.min(Math.sqrt(1.0 / newR), 0.998);
-    observer.velocity.copy(diveState.direction.clone().multiplyScalar(-velocity));
+    // dr/dtau of the rain observer; it equals the speed relative to the static observer
+    // outside the horizon and keeps growing inside, where no static observer exists.
+    observer.velocity.copy(diveState.direction.clone().multiplyScalar(-Math.sqrt(1.0 / newR)));
 
     shader.parameters.observer.distance = newR;
     observer.time += dt * effectiveSpeed * shader.parameters.time_scale;
-
-    if (newR < 1.0 && r >= 1.0) {
-        scene.updateShader();
-    }
 
     shader.needsUpdate = true;
     updateDiveUI();
@@ -213,10 +209,13 @@ export function updateDiveUI() {
     if (!radiusEl) return;
 
     var r = diveState.currentR;
-    var velocity = r > 0.01 ? Math.min(Math.sqrt(1.0 / r), 0.999) : 0.999;
+    var fallRate = Math.sqrt(1.0 / Math.max(r, 0.01));
 
     radiusEl.innerHTML = 'r = ' + r.toFixed(3) + ' r<sub>s</sub>';
-    velocityEl.textContent = 'v = ' + velocity.toFixed(3) + ' c';
+    velocityEl.textContent =
+        r > 1.0
+            ? 'v = ' + fallRate.toFixed(3) + ' c relative to a static observer'
+            : 'dr/dτ = -' + fallRate.toFixed(3) + ' c (no static observers inside)';
 
     var speedEl = document.getElementById('dive-speed-val');
     if (speedEl && diveState.active) {

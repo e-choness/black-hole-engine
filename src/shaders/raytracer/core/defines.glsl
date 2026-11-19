@@ -42,10 +42,10 @@ uniform vec2 cam_pan;
 uniform vec2 taa_jitter;
 
 uniform float interior_mode; // 0.0 = exterior (capture at horizon), 1.0 = interior (trace past horizon)
+uniform float cam_rain; // 1.0 while the camera rides the rain frame of the dive
 
-// Gravitational blueshift: sqrt(1 - r_s/r) for the observer position.
-// Light from infinity gains energy falling into the potential well.
-// For a hovering (static) observer: f_obs/f_emit = 1/grav_blueshift_factor.
+// nu_infinity/nu_static at the camera: sqrt(1 - r_s/r) for cameras referenced to the static
+// observer, 1.0 in the rain frame (whose per-ray Doppler factor already covers it).
 // Multiplied into the background Doppler factor so both gravitational and
 // kinematic Doppler are applied consistently.
 uniform float grav_blueshift_factor;

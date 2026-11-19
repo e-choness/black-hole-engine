@@ -11,10 +11,16 @@ import {
 } from './animation-capture.js';
 import { resetDive } from './dive.js';
 
+// dtau/dt of the hovering (static) observer, sqrt(1 - r_s/r). The floor only guards r <= r_s;
+// at hoverState.minR the exact value 0.014 is used.
+function hoverClockRate(r) {
+    return Math.max(Math.sqrt(Math.max(1.0 - 1.0 / r, 0.0)), 1e-3);
+}
+
 export function advanceTimelineDrivenHoverObserverTime(dt) {
     if (!isFinite(dt) || dt <= 0 || !hoverState.active) return;
     var r = Math.max(hoverState.currentR, hoverState.minR, 1.0001);
-    var timeDilation = Math.sqrt(Math.max(1.0 - 1.0 / r, 0.001));
+    var timeDilation = hoverClockRate(r);
     observer.time += (dt * shader.parameters.time_scale) / timeDilation;
 }
 
@@ -146,7 +152,7 @@ export function updateHover(dt) {
 
     shader.parameters.observer.distance = newR;
 
-    var timeDilation = Math.sqrt(Math.max(1.0 - 1.0 / newR, 0.001));
+    var timeDilation = hoverClockRate(newR);
     observer.time += (dt * shader.parameters.time_scale) / timeDilation;
 
     shader.needsUpdate = true;
@@ -165,7 +171,7 @@ export function updateHoverUI() {
     if (!radiusEl) return;
 
     var r = hoverState.currentR;
-    var gravFactor = Math.sqrt(Math.max(1.0 - 1.0 / r, 0.001));
+    var gravFactor = hoverClockRate(r);
     var blueshift = 1.0 / gravFactor;
     var properAccel = 0.5 / (r * r * gravFactor);
 

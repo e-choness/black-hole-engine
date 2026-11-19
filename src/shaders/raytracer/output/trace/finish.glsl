@@ -1,5 +1,5 @@
         {{#light_travel_time}}
-        t -= dt;
+        if (light_travel_offset) t -= dt;
         {{/light_travel_time}}
 
         if (solid_isec_t <= 1.0) u = 100.0; // break (exceeds both exterior and interior thresholds)
@@ -37,25 +37,19 @@
         } // end if (!use_kerr)
     }
 
-        trace_finished = shadow_capture || u < 1.0 || use_kerr || !allow_extended_trace || u > 20.0;
-    }
+    // Background sky for rays that reached the far field.
+    if (!shadow_capture && !forced_capture && u < 1.0) {
 
-    // Background sky: show for rays that escaped to far field.
-    // Interior escaped rays use analytical exit direction (Binet tangent)
-    // which avoids the numerical drift of pos − old_pos over many steps.
-    if (!shadow_capture && u < 1.0) {
-
-        if (interior_mode > 0.5) {
-            // Analytical exit direction from the Binet parametrisation:
-            //   d(pos)/dφ  =  φ̂/u  −  r̂·(du/u²)
-            // where r̂ and φ̂ are the radial and tangential unit vectors
-            // rotated to the current orbit angle φ.
-            vec3 r_hat  = cos(phi)*normal_vec + sin(phi)*tangent_vec;
-            vec3 phi_hat = -sin(phi)*normal_vec + cos(phi)*tangent_vec;
-            vec3 exit_dir = phi_hat / max(u, 0.001)
-                          - r_hat  * du / max(u*u, 0.001);
-            exit_dir = rotate_about_z(exit_dir, frame_drag_phase);
-            ray = normalize(exit_dir);
+        if (!escaped && du < 0.0) {
+            // Out of steps while receding: near infinity the orbit is the straight line
+            // u = sin(phi_inf - phi) / b, so phi_inf - phi = atan(u, -du).
+            phi_inf = phi + atan(u, -du);
+            escaped = true;
+        }
+        if (escaped) {
+            // At infinity the photon moves radially, along r_hat(phi_inf) of the orbit plane.
+            vec3 sky_dir = cos(phi_inf)*normal_vec + sin(phi_inf)*tangent_vec;
+            ray = rotate_about_z(sky_dir, frame_drag_phase);
         } else {
             ray = normalize(pos - old_pos);
         }
@@ -63,20 +57,9 @@
         vec2 tex_coord = sphere_map(ray * BG_COORDS);
         float t_coord;
 
-        // Interior blueshift: escaped photons gain energy climbing out
-        // of the gravitational potential well.  Boost ~ 1/√|1 − 1/r|.
-        float interior_boost = 1.0;
-        if (interior_mode > 0.5) {
-            float r_obs = max(length(cam_pos), 0.08);
-            interior_boost = 1.0 + 0.5 * sqrt(abs(1.0/r_obs - 1.0));
-            interior_boost = min(interior_boost, 4.0);
-        }
-
-        // Gravitational blueshift for background sky: light from infinity
-        // gains energy falling into the gravitational potential well.
-        // For a static (hovering) observer at r:
-        //   f_obs/f_emit = 1/sqrt(1 - r_s/r) = 1/grav_blueshift_factor
-        // Combined with kinematic Doppler from observer orbital/dive motion.
+        // bg_doppler = nu_infinity/nu_camera: the static-frame blueshift
+        // 1/sqrt(1 - r_s/r) through grav_blueshift_factor times the camera's Doppler
+        // factor, or the full rain-frame ratio 1 + beta d_r during a dive.
         float bg_doppler = ray_doppler_factor * grav_blueshift_factor;
 
         // Liouville invariant (I_nu / nu^3 = const along a ray):
@@ -98,10 +81,10 @@
                 (STAR_MAX_TEMPERATURE-STAR_MIN_TEMPERATURE) * star_color.g)
                  / safe_bg_doppler;
 
-            color += BLACK_BODY_COLOR(t_coord) * star_color.r * STAR_BRIGHTNESS * look_star_gain * vol_transmittance * interior_boost * bg_boost;
+            color += BLACK_BODY_COLOR(t_coord) * star_color.r * STAR_BRIGHTNESS * look_star_gain * vol_transmittance * bg_boost;
         }
 
-        color += galaxy_color(tex_coord, bg_doppler) * GALAXY_BRIGHTNESS * look_galaxy_gain * vol_transmittance * interior_boost * bg_boost;
+        color += galaxy_color(tex_coord, bg_doppler) * GALAXY_BRIGHTNESS * look_galaxy_gain * vol_transmittance * bg_boost;
     }
 
     return color*ray_intensity;

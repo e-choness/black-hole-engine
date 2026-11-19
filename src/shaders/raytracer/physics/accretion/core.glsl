@@ -113,19 +113,14 @@ float accretion_temperature(float radius) {
     return t_base * pow(accretion_returning_radiation_enhancement(radius), 0.25);
 }
 
-// Observer metric factor shared by the Schwarzschild redshift helpers.
-// Uses the static Schwarzschild factor because the observer's own
-// kinematic Doppler is applied separately via cam_vel aberration.
-float _observer_metric_factor() {
-    float r_obs = max(length(cam_pos), 0.05);
-    return max(abs(1.0 - 1.0 / r_obs), 0.001);
-}
-
 float gravitational_shift_static(float emission_radius) {
     // Static Schwarzschild redshift only. Moving-source kinematic Doppler
     // (including transverse time dilation via gamma) is applied separately in
     // trace_ray(), which avoids double counting the emitter gamma factor.
+    // The observer side is grav_blueshift_factor = nu_infinity/nu_static at the camera, which
+    // is 1 for the rain frame of a dive because its ray_doppler_factor already holds the full
+    // camera-to-infinity ratio.
     float r_emit = max(emission_radius, 1.0001);
     float emission_term = max(abs(1.0 - 1.0 / r_emit), 0.0001);
-    return sqrt(emission_term / _observer_metric_factor());
+    return sqrt(emission_term) / max(grav_blueshift_factor, 1e-3);
 }

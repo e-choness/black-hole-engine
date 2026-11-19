@@ -17,6 +17,7 @@ import {
 } from './renderer-quality.js';
 import { updateObserverDistanceBinding } from '../runtime/ui-bindings.js';
 import { isE2eMode, requestedQualityPreset } from '../runtime/test-hooks.js';
+import { diveState, hoverState } from '../scenarios/scenario-state.js';
 import {
     DISK_TEMPERATURE_MIN,
     DISK_TEMPERATURE_MAX,
@@ -143,6 +144,7 @@ export function init(glslSource, textures) {
         cam_pan: { value: new THREE.Vector2() },
         taa_jitter: { value: new THREE.Vector2() },
         interior_mode: { value: 0.0 },
+        cam_rain: { value: 0.0 },
         planet_distance: { value: 0.0 },
         planet_radius: { value: 0.0 },
         disk_temperature: { value: 10000.0 },
@@ -291,22 +293,30 @@ export function init(glslSource, textures) {
         uniforms.cam_pan.value.set(cameraPan.x, cameraPan.y);
 
         var obsR = observer.position.length();
+        // The Binet solver is Schwarzschild, so its horizon is r = r_s for every spin.
         uniforms.interior_mode.value = obsR < 1.0 ? 1.0 : 0.0;
 
+        // The dive camera falls from rest at infinity and is traced in that rain frame on
+        // both sides of the horizon; every other camera is referenced to the static observer.
+        var rainFrame = diveState.active || diveState.reachedSingularity;
+        uniforms.cam_rain.value = rainFrame ? 1.0 : 0.0;
+
+        // The dive and hover classify escape analytically for Schwarzschild, which the heuristic
+        // spin lensing would contradict, so both scenarios trace pure Schwarzschild lensing.
         var observerSpeedSq = observer.velocity.lengthSq();
         var photonSpinLensingScale = 1.0;
-        if (observerSpeedSq < 1e-8) {
+        if (rainFrame || hoverState.active) {
+            photonSpinLensingScale = 0.0;
+        } else if (observerSpeedSq < 1e-8) {
             var fade = (obsR - 1.5) / 0.2;
             fade = Math.max(0.0, Math.min(1.0, fade));
             photonSpinLensingScale = fade * fade * (3.0 - 2.0 * fade);
         }
         uniforms.photon_spin_lensing_scale.value = photonSpinLensingScale;
 
-        if (obsR > 1.0) {
-            uniforms.grav_blueshift_factor.value = Math.sqrt(Math.max(1.0 - 1.0 / obsR, 0.001));
-        } else {
-            uniforms.grav_blueshift_factor.value = 1.0;
-        }
+        uniforms.grav_blueshift_factor.value = rainFrame
+            ? 1.0
+            : Math.sqrt(Math.max(1.0 - 1.0 / Math.max(obsR, 1.0), 1e-6));
 
         updateEffectLabels();
     }
@@ -327,7 +337,12 @@ export function init(glslSource, textures) {
     };
 
     scene.updateShader();
-    scene.add(new THREE.Mesh(geometry, material));
+    // The vertex shader emits clip-space positions, so the quad covers the screen for every
+    // camera orientation; frustum culling against its world-space bounds would drop it
+    // whenever the dive or hover camera looks away from the hole.
+    var fullscreenQuad = new THREE.Mesh(geometry, material);
+    fullscreenQuad.frustumCulled = false;
+    scene.add(fullscreenQuad);
 
     var nextRenderer = new THREE.WebGLRenderer({
         antialias: true,

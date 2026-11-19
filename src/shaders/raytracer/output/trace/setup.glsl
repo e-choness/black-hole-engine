@@ -6,21 +6,53 @@
 vec4 trace_ray(vec3 ray) {
     vec3 pos = cam_pos;
 
-    {{#aberration}}
-    vec3 aberration_vel = cam_vel * max(look_aberration_strength, 0.0);
-    float aberration_speed = length(aberration_vel);
-    if (aberration_speed > 0.999) {
-        aberration_vel *= 0.999 / aberration_speed;
-    }
-    ray = lorentz_velocity_transformation(ray, aberration_vel);
-    {{/aberration}}
+    // initial conditions
+    float u = 1.0 / length(pos), old_u;
+    float u0 = u;
+    vec3 normal_vec = normalize(pos);
 
     float ray_intensity = 1.0;
-    float ray_doppler_factor = 1.0;
     float doppler_boost = clamp(look_doppler_boost, 0.0, 2.5);
+    float gamma = 1.0;
 
-    float gamma = 1.0/sqrt(max(1.0-dot(cam_vel,cam_vel), 0.0001));
-    ray_doppler_factor = gamma*(1.0 + dot(ray,-cam_vel));
+    // The camera is either referenced to the static observer (static, orbiting and free
+    // cameras; cam_vel is its velocity relative to that observer) or rides the rain frame of
+    // the dive (free fall from rest at infinity), the only frame that also exists inside the
+    // horizon. ray_doppler_factor is nu_static/nu_camera in the first case and
+    // nu_infinity/nu_camera in the second, where grav_blueshift_factor is 1.
+    //
+    // The Binet start is du/dphi = -u * radial_rate / d_t, where d_t is the tangential part of
+    // the look direction in the frame the photon constants are evaluated in:
+    //   static frame: radial_rate = sqrt(1 - r_s/r) d_r, the lapse converting the orthonormal
+    //                 radial component into Schwarzschild r;
+    //   rain frame:   radial_rate = d_r + beta with beta = sqrt(r_s/r), from E = eps (1 + beta d_r)
+    //                 and b = r d_t / (1 + beta d_r) (Painleve-Gullstrand form of the metric).
+    float ray_doppler_factor = 1.0;
+    float radial_rate;
+    float rain_beta = sqrt(u);
+    float photon_energy = 1.0; // E / eps, the photon energy at infinity per camera frequency
+    bool rain_frame = cam_rain > 0.5 || u > 1.0;
+    if (rain_frame) {
+        float d_r = dot(ray, normal_vec);
+        photon_energy = 1.0 + rain_beta * d_r;
+        ray_doppler_factor = photon_energy;
+        radial_rate = d_r + rain_beta;
+    } else {
+        vec3 ray_cam = ray;
+        {{#aberration}}
+        vec3 aberration_vel = cam_vel * max(look_aberration_strength, 0.0);
+        float aberration_speed = length(aberration_vel);
+        if (aberration_speed > 0.999) {
+            aberration_vel *= 0.999 / aberration_speed;
+        }
+        ray = lorentz_velocity_transformation(ray, aberration_vel);
+        {{/aberration}}
+        // nu_static/nu_camera = gamma (1 - d_cam . v) uses the direction seen by the camera,
+        // not the aberrated static-frame direction.
+        gamma = 1.0/sqrt(max(1.0-dot(cam_vel,cam_vel), 0.0001));
+        ray_doppler_factor = gamma*(1.0 - dot(ray_cam, cam_vel));
+        radial_rate = dot(ray, normal_vec) * sqrt(max(1.0 - u, 0.0));
+    }
     {{#beaming}}
     {{#physical_beaming}}
     // Observer beaming is already accounted for via transfer_factor
@@ -40,21 +72,6 @@ vec4 trace_ray(vec3 ray) {
     vec4 color = vec4(0.0,0.0,0.0,1.0);
     float vol_transmittance = 1.0; // volumetric ray transmittance (Beer-Lambert)
 
-    // initial conditions
-    float u = 1.0 / length(pos), old_u;
-    float u0 = u;
-    float observer_speed = length(cam_vel);
-    float observer_static_lapse = 1.0;
-    if (interior_mode < 0.5 && observer_speed < 1e-4) {
-        // Static camera rays live in the local orthonormal frame. In
-        // Schwarzschild coordinates the radial basis is compressed by
-        // sqrt(1 - r_s/r), so the radial component must carry that factor when
-        // converted to the Binet initial condition. Without it the near-horizon
-        // hover escape cone stays far too wide.
-        observer_static_lapse = sqrt(max(1.0 - u, 1e-4));
-    }
-
-    vec3 normal_vec = normalize(pos);
     // Tangential component of ray (perpendicular to radial direction).
     // For near-radial rays the cross product is tiny → degenerate tangent_vec.
     // Guard with a fallback perpendicular direction.
@@ -76,11 +93,10 @@ vec4 trace_ray(vec3 ray) {
 
     // du/dφ: rate of inverse-radius change per orbit angle.
     // For near-radial rays (small tangential component), du is large but finite.
-    float radial_component = dot(ray, normal_vec) * observer_static_lapse;
     float dot_tang = dot(ray, tangent_vec);
     float du = (abs(dot_tang) > 1e-6)
-        ? -radial_component / dot_tang * u
-        : -sign(dot(ray, normal_vec)) * u * 200.0; // nearly radial — large du
+        ? -radial_rate / dot_tang * u
+        : -sign(radial_rate) * u * 200.0; // nearly radial — large du
     // Clamp: ±200 keeps near-radial rays integrable while covering all
     // physically relevant escape trajectories from inside the horizon.
     // (Critical du for escape ≈ sqrt(2|u²-u³|) which is ~124 at u=20.)
@@ -93,6 +109,9 @@ vec4 trace_ray(vec3 ray) {
     float turb_t = loopable_turbulence_time(time + turbulence_time_offset);
     float dt = 1.0;
     bool shadow_capture = false;
+    // Schwarzschild t is singular at the horizon, so cameras inside the photon sphere do not
+    // retard emitters by the light travel time.
+    bool light_travel_offset = u0 < 2.0/3.0;
 
     {{^light_travel_time}}
     float planet_ang0 = t * PLANET_ORBITAL_ANG_VEL;
@@ -125,52 +144,23 @@ vec4 trace_ray(vec3 ray) {
         kerr_r_horizon = kerr_horizon_radius(kerr_a_phys);
     }
 
-    // ── Interior mode: analytical escape classification ─────────────────
-    // The Binet conserved energy E = (du/dφ)² + u² − u³ determines escape.
-    // Potential barrier maximum at u = 2/3 (photon sphere): E_crit = 4/27.
-    //   • du ≥ 0  (inward ray)           → always captured (singularity)
-    //   • du < 0  and  E ≤ 4/27          → reflected by barrier → captured
-    //   • du < 0  and  E > 4/27          → escapes through horizon
-    // Pre-classifying captured rays avoids wasting integration steps on
-    // rays that can never escape, completely eliminating the numerical
-    // artefacts that produced the blue-blob rendering.
-    if (interior_mode > 0.5) {
-        if (du >= 0.0) {
-            shadow_capture = true;  // inward → singularity
-        } else {
-            float E_binet = du*du + u*u*(1.0 - u);
-            if (E_binet <= 4.0/27.0) {
-                shadow_capture = true;  // not enough energy to escape
-            }
-        }
-    } else if (observer_speed < 1e-4 && u > 2.0/3.0) {
-        // Exact Schwarzschild escape test for a static observer inside the
-        // photon sphere. This removes the numerical leakage that made the
-        // visible sky stop shrinking during hover.
-        if (du >= 0.0) {
-            shadow_capture = true;
-        } else {
-            float E_binet = du*du + u*u*(1.0 - u);
-            if (E_binet <= 4.0/27.0) {
-                shadow_capture = true;
-            }
-        }
+    // Inside the photon sphere the escape test is analytic. The Binet invariant
+    // (du/dφ)² + u² − u³ = 1/b² must exceed its barrier value 4/27 (b < b_c) and the backward
+    // ray must start outward (du < 0). The analytic outcome replaces the numerical one, which
+    // leaks across the barrier, but captured rays are still integrated so that emitters in
+    // front of the horizon are sampled. Inside the horizon a photon with non-positive energy
+    // at infinity, 1 + β d_r <= 0, never came from our universe and stays dark.
+    bool forced_capture = false;
+    if (u > 2.0/3.0) {
+        forced_capture = !(du < 0.0 && du*du + u*u*(1.0 - u) > 4.0/27.0);
+        if (u >= 1.0 && photon_energy <= 0.0) shadow_capture = true;
     }
 
-    float E_binet0 = du0*du0 + u0*u0*(1.0 - u0);
-    bool allow_extended_trace = !use_kerr &&
-        interior_mode < 0.5 &&
-        observer_speed < 1e-4 &&
-        u0 > 2.0/3.0 &&
-        du0 < 0.0 &&
-        E_binet0 > 4.0/27.0;
-    bool trace_finished = false;
+    // Asymptotic azimuth of the orbit plane at which the backward ray reaches infinity.
+    bool escaped = false;
+    float phi_inf = 0.0;
 
-    for (int pass = 0; pass < 3; pass++) {
-        if (trace_finished) break;
-        if (pass > 0 && !allow_extended_trace) break;
-
-        for (int j=0; j < NSTEPS; j++) {
+    for (int j=0; j < NSTEPS; j++) {
         if (shadow_capture) break;  // pre-classified capture → skip loop
 
         if (use_kerr) {
@@ -257,14 +247,18 @@ vec4 trace_ray(vec3 ray) {
 
         {{#light_travel_time}}
         {{#gravitational_time_dilation}}
-        dt = sqrt(max(du*du + u*u*(1.0-u), 0.0001))/max(abs(u*u*(1.0-u)), 0.0001)*step;
+        if (light_travel_offset) {
+            dt = sqrt(max(du*du + u*u*(1.0-u), 0.0001))/max(abs(u*u*(1.0-u)), 0.0001)*step;
+        }
         {{/gravitational_time_dilation}}
         {{/light_travel_time}}
 
         integrate_geodesic_step(u, du, step, spin_alignment);
 
         if (u < 0.0) {
-            if (interior_mode > 0.5) shadow_capture = true;
+            // u(φ) is close to linear near infinity, so interpolate its zero.
+            phi_inf = phi + step * old_u / max(old_u - u, 1e-6);
+            escaped = true;
             break;
         }
         if (interior_mode < 0.5) {
@@ -299,8 +293,8 @@ vec4 trace_ray(vec3 ray) {
 
         {{#light_travel_time}}
         {{#gravitational_time_dilation}}
-        float mix = smooth_step(1.0/u, 8.0);
-        dt = mix*ray_l + (1.0-mix)*dt;
+        float ltt_mix = light_travel_offset ? smooth_step(1.0/u, 8.0) : 1.0;
+        dt = ltt_mix*ray_l + (1.0-ltt_mix)*dt;
         {{/gravitational_time_dilation}}
         {{^gravitational_time_dilation}}
         dt = ray_l;
