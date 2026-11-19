@@ -2,7 +2,8 @@
 
 Development notes on how the ray tracer models light near a black hole: the units, the two
 geodesic solvers, the camera frames, the frequency shifts applied to every emitter, the emission
-models and the imaging pipeline, and how the results are validated. Equations are written in the shader's units unless stated otherwise.
+models and the imaging pipeline, and how the results are validated. Equations are written in the
+shader's units unless stated otherwise.
 
 ## Units and conventions
 
@@ -235,16 +236,16 @@ part of `g` as well.
 
 ### Thin disk
 
-The Novikov-Thorne disk with the Page and Thorne (1974) flux, in `M = 1` units with
-`x = sqrt(r / M)` and `x_0 = sqrt(r_isco / M)`:
+The Novikov-Thorne disk with the Page and Thorne (1974) flux, with `x = sqrt(r / M)`,
+`x_0 = sqrt(r_isco / M)` and the spin `a` in units of `M`:
 
-    F(r) = (3 Mdot / (8 pi r^3)) / (x^2 (x^3 - 3x + 2a))
+    F(r) = 3 Mdot / (8 pi M^2 x^4 (x^3 - 3x + 2a))
            * [ x - x_0 - (3a/2) ln(x/x_0)
                - sum_i 3 (x_i - a)^2 / (x_i (x_i - x_j)(x_i - x_k)) ln((x - x_i)/(x_0 - x_i)) ],
 
-where `x_i` are the roots of `x^3 - 3x + 2a = 0`. The shader receives the spin-only terms and
-evaluates the bracket with three logarithms per hit. The effective temperature is
-`T(r) = T_peak (F / F_max)^(1/4)`.
+where `x_i` are the roots of `x^3 - 3x + 2a = 0`; far out it tends to the Newtonian
+`3 M Mdot / (8 pi r^3)`. The shader receives the spin-only terms and evaluates the bracket with
+four logarithms per hit. The effective temperature is `T(r) = T_peak (F / F_max)^(1/4)`.
 
 - Artist scales set `T_peak` directly, or (uniform) put the whole disk at that temperature.
 - The physical scale uses `Mdot = l L_Edd / (eta c^2)` with `L_Edd = 4 pi G M m_p c / sigma_T`
@@ -267,7 +268,7 @@ the specific intensity at a fixed observed frequency by `g^(3 + alpha)`; integra
 fluid-frame path `dl / g` of a steady flow leaves `g^(2 + alpha)` (Lind and Blandford 1985).
 For bulk speed `beta` and Lorentz factor `Gamma` at angle `theta` to the line of sight the
 kinematic part is `delta = 1 / (Gamma (1 - beta cos(theta)))`, so a `Gamma = 15` jet seen at
-4 degrees is boosted by `delta = 14.3` and its counter-jet dimmed by `delta = 0.034`.
+4 degrees is boosted by `delta = 14.3` and its counter-jet dimmed by `delta = 0.033`.
 
 ### Sky
 
@@ -422,6 +423,33 @@ pixel cost 313, 833 and 1250 ms with the Kerr-inspired mode and 268, 789 and 115
 Kerr. Shader compilation does not grow either: the time from a shader change to the first frame,
 minus that of a uniform-only change, at 160 x 90 was about 20 ms, 430 ms and 1.2 s for Full Kerr
 at mobile, high and cinematic against 20 ms, 510 ms and 1.5 s for the Kerr-inspired mode.
+
+### Scene presets
+
+Each scene preset with its own emitters and solver settings at 800 x 450, with still
+accumulation tracing every frame, timed as the mean interval between frame completions over 8 s
+(mobile) and 30 s (medium) in one session. Absolute SwiftShader times move with the host load,
+so compare within a column:
+
+| Scene preset              | mobile (ms) | medium (ms) |
+| ------------------------- | ----------- | ----------- |
+| Schwarzschild             | 82          | 2492        |
+| Default                   | 89          | 2757        |
+| Cygnus X-1                | 95          | 3167        |
+| Sgr A\*                   | 119         | 3955        |
+| Gargantua-style cinematic | 147         | 4001        |
+| TON 618                   | 169         | 4674        |
+| GRS 1915+105              | 196         | 7394        |
+| M87\*                     | 255         | 7192        |
+| 3C 273                    | 349         | 8258        |
+
+The ray-marched volumes set the cost: the thick torus (Sgr A\*) and the slim disk (TON 618) add
+35 to 90 % to the opaque thin disk, the translucent Gargantua-style disk lets rays continue
+through it, and the scenes with jets take two to four times as long as the thin-disk ones.
+Measured back to back, the Default scene took 124 and 3581 ms per frame at the commit before the
+emission and imaging work and 89 and 2757 ms after it, so the new pipeline as a whole costs less
+than the one it replaced. Anisotropic filtering of the sky is about a tenth of the medium time in
+SwiftShader (2494 ms without it); GPUs filter in hardware.
 
 ## Known limitations
 
