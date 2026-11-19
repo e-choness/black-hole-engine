@@ -210,12 +210,12 @@ a:hover {
     }
 
     #axes-gizmo-container {
-        left: auto !important;
-        right: 8px !important;
-        top: 8px !important;
-        bottom: auto !important;
+        left: 4px !important;
+        right: auto !important;
+        top: auto !important;
+        bottom: 96px !important;
         transform: scale(0.9) !important;
-        transform-origin: right top !important;
+        transform-origin: left bottom !important;
         z-index: 145 !important;
         pointer-events: auto !important;
     }
@@ -226,8 +226,6 @@ a:hover {
 
 @media screen and (max-width: 520px) {
     #axes-gizmo-container {
-        right: 4px !important;
-        top: 4px !important;
         transform: scale(0.84) !important;
     }
 

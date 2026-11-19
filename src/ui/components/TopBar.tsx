@@ -1,6 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { DropdownMenu, Popover, ToggleGroup } from 'radix-ui';
-import { Check, ChevronDown, Gauge, Maximize, Minimize, Orbit } from 'lucide-react';
+import {
+    Check,
+    ChevronDown,
+    Gauge,
+    Link2,
+    Maximize,
+    Minimize,
+    Orbit,
+    SlidersHorizontal,
+} from 'lucide-react';
 import {
     activeBlackHolePreset,
     applyBlackHolePreset,
@@ -14,6 +23,8 @@ import { useEngineValue } from '../engine/hooks';
 import { useFrameSampler } from '../engine/telemetry';
 import { portalContainer } from '../lib/portal';
 import { formatSpin, SCENARIOS, scenarioLabel, SOLVER_LABELS } from '../lib/scenarios';
+import { copyViewLink } from '../state/share';
+import { useUi } from '../state/ui-store';
 
 function ScenarioPicker() {
     const active = useEngineValue(activeBlackHolePreset);
@@ -36,7 +47,7 @@ function ScenarioPicker() {
                     sideOffset={8}
                     align="start"
                 >
-                    <DropdownMenu.Label className="overline menu-label">
+                    <DropdownMenu.Label className="caps-label menu-label">
                         Scenarios
                     </DropdownMenu.Label>
                     <DropdownMenu.RadioGroup value={active} onValueChange={applyBlackHolePreset}>
@@ -79,12 +90,14 @@ function QualityChip() {
     const quality = useEngineValue(() => params().quality);
     const solver = useEngineValue(() => params().kerr_mode);
     const statsRef = useRef<HTMLSpanElement>(null);
+    const costRef = useRef<HTMLSpanElement>(null);
     const chipRef = useRef<HTMLButtonElement>(null);
     useFrameSampler((sample) => {
-        if (!statsRef.current || !chipRef.current) return;
-        statsRef.current.textContent = sample.rendering
-            ? `${Math.round(sample.fps)} fps · ${sample.renderMs.toFixed(1)} ms`
-            : 'still · idle';
+        if (!statsRef.current || !costRef.current || !chipRef.current) return;
+        statsRef.current.textContent = sample.rendering ? `${Math.round(sample.fps)} fps` : 'still';
+        costRef.current.textContent = sample.rendering
+            ? ` · ${sample.renderMs.toFixed(1)} ms`
+            : ' · idle';
         chipRef.current.dataset.load = sample.rendering && sample.fps < 30 ? 'busy' : 'ok';
     });
     return (
@@ -95,13 +108,14 @@ function QualityChip() {
                     <span className="sr-only">Quality: </span>
                     {qualityName(quality)}
                 </span>
-                <span className="num" ref={statsRef} aria-hidden="true">
-                    –
+                <span className="num" aria-hidden="true">
+                    <span ref={statsRef}>–</span>
+                    <span ref={costRef} className="quality-chip-cost" />
                 </span>
             </Popover.Trigger>
             <Popover.Portal container={portalContainer()}>
                 <Popover.Content className="popover quality-panel bh-ui" sideOffset={8} align="end">
-                    <h2 className="overline">Render quality</h2>
+                    <h2 className="caps-label">Render quality</h2>
                     <ToggleGroup.Root
                         type="single"
                         orientation="vertical"
@@ -121,7 +135,7 @@ function QualityChip() {
                             </ToggleGroup.Item>
                         ))}
                     </ToggleGroup.Root>
-                    <h2 className="overline mt-3">Geodesic solver</h2>
+                    <h2 className="caps-label mt-3">Geodesic solver</h2>
                     <ToggleGroup.Root
                         type="single"
                         value={solver}
@@ -169,6 +183,24 @@ function FullscreenButton() {
     );
 }
 
+function InspectorToggle() {
+    const open = useUi((state) => state.inspectorOpen);
+    const setOpen = useUi((state) => state.setInspectorOpen);
+    return (
+        <button
+            type="button"
+            className="icon-btn"
+            aria-label="Parameters"
+            aria-expanded={open}
+            aria-controls={open ? 'inspector' : undefined}
+            title="Parameters"
+            onClick={() => setOpen(!open)}
+        >
+            <SlidersHorizontal size={18} aria-hidden="true" />
+        </button>
+    );
+}
+
 export function TopBar() {
     return (
         <header className="topbar">
@@ -184,6 +216,16 @@ export function TopBar() {
             <div className="topbar-group glass">
                 <QualityChip />
                 <span className="topbar-divider" aria-hidden="true" />
+                <InspectorToggle />
+                <button
+                    type="button"
+                    className="icon-btn topbar-copy-link"
+                    aria-label="Copy view link"
+                    title="Copy view link"
+                    onClick={copyViewLink}
+                >
+                    <Link2 size={18} aria-hidden="true" />
+                </button>
                 <FullscreenButton />
             </div>
         </header>

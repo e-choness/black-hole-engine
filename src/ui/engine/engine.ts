@@ -14,6 +14,15 @@ import { resetDive, startDive } from '../../app/core/scenarios/dive.js';
 import { resetHover, startHover } from '../../app/core/scenarios/hover.js';
 import { getTimelinePanelBinding } from '../../app/core/runtime/ui-bindings.js';
 import { frameStats } from '../../app/core/runtime/frame-stats.js';
+import {
+    getPresentationPathValue,
+    setPresentationPathValue,
+} from '../../app/presentation/runtime/path-bindings.js';
+import { getPresentationState } from '../../app/presentation/runtime/presentation-controller.js';
+import { seekDive } from '../../app/core/scenarios/dive.js';
+import { seekHover } from '../../app/core/scenarios/hover.js';
+import { updateCamera } from '../../app/scene/camera-runtime.js';
+import { OBSERVER_DISTANCE_MIN, OBSERVER_ORBIT_MIN } from '../../app/core/observer.js';
 
 export type KerrMode = 'fast' | 'kerr_inspired_disk_velocity' | 'full_kerr';
 
@@ -66,10 +75,31 @@ interface EngineObserver {
     orientation: { elements: ArrayLike<number> };
 }
 
+interface Vector3Like {
+    x: number;
+    y: number;
+    z: number;
+    set(x: number, y: number, z: number): unknown;
+}
+
+export interface EngineCamera {
+    position: Vector3Like;
+    up: Vector3Like;
+    quaternion: { x: number; y: number; z: number; w: number };
+}
+
+interface CameraControls {
+    target: Vector3Like;
+    update(): void;
+    addEventListener(type: 'change', listener: () => void): void;
+}
+
 interface RuntimeState {
     shader: { parameters: EngineParams } | null;
     renderer: { domElement: HTMLCanvasElement } | null;
     observer: EngineObserver;
+    camera: EngineCamera | null;
+    cameraControls: CameraControls | null;
 }
 
 // runtime-state.js assigns its bindings during init(), which JavaScript inference cannot follow.
@@ -99,6 +129,50 @@ export function engineObserver(): EngineObserver {
 export function canvas(): HTMLCanvasElement | null {
     return runtime.renderer ? runtime.renderer.domElement : null;
 }
+
+export function engineCamera(): EngineCamera {
+    return runtime.camera!;
+}
+
+export function cameraControls(): CameraControls | null {
+    return runtime.cameraControls;
+}
+
+// Orientation-only camera pose (the camera sits on the unit sphere and looks at the origin).
+export function setCameraPose(position: number[], up: number[]): void {
+    const camera = engineCamera();
+    camera.position.set(position[0], position[1], position[2]);
+    camera.up.set(up[0], up[1], up[2]);
+    const controls = cameraControls();
+    if (controls) {
+        controls.target.set(0, 0, 0);
+        controls.update();
+    }
+    updateCamera();
+}
+
+export function observerDistanceMin(): number {
+    return params().observer.motion ? OBSERVER_ORBIT_MIN : OBSERVER_DISTANCE_MIN;
+}
+
+export const getPathValue = getPresentationPathValue as (path: string) => unknown;
+export const setPathValue = setPresentationPathValue as (path: string, value: unknown) => boolean;
+export const seekDiveRadius = seekDive as (radius: number) => void;
+export const seekHoverRadius = seekHover as (radius: number) => void;
+
+export function presentationBusy(): boolean {
+    const state = getPresentationState() as { playing: boolean; recording: boolean };
+    return state.playing || state.recording;
+}
+
+export type ApplyKind = 'compile' | 'uniform' | 'redraw' | 'taa' | 'resolution';
+export type PresetKind = 'scenario' | 'quality';
+export const commitParamChange = actions.commitParamChange as (kind: ApplyKind) => void;
+export const resetTurbulenceClock = actions.resetTurbulenceClock as () => void;
+export const subscribePresetApplied = actions.subscribePresetApplied as (
+    listener: (kind: PresetKind) => void,
+) => () => void;
+export const baseBlackHolePreset = actions.getBaseBlackHolePresetName as () => string;
 
 export const subscribeEngine = actions.subscribeEngineChanges as (
     listener: () => void,

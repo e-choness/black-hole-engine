@@ -15,5 +15,11 @@ test('the interface has no serious or critical accessibility violations', async 
     const problems = trackPageProblems(page);
     await openSimulation(page);
     expect(await blockingViolations(page)).toEqual([]);
+
+    await page.getByRole('button', { name: 'Parameters', exact: true }).click();
+    for (const tab of ['Black hole', 'Disk', 'Render']) {
+        await page.getByRole('tab', { name: tab }).click();
+        expect(await blockingViolations(page), tab).toEqual([]);
+    }
     expect(problems).toEqual([]);
 });

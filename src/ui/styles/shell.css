@@ -255,18 +255,41 @@
     font-weight: 500;
 }
 
-/* Narrow screens get the compact top bar of the mobile board. */
+/* Tablet widths drop the title and the solver detail; narrow screens get the compact top bar of
+   the mobile board. */
+@media (max-width: 1024px) {
+    .scenario-btn-detail {
+        display: none;
+    }
+
+    .brand h1 {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+    }
+}
+
 @media (max-width: 760px) {
     .shell {
         grid-template-columns: minmax(0, 1fr);
     }
 
     .topbar {
-        padding: 8px 10px;
+        gap: 6px;
+        padding: 8px;
     }
 
-    .brand h1,
+    .topbar-group {
+        gap: 4px;
+    }
+
     .scenario-btn-detail,
+    .topbar-divider,
+    .topbar-copy-link,
+    .quality-chip-cost,
     .rail {
         display: none;
     }

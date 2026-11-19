@@ -1,6 +1,6 @@
 // Role: Render quality preset library — centralizes quality tier parameter
-//       values and selector labels. Applied by setupGUI() in gui.js so quality
-//       behavior is data-driven and separated from UI wiring.
+//       values and selector labels. Applied by applyQualityPreset() in engine-actions.js so
+//       quality behavior is data-driven and separated from UI wiring.
 
 export var QUALITY_PRESETS = {
     mobile: {

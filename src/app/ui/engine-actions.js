@@ -11,6 +11,7 @@ import {
     applyRenderScaleFromSettings,
     resetTemporalAAHistory,
     setRefreshAllControllersGlobal,
+    updateUniforms,
 } from '../core/runtime/runtime-state.js';
 import { clampObserverDistance } from '../core/observer.js';
 import {
@@ -25,8 +26,10 @@ import { registerBlackHoleUiBinding } from '../core/runtime/runtime-registry.js'
 export const CUSTOM_PRESET = 'Custom';
 
 const listeners = new Set();
+const presetListeners = new Set();
 let noticeHandler = null;
 let activePreset = 'Default';
+let basePreset = 'Default';
 let blackHoleCustomState = null;
 let qualityCustomState = null;
 let pausedTimeScale = null;
@@ -49,6 +52,17 @@ export function subscribeEngineChanges(listener) {
     return () => listeners.delete(listener);
 }
 
+// Fired after a named scenario ('scenario') or quality preset ('quality') has been applied, before
+// the change notification, so listeners can take the new values as their reference.
+export function subscribePresetApplied(listener) {
+    presetListeners.add(listener);
+    return () => presetListeners.delete(listener);
+}
+
+function presetApplied(kind) {
+    presetListeners.forEach((listener) => listener(kind));
+}
+
 export function setEngineNoticeHandler(handler) {
     noticeHandler = handler;
 }
@@ -59,6 +73,11 @@ export function engineNotice(text, options) {
 
 export function getBlackHolePresetName() {
     return activePreset;
+}
+
+// The named scenario the current values started from, also while they are customised.
+export function getBaseBlackHolePresetName() {
+    return basePreset;
 }
 
 function captureQualityPresetState() {
@@ -159,6 +178,7 @@ function applyQualityPresetInternal(value, selectSolver) {
     applyRenderScaleFromSettings();
     resetTemporalAAHistory();
     scene.updateShader();
+    if (value !== 'custom') presetApplied('quality');
     notifyEngineChanged();
 }
 
@@ -218,9 +238,26 @@ export function applyBlackHolePreset(name) {
     );
 
     activePreset = name;
+    basePreset = name;
     updateCamera();
     scene.updateShader();
+    presetApplied('scenario');
     notifyEngineChanged();
+}
+
+// Side effects of a parameter write, by the kind the parameter registry assigns to it.
+export function commitParamChange(kind) {
+    if (kind === 'compile') scene.updateShader();
+    else if (kind === 'uniform') updateUniforms();
+    else if (kind === 'resolution') applyRenderScaleFromSettings();
+    if (kind === 'resolution' || kind === 'taa') resetTemporalAAHistory();
+    shader.needsUpdate = true;
+    notifyEngineChanged();
+}
+
+// The turbulence pattern restarts from its first frame when the accretion geometry changes.
+export function resetTurbulenceClock() {
+    observer.turbulenceTimeOffset = -observer.time;
 }
 
 export function resetObserverCamera() {

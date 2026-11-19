@@ -1,6 +1,7 @@
 @import 'tailwindcss/theme.css' layer(theme);
 @import 'tailwindcss/utilities.css' layer(utilities);
 @import './shell.css';
+@import './inspector.css';
 
 /* Event Horizon design tokens. The panel is more opaque than the design's 0.78 and text-3 is
    lighter than #7D8596 so that secondary text keeps 4.5:1 contrast over the brightest disk. */
@@ -147,6 +148,7 @@
 }
 
 .icon-btn[aria-pressed='true'],
+.icon-btn[aria-expanded='true'],
 .icon-btn[data-state='open'] {
     background: rgb(255 180 77 / 0.12);
     color: var(--color-accent);
@@ -214,7 +216,7 @@
     border-color: transparent;
 }
 
-.overline {
+.caps-label {
     font-size: 11px;
     font-weight: 600;
     letter-spacing: 0.08em;
