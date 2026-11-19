@@ -3,7 +3,7 @@
 //       simulation-time scaling used for orbit/hover modes. Also exports
 //       formatThousands.
 
-import { THREE } from '../vendor.js';
+import * as THREE from 'three';
 import { degToRad } from './shader.js';
 
 var boundShader = null;
@@ -49,7 +49,9 @@ Observer.prototype.orbitalFrame = function () {
     var orbitalZ = new THREE.Vector3().crossVectors(this.position, orbitalY).normalize();
     var orbitalX = new THREE.Vector3().crossVectors(orbitalY, orbitalZ);
 
-    return new THREE.Matrix4().makeBasis(orbitalX, orbitalY, orbitalZ).linearPart();
+    return new THREE.Matrix3().setFromMatrix4(
+        new THREE.Matrix4().makeBasis(orbitalX, orbitalY, orbitalZ),
+    );
 };
 
 Observer.prototype.move = function (dt) {

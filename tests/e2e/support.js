@@ -1,0 +1,19 @@
+// Shared steps for the end-to-end tests.
+
+// Collects console errors and uncaught page errors; every test expects the list to stay empty.
+export function trackPageProblems(page) {
+    const problems = [];
+    page.on('console', (message) => {
+        if (message.type() === 'error') problems.push(`console.error: ${message.text()}`);
+    });
+    page.on('pageerror', (error) => problems.push(`pageerror: ${error.message}`));
+    return problems;
+}
+
+// Opens the simulation with the mobile preset and the frozen e2e clock, then waits until the
+// first frame has been presented.
+export async function openSimulation(page) {
+    await page.goto('./?quality=mobile&e2e=1');
+    await page.waitForFunction(() => window.__BH__ !== undefined);
+    await page.evaluate(() => window.__BH__.ready);
+}

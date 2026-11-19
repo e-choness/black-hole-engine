@@ -3,14 +3,7 @@ import { defineConfig, globalIgnores } from 'eslint/config';
 import globals from 'globals';
 
 export default defineConfig([
-    globalIgnores([
-        'dist/',
-        'coverage/',
-        '.cache/',
-        'public/vendor/',
-        'test-results/',
-        'playwright-report/',
-    ]),
+    globalIgnores(['dist/', 'coverage/', '.cache/', 'test-results/', 'playwright-report/']),
     js.configs.recommended,
     {
         linterOptions: {

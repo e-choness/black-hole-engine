@@ -1,6 +1,4 @@
-'use strict';
-
-import { THREE } from '../../vendor.js';
+import * as THREE from 'three';
 import {
     renderer,
     camera,
@@ -117,7 +115,7 @@ function stepRendererSimulation(dt, skipBenchmark) {
 
 function drawRendererFrame(forceRender) {
     camera.updateMatrixWorld();
-    camera.matrixWorldInverse.getInverse(camera.matrixWorld);
+    camera.matrixWorldInverse.copy(camera.matrixWorld).invert();
     updatePresentationOverlay();
 
     if (
@@ -164,9 +162,8 @@ export function animate() {
 function renderSceneToTarget(target) {
     if (shader.parameters.bloom.enabled && bloomPass) {
         bloomPass.render(renderer, scene, camera, shader.parameters.bloom, target);
-    } else if (target) {
-        renderer.render(scene, camera, target, true);
     } else {
+        renderer.setRenderTarget(target);
         renderer.render(scene, camera);
     }
 }

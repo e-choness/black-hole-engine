@@ -1,18 +1,51 @@
 import { renderer } from '../../core/runtime/runtime-state.js';
 import { getBlackHoleRuntimeApi } from '../../core/runtime/runtime-registry.js';
 import { QUALITY_PRESETS } from '../../ui/quality-presets.js';
+import {
+    PRESENTATION_VIDEO_CONTAINERS,
+    normalizePresentationVideoContainer,
+    pickRecorderMimeType,
+} from './presentation-video-formats.js';
 
-export function choosePresentationMimeType() {
+export function choosePresentationMimeType(container) {
     if (typeof MediaRecorder === 'undefined') return '';
     if (typeof MediaRecorder.isTypeSupported !== 'function') {
-        return 'video/webm';
+        return PRESENTATION_VIDEO_CONTAINERS[normalizePresentationVideoContainer(container)]
+            .mimeType;
+    }
+    return pickRecorderMimeType(container, function (mimeType) {
+        return MediaRecorder.isTypeSupported(mimeType);
+    });
+}
+
+// Wraps a file opened with the File System Access API. Mediabunny closes its target both when
+// a recording is finalized and when it is cancelled, so the file is committed only after
+// finish() has been called and is aborted on any other close.
+export function createRecordingFileSink(fileStream) {
+    var state = 'open';
+
+    function discard() {
+        if (state === 'discarded') return;
+        state = 'discarded';
+        fileStream.abort().catch(function () {});
     }
 
-    var candidates = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
-    for (var i = 0; i < candidates.length; i++) {
-        if (MediaRecorder.isTypeSupported(candidates[i])) return candidates[i];
-    }
-    return '';
+    return {
+        writable: new WritableStream({
+            write: function (chunk) {
+                return fileStream.write(chunk);
+            },
+            close: function () {
+                if (state === 'finishing') return fileStream.close();
+                discard();
+            },
+            abort: discard,
+        }),
+        finish: function () {
+            if (state === 'open') state = 'finishing';
+        },
+        discard: discard,
+    };
 }
 
 function presentationCaptureFilename(prefix, mimeType) {
@@ -138,14 +171,6 @@ export function isRendererContextLost() {
     );
 }
 
-export function getPresentationWebMMuxerApi() {
-    if (typeof window === 'undefined' || !window.WebMMuxer) return null;
-    var muxApi = window.WebMMuxer;
-    if (typeof muxApi.Muxer !== 'function') return null;
-    if (typeof muxApi.ArrayBufferTarget !== 'function') return null;
-    return muxApi;
-}
-
 export function getOfflinePresentationRecordingSupportState() {
     if (!renderer || !renderer.domElement) {
         return { supported: false, reason: 'Renderer not initialized yet.' };
@@ -155,9 +180,6 @@ export function getOfflinePresentationRecordingSupportState() {
     }
     if (typeof VideoEncoder === 'undefined') {
         return { supported: false, reason: 'VideoEncoder API is unavailable.' };
-    }
-    if (!getPresentationWebMMuxerApi()) {
-        return { supported: false, reason: 'WebM muxer library is unavailable.' };
     }
     if (!getPresentationRendererRuntimeApi()) {
         return { supported: false, reason: 'Renderer offline stepping API is unavailable.' };

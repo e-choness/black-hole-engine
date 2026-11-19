@@ -1,5 +1,9 @@
 import { observer, shader } from '../../core/runtime/runtime-state.js';
 import { QUALITY_PRESETS } from '../../ui/quality-presets.js';
+import {
+    PRESENTATION_VIDEO_CONTAINERS,
+    normalizePresentationVideoContainer,
+} from '../runtime/presentation-video-formats.js';
 
 export function setupRecordingModal(options) {
     var panel = options.panel;
@@ -46,6 +50,7 @@ export function setupRecordingModal(options) {
     var recResetSimCb = elements.recResetSimCb;
     var recQualitySelect = elements.recQualitySelect;
     var recModeSelect = elements.recModeSelect;
+    var recFormatSelect = elements.recFormatSelect;
     var recResSelect = elements.recResSelect;
     var recFpsInput = elements.recFpsInput;
     var recBitrateInput = elements.recBitrateInput;
@@ -110,6 +115,19 @@ export function setupRecordingModal(options) {
         }
         if (cur) recModeSelect.value = cur;
         if (!recModeSelect.value) recModeSelect.value = 'offline';
+    }
+
+    function populateRecFormat() {
+        if (!recFormatSelect) return;
+        var cur = recFormatSelect.value;
+        recFormatSelect.innerHTML = '';
+        Object.keys(PRESENTATION_VIDEO_CONTAINERS).forEach(function (key) {
+            var option = document.createElement('option');
+            option.value = key;
+            option.textContent = PRESENTATION_VIDEO_CONTAINERS[key].label;
+            recFormatSelect.appendChild(option);
+        });
+        recFormatSelect.value = normalizePresentationVideoContainer(cur);
     }
 
     function refreshRecResolutionLabel() {
@@ -295,6 +313,7 @@ export function setupRecordingModal(options) {
     function openRecModal() {
         populateRecQuality();
         populateRecMode();
+        populateRecFormat();
         populateRecResolution();
         if (typeof applySavedRecordingUiState === 'function') {
             applySavedRecordingUiState();
@@ -402,6 +421,7 @@ export function setupRecordingModal(options) {
     if (hudFsInput) hudFsInput.addEventListener('input', applyHudLayout);
     if (recQualitySelect) recQualitySelect.addEventListener('change', rememberState);
     if (recModeSelect) recModeSelect.addEventListener('change', rememberState);
+    if (recFormatSelect) recFormatSelect.addEventListener('change', rememberState);
     if (recResSelect) recResSelect.addEventListener('change', rememberState);
     if (recFpsInput) recFpsInput.addEventListener('input', rememberState);
     if (recBitrateInput) recBitrateInput.addEventListener('input', rememberState);
@@ -444,31 +464,30 @@ export function setupRecordingModal(options) {
         recBitrateInput.value = Math.round(bitrate);
 
         var recMode = recModeSelect ? recModeSelect.value : 'offline';
+        var videoContainer = normalizePresentationVideoContainer(
+            recFormatSelect ? recFormatSelect.value : '',
+        );
         var recOptions = {
             fps: fps,
             bitrateMbps: bitrate,
             autoStopOnPresentationEnd: true,
             recordingMode: recMode,
+            videoContainer: videoContainer,
             recordingResolution: recResSelect ? recResSelect.value : 'current',
             qualityPreset: recQualitySelect ? recQualitySelect.value : 'optimal',
             includeAnnotationsInRecording: !!recAnnotRecordCb.checked,
         };
 
-        if (
-            recMode === 'offline' &&
-            typeof showSaveFilePicker === 'function' &&
-            typeof window.WebMMuxer !== 'undefined' &&
-            typeof window.WebMMuxer.FileSystemWritableFileStreamTarget === 'function'
-        ) {
+        // Offline recordings stream straight to a file when the browser can save one, so long
+        // renders do not have to fit in memory.
+        if (recMode === 'offline' && typeof showSaveFilePicker === 'function') {
+            var container = PRESENTATION_VIDEO_CONTAINERS[videoContainer];
+            var accept = {};
+            accept[container.mimeType] = [container.extension];
             try {
                 var fileHandle = await showSaveFilePicker({
-                    suggestedName: 'black-hole-presentation.webm',
-                    types: [
-                        {
-                            description: 'WebM video',
-                            accept: { 'video/webm': ['.webm'] },
-                        },
-                    ],
+                    suggestedName: 'black-hole-presentation' + container.extension,
+                    types: [{ description: container.label, accept: accept }],
                 });
                 recOptions.writableFileStream = await fileHandle.createWritable();
             } catch (pickerErr) {
@@ -477,13 +496,10 @@ export function setupRecordingModal(options) {
             }
         }
 
-        var started = startPresentationRecording(recOptions);
+        recStartBtn.disabled = true;
+        setRecStatus('Starting\u2026', 'is-recording');
+        var started = await startPresentationRecording(recOptions);
         if (!started) {
-            if (recOptions.writableFileStream) {
-                try {
-                    recOptions.writableFileStream.abort();
-                } catch (e) {}
-            }
             var startState =
                 typeof getPresentationState === 'function' ? getPresentationState() : {};
             setRecStatus(

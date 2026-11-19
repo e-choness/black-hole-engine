@@ -320,6 +320,10 @@ export function buildTimelinePanel() {
         '<select id="tl-rec-mode" class="tl-rec-select"></select>' +
         '</div>' +
         '<div class="tl-rec-row">' +
+        '<label>Format</label>' +
+        '<select id="tl-rec-format" class="tl-rec-select"></select>' +
+        '</div>' +
+        '<div class="tl-rec-row">' +
         '<label>Resolution</label>' +
         '<select id="tl-rec-resolution" class="tl-rec-select"></select>' +
         '</div>' +
@@ -399,6 +403,7 @@ export function buildTimelinePanel() {
     var recResetSimCb = panel.querySelector('#tl-rec-reset-sim');
     var recQualitySelect = panel.querySelector('#tl-rec-quality');
     var recModeSelect = panel.querySelector('#tl-rec-mode');
+    var recFormatSelect = panel.querySelector('#tl-rec-format');
     var recResSelect = panel.querySelector('#tl-rec-resolution');
     var recFpsInput = panel.querySelector('#tl-rec-fps');
     var recBitrateInput = panel.querySelector('#tl-rec-bitrate');
@@ -533,6 +538,7 @@ export function buildTimelinePanel() {
                 recordingUi: {
                     quality: recQualitySelect ? recQualitySelect.value : '',
                     mode: recModeSelect ? recModeSelect.value : '',
+                    format: recFormatSelect ? recFormatSelect.value : '',
                     resolution: recResSelect ? recResSelect.value : '',
                     fps: recFpsInput ? recFpsInput.value : '',
                     bitrate: recBitrateInput ? recBitrateInput.value : '',
@@ -562,6 +568,7 @@ export function buildTimelinePanel() {
         var out = {};
         if (typeof raw.quality === 'string') out.quality = raw.quality;
         if (typeof raw.mode === 'string') out.mode = raw.mode;
+        if (typeof raw.format === 'string') out.format = raw.format;
         if (typeof raw.resolution === 'string') out.resolution = raw.resolution;
         if (raw.fps !== undefined) out.fps = String(raw.fps);
         if (raw.bitrate !== undefined) out.bitrate = String(raw.bitrate);
@@ -590,6 +597,15 @@ export function buildTimelinePanel() {
             )
         ) {
             recModeSelect.value = restoredRecordingUiState.mode;
+        }
+        if (
+            recFormatSelect &&
+            restoredRecordingUiState.format &&
+            recFormatSelect.querySelector(
+                'option[value="' + CSS.escape(restoredRecordingUiState.format) + '"]',
+            )
+        ) {
+            recFormatSelect.value = restoredRecordingUiState.format;
         }
         if (
             recResSelect &&
@@ -3413,6 +3429,7 @@ export function buildTimelinePanel() {
             recResetSimCb: recResetSimCb,
             recQualitySelect: recQualitySelect,
             recModeSelect: recModeSelect,
+            recFormatSelect: recFormatSelect,
             recResSelect: recResSelect,
             recFpsInput: recFpsInput,
             recBitrateInput: recBitrateInput,

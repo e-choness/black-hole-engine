@@ -4,7 +4,7 @@
 
 vec4 galaxy_color(vec2 tex_coord, float doppler_factor) {
 
-    vec4 base_color = texture2D(galaxy_texture, tex_coord);
+    vec4 base_color = texture(galaxy_texture, tex_coord);
     vec4 color = base_color;
     if (abs(doppler_factor - 1.0) < 1e-4) return color;
 

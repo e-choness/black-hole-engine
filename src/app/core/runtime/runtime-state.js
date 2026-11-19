@@ -1,4 +1,4 @@
-import { THREE } from '../../vendor.js';
+import * as THREE from 'three';
 import { Observer, bindObserverShader } from '../observer.js';
 
 export const DISK_TEMPERATURE_MIN = 4500.0;

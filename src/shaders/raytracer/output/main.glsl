@@ -15,6 +15,8 @@ vec2 sample_offset(int i, vec2 pixel) {
     return radius * vec2(cos(base_angle), sin(base_angle));
 }
 
+out vec4 fragColor;
+
 void main() {
 
     {{#planetEnabled}}
@@ -42,5 +44,5 @@ void main() {
     }
 
     vec4 color = accumulated / float(SAMPLE_COUNT);
-    gl_FragColor = finalize_color(color);
+    fragColor = finalize_color(color);
 }

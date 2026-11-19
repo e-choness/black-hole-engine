@@ -1,4 +1,4 @@
-import { THREE } from '../../vendor.js';
+import * as THREE from 'three';
 import { camera, observer, shader } from '../../core/runtime/runtime-state.js';
 var presentationOverlayHooks = {
     onUiConfigChange: null,

@@ -1,6 +1,3 @@
-'use strict';
-
-import { $ } from '../../vendor.js';
 import { shader, scene, applyRenderScaleFromSettings } from '../runtime/runtime-state.js';
 import { refreshRendererUiBindings } from '../runtime/ui-bindings.js';
 import { QUALITY_PRESETS, applyQualityPresetValues } from '../../ui/quality-presets.js';
@@ -58,11 +55,9 @@ export function applyQualityPresetRuntime(qualityName) {
     var preset = applyQualityPresetValues(shader.parameters, qualityName);
     if (!preset) return false;
 
-    if (preset.hide_planet_controls) {
-        $('.planet-controls').hide();
-    } else {
-        $('.planet-controls').show();
-    }
+    document.querySelectorAll('.planet-controls').forEach(function (element) {
+        element.style.display = preset.hide_planet_controls ? 'none' : '';
+    });
 
     applyRenderScaleFromSettings();
     if (scene && typeof scene.updateShader === 'function') {

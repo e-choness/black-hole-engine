@@ -1,4 +1,4 @@
-import { THREE } from '../../vendor.js';
+import * as THREE from 'three';
 
 export const diveState = {
     active: false,

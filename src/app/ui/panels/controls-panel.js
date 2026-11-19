@@ -16,8 +16,7 @@ export function setupControlsPanel(gui) {
         '<div id="controls-content" class="sp-content"></div>';
     document.body.appendChild(ctrlPanel);
 
-    var dgAc = gui.domElement.parentElement;
-    document.getElementById('controls-content').appendChild(dgAc);
+    document.getElementById('controls-content').appendChild(gui.domElement);
 
     var openBtn = document.createElement('button');
     openBtn.id = 'controls-open-btn';

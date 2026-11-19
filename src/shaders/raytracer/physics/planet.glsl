@@ -110,7 +110,7 @@ vec4 planet_intersection(vec3 old_pos, vec3 ray, float t, float dt,
     // Use physical blackbody tint for planet illumination
     vec3 light_tint = physical_tint;
 
-    ret = texture2D(planet_texture, tex_coord) * lightness;
+    ret = texture(planet_texture, tex_coord) * lightness;
     ret.rgb *= light_tint;
     if (isec_t < 0.0) isec_t = 0.5;
     ret.w = isec_t;

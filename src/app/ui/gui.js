@@ -1,10 +1,10 @@
-// Role: dat.GUI configuration — builds every control panel and folder, wires up
+// Role: lil-gui configuration — builds every control panel and folder, wires up
 //       all parameter bindings, manages conditional visibility for jet / torus /
 //       planet controls, and defines applyBlackHolePreset() to bulk-apply preset
 //       data from presets.js and quality-presets.js. Must be called after init()
 //       has created the scene.
 
-import { $, dat } from '../vendor.js';
+import GUI from 'lil-gui';
 import {
     DISK_TEMPERATURE_MIN,
     DISK_TEMPERATURE_MAX,
@@ -53,11 +53,36 @@ import { setupAccretionLookFolders } from './panels/accretion-look-folders.js';
 import { setupSimulationFolders } from './panels/simulation-folders.js';
 
 export function setupGUI() {
-    var hint = $('#hint-text');
+    var hint = document.getElementById('hint-text');
+    var hintAnimation = null;
     var p = shader.parameters;
 
+    function hideHint() {
+        if (hintAnimation) hintAnimation.cancel();
+        hintAnimation = null;
+        hint.style.display = 'none';
+    }
+
+    // Fades the hint in over 120 ms, holds it for holdMs and fades it out over fadeOutMs.
+    function flashHint(text, holdMs, fadeOutMs) {
+        if (hintAnimation) hintAnimation.cancel();
+        hint.textContent = text;
+        hint.style.display = '';
+        var duration = 120 + holdMs + fadeOutMs;
+        hintAnimation = hint.animate(
+            [
+                { opacity: 0 },
+                { opacity: 1, offset: 120 / duration },
+                { opacity: 1, offset: (120 + holdMs) / duration },
+                { opacity: 0 },
+            ],
+            { duration: duration, fill: 'forwards' },
+        );
+        hintAnimation.onfinish = hideHint;
+    }
+
     function updateShader() {
-        hint.hide();
+        hideHint();
         scene.updateShader();
     }
 
@@ -72,8 +97,7 @@ export function setupGUI() {
     }
 
     function showObserverControlHint(prefix) {
-        hint.text(observerControlHelp(prefix));
-        hint.stop(true, true).fadeIn(120).delay(1400).fadeOut(360);
+        flashHint(observerControlHelp(prefix), 1400, 360);
     }
 
     function resetObserverCamera() {
@@ -86,43 +110,32 @@ export function setupGUI() {
         }
         updateCamera();
         shader.needsUpdate = true;
-        hint.text('Camera reset. ' + observerControlHelp(''));
-        hint.stop(true, true).fadeIn(120).delay(900).fadeOut(360);
+        flashHint('Camera reset. ' + observerControlHelp(''), 900, 360);
     }
 
-    var gui = new dat.GUI({ width: 360 });
+    var gui = new GUI({ autoPlace: false, closeFolders: true });
 
     setupControlsPanel(gui);
 
     var syncObserverWidgetControls = null;
 
-    // Recursively update all dat.GUI controllers to reflect programmatic changes.
-    // dat.GUI does NOT auto-sync the displayed value when the bound property
-    // is changed from code — you must call updateDisplay() on each controller.
+    // lil-gui does not notice when code changes a bound property, so every controller is
+    // redrawn after programmatic updates such as presets and timeline playback.
     function refreshAllControllers() {
-        function recurse(folder) {
-            for (var i = 0; i < folder.__controllers.length; i++) {
-                folder.__controllers[i].updateDisplay();
-            }
-            for (var key in folder.__folders) {
-                recurse(folder.__folders[key]);
-            }
-        }
-        recurse(gui);
+        gui.controllersRecursive().forEach(function (controller) {
+            controller.updateDisplay();
+        });
         if (syncObserverWidgetControls) syncObserverWidgetControls();
     }
     setRefreshAllControllersGlobal(refreshAllControllers);
     registerBlackHoleUiBinding('refreshControllers', refreshAllControllers);
 
-    function setGuiRowClass(guiEl, klass) {
-        $(guiEl.domElement).parent().parent().addClass(klass);
+    function setGuiRowClass(controller, classNames) {
+        controller.domElement.classList.add(...classNames.split(/\s+/));
     }
 
     function addHelpText(controller, text) {
-        if (!text) return;
-        // Use the parent .cr row for the tooltip
-        var row = $(controller.domElement).closest('.cr')[0];
-        if (row) row.title = text;
+        if (text) controller.domElement.title = text;
     }
 
     var blackHolePresetController = null;
@@ -269,34 +282,22 @@ export function setupGUI() {
 
     function addControl(folder, obj, key, cfg) {
         cfg = cfg || {};
-        var c;
-        if (cfg.options) c = folder.add(obj, key, cfg.options);
-        else c = folder.add(obj, key);
-        // dat.GUI may replace numeric controllers when min/max are set.
-        // Keep the returned controller so later name/onChange/visibility
-        // always target the live row in the DOM.
-        if (cfg.min !== undefined) c = c.min(cfg.min) || c;
-        if (cfg.max !== undefined) c = c.max(cfg.max) || c;
-        if (cfg.step !== undefined) c = c.step(cfg.step) || c;
-        if (cfg.name) c = c.name(cfg.name) || c;
+        var c = cfg.options ? folder.add(obj, key, cfg.options) : folder.add(obj, key);
+        if (cfg.min !== undefined) c.min(cfg.min);
+        if (cfg.max !== undefined) c.max(cfg.max);
+        if (cfg.step !== undefined) c.step(cfg.step);
+        if (cfg.name) c.name(cfg.name);
         var onChange = cfg.onChange;
         if (cfg.trackBlackHolePreset) onChange = withBlackHolePresetTracking(onChange);
         if (cfg.trackQualityPreset) onChange = withQualityPresetTracking(onChange);
-        if (onChange) c = c.onChange(onChange) || c;
+        if (onChange) c.onChange(onChange);
         if (cfg.help) addHelpText(c, cfg.help);
         if (cfg.className) setGuiRowClass(c, cfg.className);
         return c;
     }
 
     function setControlVisible(controller, isVisible) {
-        if (!controller) return;
-        // dat.GUI stores the row <li> on __li; this is the most reliable target.
-        var row =
-            controller && controller.__li
-                ? controller.__li
-                : $(controller.domElement).closest('li')[0];
-        if (!row) return;
-        row.style.display = isVisible ? '' : 'none';
+        if (controller) controller.show(isVisible);
     }
 
     function setControlsVisible(controllers, isVisible) {
@@ -319,12 +320,17 @@ export function setupGUI() {
     function applyKerrMode(mode) {
         // Re-apply quality preset with new mode (preset values depend on kerr_mode)
         applyQualityPresetInternal(p.quality);
-        hint.text('Solver mode: ' + getOptionLabel(KERR_MODE_LABELS, mode));
-        hint.stop(true, true).fadeIn(120).delay(900).fadeOut(350);
+        flashHint('Solver mode: ' + getOptionLabel(KERR_MODE_LABELS, mode), 900, 350);
+    }
+
+    function setPlanetControlsVisible(visible) {
+        document.querySelectorAll('.planet-controls').forEach(function (element) {
+            element.style.display = visible ? '' : 'none';
+        });
     }
 
     function applyQualityPresetInternal(value) {
-        $('.planet-controls').show();
+        setPlanetControlsVisible(true);
 
         if (value === 'custom') {
             restoreQualityPresetState(qualityCustomState);
@@ -333,7 +339,7 @@ export function setupGUI() {
             if (!preset) return;
 
             if (preset.hide_planet_controls) {
-                $('.planet-controls').hide();
+                setPlanetControlsVisible(false);
             }
         }
 

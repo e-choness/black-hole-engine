@@ -187,26 +187,8 @@ body.sp-resizing * {
 #controls-panel .sp-content {
     overflow-x: auto;
 }
-#controls-panel .dg.ac {
-    position: static !important;
-    right: auto !important;
-    top: auto !important;
-    z-index: auto !important;
-    width: auto !important;
-}
-#controls-panel .dg.main {
-    position: static !important;
-    float: none !important;
-    width: 100% !important;
-    max-height: none !important;
-    overflow: visible !important;
-    z-index: auto !important;
-    margin-right: 0 !important;
-    box-sizing: border-box !important;
-}
-#controls-panel .dg.main > ul {
-    max-height: none !important;
-    overflow-y: visible !important;
+#controls-panel .lil-gui.lil-root {
+    width: 100%;
 }
 
 /* ── Animations Panel (left) ── */

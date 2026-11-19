@@ -44,6 +44,17 @@ export default defineConfig({
         target: 'es2022',
         sourcemap: true,
         modulePreload: { polyfill: false },
+        // three.js is about 770 kB minified because WebGLRenderer pulls in the shader library of
+        // every built-in material. It gets a chunk of its own, which also stays cached across app
+        // releases, and the size warning is raised to just above it.
+        chunkSizeWarningLimit: 800,
+        rolldownOptions: {
+            output: {
+                codeSplitting: {
+                    groups: [{ name: 'three', test: /[\\/]node_modules[\\/]three[\\/]/ }],
+                },
+            },
+        },
     },
     server: {
         port: 5173,

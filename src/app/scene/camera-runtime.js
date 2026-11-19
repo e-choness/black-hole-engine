@@ -3,7 +3,7 @@
 //       frame, and provides a Frobenius-norm matrix distance helper used by the
 //       animate loop to skip redundant renders.
 
-import { THREE } from '../vendor.js';
+import * as THREE from 'three';
 import { degToRad } from '../core/shader.js';
 import { diveState, hoverState } from '../core/scenarios/scenario-state.js';
 import { camera, observer, shader } from '../core/runtime/runtime-state.js';
@@ -23,7 +23,7 @@ export function initializeCamera(targetCamera) {
 
 export function updateCamera() {
     camera.updateMatrixWorld();
-    camera.matrixWorldInverse.getInverse(camera.matrixWorld);
+    camera.matrixWorldInverse.copy(camera.matrixWorld).invert();
 
     var m = camera.matrixWorldInverse.elements;
     var cameraMatrix;
@@ -48,7 +48,9 @@ export function updateCamera() {
         var right = new THREE.Vector3().crossVectors(inward, upHint).normalize();
         var up = new THREE.Vector3().crossVectors(right, inward).normalize();
 
-        var diveFrame = new THREE.Matrix4().makeBasis(right, inward, up).linearPart();
+        var diveFrame = new THREE.Matrix3().setFromMatrix4(
+            new THREE.Matrix4().makeBasis(right, inward, up),
+        );
         observer.orientation = diveFrame.multiply(orbitRot);
         shader.needsUpdate = true;
     } else if (hoverState.active) {
@@ -63,9 +65,9 @@ export function updateCamera() {
         var hoverRight = new THREE.Vector3().crossVectors(hoverInward, hoverUpHint).normalize();
         var hoverUp = new THREE.Vector3().crossVectors(hoverRight, hoverInward).normalize();
 
-        var hoverFrame = new THREE.Matrix4()
-            .makeBasis(hoverRight, hoverInward, hoverUp)
-            .linearPart();
+        var hoverFrame = new THREE.Matrix3().setFromMatrix4(
+            new THREE.Matrix4().makeBasis(hoverRight, hoverInward, hoverUp),
+        );
         observer.orientation = hoverFrame.multiply(hoverOrbitRot);
         shader.needsUpdate = true;
     } else {

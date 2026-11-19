@@ -92,7 +92,7 @@
         float bg_D = 1.0 / safe_bg_doppler;
         float bg_boost = min(bg_D * bg_D * bg_D, 10000.0);
 
-        vec4 star_color = texture2D(star_texture, tex_coord);
+        vec4 star_color = texture(star_texture, tex_coord);
         if (star_color.r > 0.0) {
             t_coord = (STAR_MIN_TEMPERATURE +
                 (STAR_MAX_TEMPERATURE-STAR_MIN_TEMPERATURE) * star_color.g)

@@ -1,8 +1,8 @@
 # Black Hole Simulation
 
 A real-time black hole renderer that runs in the browser. Every pixel traces a light ray through
-curved spacetime on the GPU with WebGL, so the lensed sky, the accretion flow and relativistic jets
-are recomputed live as you move the camera or change the physics. A timeline editor turns any
+curved spacetime on the GPU with WebGL 2, so the lensed sky, the accretion flow and relativistic
+jets are recomputed live as you move the camera or change the physics. A timeline editor turns any
 setup into a scripted presentation that can be recorded to video.
 
 ## Features
@@ -16,10 +16,17 @@ setup into a scripted presentation that can be recorded to video.
 - Bloom, temporal anti-aliasing and cinematic tone mapping. Quality presets range from Mobile to
   Cinematic, and a one-time GPU benchmark picks the default.
 - Observer orbits plus scripted "dive" and "hover" scenarios.
+- Camera controls: drag to orbit, right-drag to pan, drag with both buttons to roll and scroll to
+  zoom. On touch screens one finger orbits, two fingers pan and a pinch zooms.
 - Presentation timeline with keyframed parameters, camera motion, annotations, bundled tours and
   JSON import/export.
-- Capture: PNG screenshots, real-time WebM recording (MediaRecorder) and frame-exact offline WebM
-  rendering (WebCodecs).
+- Capture: PNG screenshots, frame-exact offline rendering to MP4 (H.264) or WebM (VP9 or AV1)
+  through WebCodecs and [Mediabunny](https://mediabunny.dev), and real-time recording through
+  MediaRecorder. Where the File System Access API is available, offline renders stream straight
+  into the chosen file instead of being held in memory.
+
+The simulation needs a browser with WebGL 2 and explains in the page when it is missing. Offline
+recording also needs WebCodecs.
 
 ## Quick start
 
@@ -32,16 +39,16 @@ docker compose up dev
 
 Then open <http://localhost:5173>. Source changes reload in the browser.
 
-| Command                                          | What it does                                                   |
-| ------------------------------------------------ | -------------------------------------------------------------- |
-| `docker compose up dev`                          | Vite dev server with hot module reload                         |
-| `docker compose run --rm test`                   | ESLint, Prettier check and Vitest unit tests                   |
-| `docker compose run --rm build`                  | Production build into `dist/`                                  |
-| `docker compose up --build preview`              | Production nginx image on <http://localhost:8080>              |
-| `docker compose run --rm e2e`                    | Playwright smoke test in headless Chromium with software WebGL |
-| `docker compose run --rm test npm run format`    | Format with Prettier and apply ESLint fixes                    |
-| `docker compose run --rm test npm install <pkg>` | Add a dependency (updates `package.json` and the lockfile)     |
-| `docker compose down --remove-orphans`           | Stop and remove the project's containers                       |
+| Command                                          | What it does                                                  |
+| ------------------------------------------------ | ------------------------------------------------------------- |
+| `docker compose up dev`                          | Vite dev server with hot module reload                        |
+| `docker compose run --rm test`                   | ESLint, Prettier check and Vitest unit tests                  |
+| `docker compose run --rm build`                  | Production build into `dist/`                                 |
+| `docker compose up --build preview`              | Production nginx image on <http://localhost:8080>             |
+| `docker compose run --rm e2e`                    | Playwright e2e tests in headless Chromium with software WebGL |
+| `docker compose run --rm test npm run format`    | Format with Prettier and apply ESLint fixes                   |
+| `docker compose run --rm test npm install <pkg>` | Add a dependency (updates `package.json` and the lockfile)    |
+| `docker compose down --remove-orphans`           | Stop and remove the project's containers                      |
 
 Settings can be exported or put in a `.env` file next to `compose.yaml`:
 
@@ -106,15 +113,15 @@ server, the build-time `<meta>` tag and the nginx configuration.
 index.html               page shell and Vite entry
 src/app/main.js          application entry point
 src/app/core/            renderer, render loop, runtime state, observer physics, scenarios
-src/app/graphics/        bloom post-processing
-src/app/presentation/    timeline editor, presentation runtime, bundled presentation presets
-src/app/scene/           camera control
-src/app/ui/              control panels, quality presets, widgets
-src/shaders/raytracer/   GLSL ray tracer; index.js defines the order the shards are joined in
+src/app/graphics/        bloom and the shared full-screen pass helpers
+src/app/presentation/    timeline editor, presentation runtime and recording, bundled presets
+src/app/scene/           camera runtime and the mouse and touch observer controls
+src/app/ui/              lil-gui control panels, quality presets, widgets
+src/shaders/raytracer/   GLSL ES 3.00 ray tracer; index.js sets the order the shards are joined in
 src/styles/              stylesheets
-public/                  files served as-is: textures, icons and vendored libraries
+public/                  files served as-is: textures and icons
 tests/unit/              Vitest unit tests
-tests/e2e/               Playwright smoke test
+tests/e2e/               Playwright tests: rendering, controls, recording, missing WebGL 2
 config/                  security headers shared by every server
 docker/                  container entrypoint and nginx configuration
 scripts/                 build helpers
@@ -145,6 +152,10 @@ await page.waitForFunction(() => window.__BH__.frameCount >= 24);
 ```
 
 The WebGL canvas has the id `bh-canvas`.
+
+`window.blackHolePresentation` is the presentation API the e2e tests drive, for example
+`loadPreset(name)`, `startRecording(options)` (a promise that resolves to `true` once recording
+has started), `stopRecording()`, `state()` and `getPathValue(path)`.
 
 ## Contributing
 

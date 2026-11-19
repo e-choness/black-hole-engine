@@ -3,7 +3,7 @@
 //       and exposes compile() to render the template into a ready-to-use fragment
 //       shader string. Also defines the degToRad helper.
 
-import { Mustache } from '../vendor.js';
+import Mustache from 'mustache';
 import { diveState, hoverState } from './scenarios/scenario-state.js';
 
 export function degToRad(a) {

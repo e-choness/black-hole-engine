@@ -3,162 +3,133 @@
 //       bright emission. Called once during init() to build the pass; the returned
 //       bloomPass object exposes render() and resize() for use in the render loop.
 
-import { THREE } from '../vendor.js';
+import * as THREE from 'three';
+import { FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
+import {
+    COPY_FRAGMENT_SHADER,
+    createPassMaterial,
+    createRenderTarget,
+    renderPass,
+} from './post-processing.js';
 
-export function setupBloom() {
-    var ppVertexShader = [
-        'varying vec2 vUv;',
-        'void main() {',
-        '    vUv = uv;',
-        '    gl_Position = vec4(position, 1.0);',
-        '}',
-    ].join('\n');
+const THRESHOLD_FRAGMENT_SHADER = /* glsl */ `
+uniform sampler2D tDiffuse;
+uniform float threshold;
+uniform float softKnee;
+in vec2 vUv;
+out vec4 fragColor;
 
-    var thresholdFS = [
-        'uniform sampler2D tDiffuse;',
-        'uniform float threshold;',
-        'uniform float softKnee;',
-        'varying vec2 vUv;',
-        'void main() {',
-        '    vec4 c = texture2D(tDiffuse, vUv);',
-        '    float br = max(c.r, max(c.g, c.b));',
-        '    float knee = threshold * softKnee;',
-        '    float soft = br - threshold + knee;',
-        '    soft = clamp(soft, 0.0, 2.0 * knee);',
-        '    soft = soft * soft / (4.0 * knee + 0.00001);',
-        '    float contrib = max(soft, br - threshold) / max(br, 0.00001);',
-        '    gl_FragColor = vec4(c.rgb * contrib, 1.0);',
-        '}',
-    ].join('\n');
+void main() {
+    vec4 c = texture(tDiffuse, vUv);
+    float br = max(c.r, max(c.g, c.b));
+    float knee = threshold * softKnee;
+    float soft = br - threshold + knee;
+    soft = clamp(soft, 0.0, 2.0 * knee);
+    soft = soft * soft / (4.0 * knee + 0.00001);
+    float contrib = max(soft, br - threshold) / max(br, 0.00001);
+    fragColor = vec4(c.rgb * contrib, 1.0);
+}
+`;
 
-    var blurFS = [
-        'uniform sampler2D tDiffuse;',
-        'uniform vec2 direction;',
-        'varying vec2 vUv;',
-        'void main() {',
-        '    vec4 sum = vec4(0.0);',
-        '    sum += texture2D(tDiffuse, vUv - 4.0 * direction) * 0.01621622;',
-        '    sum += texture2D(tDiffuse, vUv - 3.0 * direction) * 0.05405405;',
-        '    sum += texture2D(tDiffuse, vUv - 2.0 * direction) * 0.12162162;',
-        '    sum += texture2D(tDiffuse, vUv - 1.0 * direction) * 0.19459459;',
-        '    sum += texture2D(tDiffuse, vUv) * 0.22702703;',
-        '    sum += texture2D(tDiffuse, vUv + 1.0 * direction) * 0.19459459;',
-        '    sum += texture2D(tDiffuse, vUv + 2.0 * direction) * 0.12162162;',
-        '    sum += texture2D(tDiffuse, vUv + 3.0 * direction) * 0.05405405;',
-        '    sum += texture2D(tDiffuse, vUv + 4.0 * direction) * 0.01621622;',
-        '    gl_FragColor = sum;',
-        '}',
-    ].join('\n');
+const BLUR_FRAGMENT_SHADER = /* glsl */ `
+uniform sampler2D tDiffuse;
+uniform vec2 direction;
+in vec2 vUv;
+out vec4 fragColor;
 
-    var copyFS = [
-        'uniform sampler2D tDiffuse;',
-        'varying vec2 vUv;',
-        'void main() {',
-        '    gl_FragColor = texture2D(tDiffuse, vUv);',
-        '}',
-    ].join('\n');
+void main() {
+    vec4 sum = vec4(0.0);
+    sum += texture(tDiffuse, vUv - 4.0 * direction) * 0.01621622;
+    sum += texture(tDiffuse, vUv - 3.0 * direction) * 0.05405405;
+    sum += texture(tDiffuse, vUv - 2.0 * direction) * 0.12162162;
+    sum += texture(tDiffuse, vUv - 1.0 * direction) * 0.19459459;
+    sum += texture(tDiffuse, vUv) * 0.22702703;
+    sum += texture(tDiffuse, vUv + 1.0 * direction) * 0.19459459;
+    sum += texture(tDiffuse, vUv + 2.0 * direction) * 0.12162162;
+    sum += texture(tDiffuse, vUv + 3.0 * direction) * 0.05405405;
+    sum += texture(tDiffuse, vUv + 4.0 * direction) * 0.01621622;
+    fragColor = sum;
+}
+`;
 
-    var compositeFS = [
-        'uniform sampler2D tDiffuse;',
-        'uniform sampler2D tBloom0;',
-        'uniform sampler2D tBloom1;',
-        'uniform sampler2D tBloom2;',
-        'uniform sampler2D tBloom3;',
-        'uniform sampler2D tBloom4;',
-        'uniform float bloomStrength;',
-        'uniform float bloomRadius;',
-        'varying vec2 vUv;',
-        'void main() {',
-        '    vec4 orig = texture2D(tDiffuse, vUv);',
-        '    float r = bloomRadius;',
-        '    float p = 1.2 + 0.8 * r;',
-        '    float w0 = 1.0;',
-        '    float w1 = 1.0 / pow(2.0, p);',
-        '    float w2 = 1.0 / pow(3.0, p);',
-        '    float w3 = 1.0 / pow(4.0, p);',
-        '    float w4 = 1.0 / pow(5.0, p);',
-        '    float wsum = w0 + w1 + w2 + w3 + w4;',
-        '    vec4 bloom = (texture2D(tBloom0, vUv) * w0',
-        '        + texture2D(tBloom1, vUv) * w1',
-        '        + texture2D(tBloom2, vUv) * w2',
-        '        + texture2D(tBloom3, vUv) * w3',
-        '        + texture2D(tBloom4, vUv) * w4) / wsum;',
-        '    gl_FragColor = vec4(orig.rgb + bloom.rgb * bloomStrength, 1.0);',
-        '}',
-    ].join('\n');
+// The composite is clamped to the display range: it feeds the TAA history, which must keep
+// seeing the same values an 8-bit target would hold, and the canvas clamps anyway.
+const COMPOSITE_FRAGMENT_SHADER = /* glsl */ `
+uniform sampler2D tDiffuse;
+uniform sampler2D tBloom0;
+uniform sampler2D tBloom1;
+uniform sampler2D tBloom2;
+uniform sampler2D tBloom3;
+uniform sampler2D tBloom4;
+uniform float bloomStrength;
+uniform float bloomRadius;
+in vec2 vUv;
+out vec4 fragColor;
 
+void main() {
+    vec4 orig = texture(tDiffuse, vUv);
+    float r = bloomRadius;
+    float p = 1.2 + 0.8 * r;
+    float w0 = 1.0;
+    float w1 = 1.0 / pow(2.0, p);
+    float w2 = 1.0 / pow(3.0, p);
+    float w3 = 1.0 / pow(4.0, p);
+    float w4 = 1.0 / pow(5.0, p);
+    float wsum = w0 + w1 + w2 + w3 + w4;
+    vec4 bloom = (texture(tBloom0, vUv) * w0
+        + texture(tBloom1, vUv) * w1
+        + texture(tBloom2, vUv) * w2
+        + texture(tBloom3, vUv) * w3
+        + texture(tBloom4, vUv) * w4) / wsum;
+    fragColor = vec4(clamp(orig.rgb + bloom.rgb * bloomStrength, 0.0, 1.0), 1.0);
+}
+`;
+
+export function setupBloom(renderer) {
     var BLOOM_LEVELS = 5;
-    var rtParams = {
-        minFilter: THREE.LinearFilter,
-        magFilter: THREE.LinearFilter,
-        format: THREE.RGBAFormat,
-    };
 
-    var ppScene = new THREE.Scene();
-    var ppCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-    var ppGeom = new THREE.PlaneBufferGeometry(2, 2);
-    var ppMesh = new THREE.Mesh(ppGeom);
-    ppScene.add(ppMesh);
-
-    var thresholdMat = new THREE.ShaderMaterial({
-        uniforms: {
-            tDiffuse: { type: 't', value: null },
-            threshold: { type: 'f', value: 0.65 },
-            softKnee: { type: 'f', value: 0.5 },
+    var thresholdMat = createPassMaterial(
+        {
+            tDiffuse: { value: null },
+            threshold: { value: 0.65 },
+            softKnee: { value: 0.5 },
         },
-        vertexShader: ppVertexShader,
-        fragmentShader: thresholdFS,
-        depthWrite: false,
-        depthTest: false,
-    });
+        THRESHOLD_FRAGMENT_SHADER,
+    );
 
-    var blurMat = new THREE.ShaderMaterial({
-        uniforms: {
-            tDiffuse: { type: 't', value: null },
-            direction: { type: 'v2', value: new THREE.Vector2() },
+    var blurMat = createPassMaterial(
+        {
+            tDiffuse: { value: null },
+            direction: { value: new THREE.Vector2() },
         },
-        vertexShader: ppVertexShader,
-        fragmentShader: blurFS,
-        depthWrite: false,
-        depthTest: false,
-    });
+        BLUR_FRAGMENT_SHADER,
+    );
 
-    var copyMat = new THREE.ShaderMaterial({
-        uniforms: {
-            tDiffuse: { type: 't', value: null },
-        },
-        vertexShader: ppVertexShader,
-        fragmentShader: copyFS,
-        depthWrite: false,
-        depthTest: false,
-    });
+    var copyMat = createPassMaterial({ tDiffuse: { value: null } }, COPY_FRAGMENT_SHADER);
 
-    var compositeMat = new THREE.ShaderMaterial({
-        uniforms: {
-            tDiffuse: { type: 't', value: null },
-            tBloom0: { type: 't', value: null },
-            tBloom1: { type: 't', value: null },
-            tBloom2: { type: 't', value: null },
-            tBloom3: { type: 't', value: null },
-            tBloom4: { type: 't', value: null },
-            bloomStrength: { type: 'f', value: 0.35 },
-            bloomRadius: { type: 'f', value: 0.85 },
+    var compositeMat = createPassMaterial(
+        {
+            tDiffuse: { value: null },
+            tBloom0: { value: null },
+            tBloom1: { value: null },
+            tBloom2: { value: null },
+            tBloom3: { value: null },
+            tBloom4: { value: null },
+            bloomStrength: { value: 0.35 },
+            bloomRadius: { value: 0.85 },
         },
-        vertexShader: ppVertexShader,
-        fragmentShader: compositeFS,
-        depthWrite: false,
-        depthTest: false,
-    });
+        COMPOSITE_FRAGMENT_SHADER,
+    );
 
     function createTargets(w, h) {
-        var mainRT = new THREE.WebGLRenderTarget(w, h, rtParams);
+        var mainRT = createRenderTarget(renderer, w, h);
         var mips = [];
         var temps = [];
         for (var i = 0; i < BLOOM_LEVELS; i++) {
             var mw = Math.max(1, Math.floor(w / Math.pow(2, i + 1)));
             var mh = Math.max(1, Math.floor(h / Math.pow(2, i + 1)));
-            mips.push(new THREE.WebGLRenderTarget(mw, mh, rtParams));
-            temps.push(new THREE.WebGLRenderTarget(mw, mh, rtParams));
+            mips.push(createRenderTarget(renderer, mw, mh));
+            temps.push(createRenderTarget(renderer, mw, mh));
         }
         return { mainRT: mainRT, mips: mips, temps: temps };
     }
@@ -167,9 +138,7 @@ export function setupBloom() {
 
     var bloomPass = {
         BLOOM_LEVELS: BLOOM_LEVELS,
-        ppScene: ppScene,
-        ppCamera: ppCamera,
-        ppMesh: ppMesh,
+        quad: new FullScreenQuad(),
         thresholdMat: thresholdMat,
         blurMat: blurMat,
         copyMat: copyMat,
@@ -193,12 +162,12 @@ export function setupBloom() {
         render: function (rdr, mainScene, mainCamera, params, outputTarget) {
             var bp = this;
 
-            rdr.render(mainScene, mainCamera, bp.mainRT, true);
+            rdr.setRenderTarget(bp.mainRT);
+            rdr.render(mainScene, mainCamera);
 
-            bp.thresholdMat.uniforms.tDiffuse.value = bp.mainRT;
+            bp.thresholdMat.uniforms.tDiffuse.value = bp.mainRT.texture;
             bp.thresholdMat.uniforms.threshold.value = params.threshold;
-            bp.ppMesh.material = bp.thresholdMat;
-            rdr.render(bp.ppScene, bp.ppCamera, bp.bloomMips[0], true);
+            renderPass(rdr, bp.quad, bp.thresholdMat, bp.bloomMips[0]);
 
             for (var i = 0; i < bp.BLOOM_LEVELS; i++) {
                 var mip = bp.bloomMips[i];
@@ -207,33 +176,26 @@ export function setupBloom() {
                 var mh = mip.height;
 
                 if (i > 0) {
-                    bp.copyMat.uniforms.tDiffuse.value = bp.bloomMips[i - 1];
-                    bp.ppMesh.material = bp.copyMat;
-                    rdr.render(bp.ppScene, bp.ppCamera, mip, true);
+                    bp.copyMat.uniforms.tDiffuse.value = bp.bloomMips[i - 1].texture;
+                    renderPass(rdr, bp.quad, bp.copyMat, mip);
                 }
 
-                bp.blurMat.uniforms.tDiffuse.value = mip;
+                bp.blurMat.uniforms.tDiffuse.value = mip.texture;
                 bp.blurMat.uniforms.direction.value.set(1.0 / mw, 0);
-                bp.ppMesh.material = bp.blurMat;
-                rdr.render(bp.ppScene, bp.ppCamera, tmp, true);
+                renderPass(rdr, bp.quad, bp.blurMat, tmp);
 
-                bp.blurMat.uniforms.tDiffuse.value = tmp;
+                bp.blurMat.uniforms.tDiffuse.value = tmp.texture;
                 bp.blurMat.uniforms.direction.value.set(0, 1.0 / mh);
-                rdr.render(bp.ppScene, bp.ppCamera, mip, true);
+                renderPass(rdr, bp.quad, bp.blurMat, mip);
             }
 
-            bp.compositeMat.uniforms.tDiffuse.value = bp.mainRT;
+            bp.compositeMat.uniforms.tDiffuse.value = bp.mainRT.texture;
             for (var j = 0; j < bp.BLOOM_LEVELS; j++) {
-                bp.compositeMat.uniforms['tBloom' + j].value = bp.bloomMips[j];
+                bp.compositeMat.uniforms['tBloom' + j].value = bp.bloomMips[j].texture;
             }
             bp.compositeMat.uniforms.bloomStrength.value = params.strength;
             bp.compositeMat.uniforms.bloomRadius.value = params.radius;
-            bp.ppMesh.material = bp.compositeMat;
-            if (outputTarget) {
-                rdr.render(bp.ppScene, bp.ppCamera, outputTarget, true);
-            } else {
-                rdr.render(bp.ppScene, bp.ppCamera);
-            }
+            renderPass(rdr, bp.quad, bp.compositeMat, outputTarget || null);
         },
     };
 

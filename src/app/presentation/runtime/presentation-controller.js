@@ -61,13 +61,18 @@ import {
     resolvePresentationRecordingResolution,
     getPresentationRendererRuntimeApi,
     isRendererContextLost,
-    getPresentationWebMMuxerApi,
     getOfflinePresentationRecordingSupportState,
     isOfflinePresentationRecordingSupported,
     stopPresentationCaptureStreamTracks,
     downloadPresentationCaptureDataUrl,
     downloadPresentationRecordingBlob,
+    createRecordingFileSink,
 } from './presentation-recording-support.js';
+import {
+    DEFAULT_PRESENTATION_VIDEO_CONTAINER,
+    PRESENTATION_VIDEO_CONTAINERS,
+    normalizePresentationVideoContainer,
+} from './presentation-video-formats.js';
 import {
     capturePresentationQualitySnapshot,
     restorePresentationQualitySnapshot,
@@ -97,7 +102,8 @@ export {
 // ─── Presentation Timeline + Capture ─────────────────────────────────────────
 // Timeline system for scripted camera/parameter animations suitable for slides
 // and demos. Supports keyframed parameter tracks, timed events (dive/hover),
-// and optional canvas recording via MediaRecorder.
+// and canvas recording: offline through WebCodecs and Mediabunny, realtime through
+// MediaRecorder.
 var presentationState = {
     active: false,
     paused: true,
@@ -111,11 +117,13 @@ var presentationState = {
 
 var presentationCaptureState = {
     active: false,
+    starting: false,
     recorder: null,
     stream: null,
     chunks: [],
     mode: 'realtime',
     preferredMode: 'offline',
+    videoContainer: DEFAULT_PRESENTATION_VIDEO_CONTAINER,
     fps: 60,
     bitrateMbps: 20.0,
     filenamePrefix: 'black-hole-presentation',
@@ -650,13 +658,13 @@ export function getPresentationState() {
     }
     var offlinePhase = offlineJob && offlineJob.phase ? offlineJob.phase : 'idle';
     var offlineFinalizingProgress = -1;
+    var offlineEncodeBacklog = offlineJob
+        ? Math.max(0, offlineJob.frameCount - offlineJob.packetsEncoded)
+        : 0;
     if (offlineJob && offlinePhase === 'finalizing-encode') {
-        var q =
-            offlineJob.encoder && typeof offlineJob.encoder.encodeQueueSize === 'number'
-                ? offlineJob.encoder.encodeQueueSize
-                : 0;
-        var q0 = Math.max(1, offlineJob.finalizingStartQueue || q || 1);
-        offlineFinalizingProgress = 0.1 + 0.7 * (1.0 - presentationClamp(q / q0, 0.0, 1.0));
+        var startBacklog = Math.max(1, offlineJob.finalizingStartBacklog || offlineEncodeBacklog);
+        offlineFinalizingProgress =
+            0.1 + 0.7 * (1.0 - presentationClamp(offlineEncodeBacklog / startBacklog, 0.0, 1.0));
     } else if (offlineJob && offlinePhase === 'finalizing-mux') {
         offlineFinalizingProgress = 0.9;
     } else if (offlineJob && offlinePhase === 'finalizing-download') {
@@ -678,6 +686,7 @@ export function getPresentationState() {
         recording: !!presentationCaptureState.active,
         recording_mode: presentationCaptureState.mode || 'realtime',
         recording_mode_preferred: presentationCaptureState.preferredMode || 'offline',
+        recording_video_container: presentationCaptureState.videoContainer,
         recording_offline_supported: isOfflinePresentationRecordingSupported(),
         recording_offline_unavailable_reason:
             presentationCaptureState.offlineUnavailableReason || '',
@@ -695,12 +704,8 @@ export function getPresentationState() {
         recording_offline_since_last_frame_s: offlineSinceLastFrameSeconds,
         recording_offline_render_fps: offlineRenderFps,
         recording_offline_eta_s: offlineEtaSeconds,
-        recording_offline_encode_queue:
-            offlineJob &&
-            offlineJob.encoder &&
-            typeof offlineJob.encoder.encodeQueueSize === 'number'
-                ? offlineJob.encoder.encodeQueueSize
-                : 0,
+        recording_offline_encode_queue: offlineEncodeBacklog,
+        recording_offline_codec: offlineJob ? offlineJob.codec : '',
         recording_offline_timeline_done_s:
             offlineFramesDone / Math.max(presentationCaptureState.fps || 60, 1),
         recording_offline_timeline_total_s:
@@ -972,18 +977,20 @@ function clearPresentationCaptureBuffers() {
     presentationCaptureState.outputHeight = 0;
 }
 
+function restorePresentationRendererSize() {
+    if (!presentationCaptureState.rendererResizedForRecording) return;
+    var restoreApi = getPresentationRendererRuntimeApi();
+    if (restoreApi && typeof restoreApi.restoreWindowSizeAfterRecording === 'function') {
+        restoreApi.restoreWindowSizeAfterRecording();
+    }
+    presentationCaptureState.rendererResizedForRecording = false;
+}
+
 function cleanupPresentationRecordingState() {
     stopPresentationCaptureStreamTracks(presentationCaptureState.stream);
 
     setPresentationRendererOfflineStepping(false);
-
-    if (presentationCaptureState.rendererResizedForRecording) {
-        var restoreApi = getPresentationRendererRuntimeApi();
-        if (restoreApi && typeof restoreApi.restoreWindowSizeAfterRecording === 'function') {
-            restoreApi.restoreWindowSizeAfterRecording();
-        }
-        presentationCaptureState.rendererResizedForRecording = false;
-    }
+    restorePresentationRendererSize();
 
     presentationCaptureState.active = false;
     presentationCaptureState.recorder = null;
@@ -997,23 +1004,40 @@ function cleanupPresentationRecordingState() {
     presentationCaptureState.restoreQualitySnapshot = null;
 }
 
+// A hardware encoder that dies without reporting an error never completes the flush inside
+// Output.finalize(), so finalization fails once encoded packets stop arriving for this long.
+var OFFLINE_FINALIZE_STALL_MS = 30000;
+
+function armOfflineFinalizeWatchdog(offlineJob) {
+    clearTimeout(offlineJob.finalizeWatchdog);
+    offlineJob.finalizeWatchdog = setTimeout(function () {
+        offlineJob.finalizeWatchdog = 0;
+        if (offlineJob.onFinalizeStalled) offlineJob.onFinalizeStalled();
+    }, OFFLINE_FINALIZE_STALL_MS);
+}
+
+// Called by the encoder for every frame. During finalization each packet re-arms the stall
+// watchdog and the last one moves the job on to muxing.
+function noteOfflinePacketEncoded(offlineJob) {
+    offlineJob.packetsEncoded += 1;
+    if (offlineJob.phase !== 'finalizing-encode') return;
+    if (offlineJob.packetsEncoded < offlineJob.frameCount) {
+        armOfflineFinalizeWatchdog(offlineJob);
+        return;
+    }
+    clearTimeout(offlineJob.finalizeWatchdog);
+    offlineJob.finalizeWatchdog = 0;
+    offlineJob.phase = 'finalizing-mux';
+    refreshPresentationUiBindings();
+}
+
 function finalizeOfflinePresentationRecording() {
     var offlineJob = presentationCaptureState.offlineJob;
     if (!offlineJob || offlineJob.finalizing) return;
     offlineJob.finalizing = true;
-    if (offlineJob.failed) {
-        offlineJob.phase = 'failed';
-    } else {
-        offlineJob.phase = 'finalizing-encode';
-        offlineJob.finalizingStartQueue =
-            offlineJob.encoder && typeof offlineJob.encoder.encodeQueueSize === 'number'
-                ? offlineJob.encoder.encodeQueueSize
-                : 0;
-    }
-    refreshPresentationUiBindings();
 
     function finishCleanup() {
-        if (offlineJob && !offlineJob.failed) {
+        if (!offlineJob.failed) {
             offlineJob.phase = 'done';
             refreshPresentationUiBindings();
         }
@@ -1021,281 +1045,152 @@ function finalizeOfflinePresentationRecording() {
         refreshPresentationUiBindings();
     }
 
-    if (offlineJob.failed) {
-        if (offlineJob.encoder && typeof offlineJob.encoder.close === 'function') {
-            try {
-                offlineJob.encoder.close();
-            } catch (closeErr) {}
-        }
+    function discardOutput() {
+        offlineJob.failed = true;
+        offlineJob.phase = 'failed';
+        offlineJob.onFinalizeStalled = null;
+        clearTimeout(offlineJob.finalizeWatchdog);
+        offlineJob.finalizeWatchdog = 0;
+        if (offlineJob.fileSink) offlineJob.fileSink.discard();
+        // cancel() waits for a pending finalize(), so cleanup does not wait for it.
+        offlineJob.output.cancel().catch(function (cancelErr) {
+            console.warn('Offline recording cancel failed:', cancelErr);
+        });
+        refreshPresentationUiBindings();
         finishCleanup();
+    }
+
+    if (offlineJob.failed) {
+        discardOutput();
         return;
     }
 
-    function finalizeMuxedOutput() {
-        if (!offlineJob.encoder || typeof offlineJob.encoder.flush !== 'function') {
-            finishCleanup();
+    var backlog = Math.max(0, offlineJob.frameCount - offlineJob.packetsEncoded);
+    offlineJob.finalizingStartBacklog = backlog;
+    offlineJob.phase = backlog > 0 ? 'finalizing-encode' : 'finalizing-mux';
+    refreshPresentationUiBindings();
+
+    var settled = false;
+    function settle(error) {
+        if (settled) return;
+        settled = true;
+        offlineJob.onFinalizeStalled = null;
+        clearTimeout(offlineJob.finalizeWatchdog);
+        offlineJob.finalizeWatchdog = 0;
+        if (error) {
+            console.warn('Offline recording finalize failed:', error);
+            discardOutput();
             return;
         }
-
-        // Guard against two failure modes caused by GPU context loss / hardware encoder crash:
-        //   1. flush() throws synchronously (encoder state already 'closed')
-        //   2. flush() returns a Promise that never settles (HW encoder died silently,
-        //      no error callback fired). Without a watchdog this hangs the UI at 10% forever.
-        var flushSettled = false;
-        var flushWatchdog = setTimeout(function () {
-            if (flushSettled) return;
-            flushSettled = true;
-            offlineJob.flushWatchdog = null;
-            console.warn('Offline encoder flush timed out — GPU context may have been lost.');
-            offlineJob.failed = true;
-            offlineJob.phase = 'failed';
+        if (!offlineJob.fileSink) {
+            offlineJob.phase = 'finalizing-download';
             refreshPresentationUiBindings();
-            if (offlineJob.encoder && typeof offlineJob.encoder.close === 'function') {
-                try {
-                    offlineJob.encoder.close();
-                } catch (closeErr) {}
-            }
-            finishCleanup();
-        }, 30000);
-
-        var flushPromise;
-        try {
-            offlineJob.flushWatchdog = flushWatchdog;
-            flushPromise = offlineJob.encoder.flush();
-        } catch (syncFlushErr) {
-            clearTimeout(flushWatchdog);
-            offlineJob.flushWatchdog = null;
-            flushSettled = true;
-            console.warn('Offline encoder flush threw synchronously:', syncFlushErr);
-            offlineJob.failed = true;
-            offlineJob.phase = 'failed';
-            refreshPresentationUiBindings();
-            if (offlineJob.encoder && typeof offlineJob.encoder.close === 'function') {
-                try {
-                    offlineJob.encoder.close();
-                } catch (closeErr) {}
-            }
-            finishCleanup();
-            return;
-        }
-
-        Promise.resolve(flushPromise)
-            .then(function () {
-                clearTimeout(flushWatchdog);
-                offlineJob.flushWatchdog = null;
-                if (flushSettled) return;
-                flushSettled = true;
-                offlineJob.phase = 'finalizing-mux';
-                refreshPresentationUiBindings();
-
-                // Yield one tick so the UI can paint the finalization phase
-                setTimeout(function () {
-                    try {
-                        if (offlineJob.muxer && typeof offlineJob.muxer.finalize === 'function') {
-                            offlineJob.muxer.finalize();
-                        }
-                        offlineJob.phase = 'finalizing-download';
-                        refreshPresentationUiBindings();
-
-                        setTimeout(function () {
-                            if (
-                                offlineJob.encoder &&
-                                typeof offlineJob.encoder.close === 'function'
-                            ) {
-                                try {
-                                    offlineJob.encoder.close();
-                                } catch (closeErr) {}
-                            }
-
-                            if (offlineJob.writableFileStream) {
-                                // FileSystemWritableFileStreamTarget path: data already streamed to
-                                // disk during encoding. Just close the writable stream (which also
-                                // flushes any pending buffered writes) and we're done — no Blob ever
-                                // accumulates in RAM.
-                                offlineJob.writableFileStream
-                                    .close()
-                                    .then(function () {
-                                        finishCleanup();
-                                    })
-                                    .catch(function (closeErr) {
-                                        console.warn(
-                                            'Failed to close recording file stream:',
-                                            closeErr,
-                                        );
-                                        offlineJob.failed = true;
-                                        finishCleanup();
-                                    });
-                            } else {
-                                // ArrayBufferTarget path: build a Blob from the in-memory buffer
-                                // and trigger the browser download dialog.
-                                try {
-                                    var buffer = offlineJob.target && offlineJob.target.buffer;
-                                    if (buffer) {
-                                        var mime = 'video/webm';
-                                        var blob = new Blob([buffer], { type: mime });
-                                        downloadPresentationRecordingBlob(
-                                            blob,
-                                            mime,
-                                            presentationCaptureState.filenamePrefix,
-                                        );
-                                    }
-                                } catch (downloadErr) {
-                                    console.warn(
-                                        'Offline recording download preparation failed:',
-                                        downloadErr,
-                                    );
-                                    offlineJob.failed = true;
-                                }
-                                finishCleanup();
-                            }
-                        }, 0);
-                    } catch (muxErr) {
-                        console.warn('Offline recording finalize failed:', muxErr);
-                        offlineJob.failed = true;
-                        if (offlineJob.encoder && typeof offlineJob.encoder.close === 'function') {
-                            try {
-                                offlineJob.encoder.close();
-                            } catch (closeErr2) {}
-                        }
-                        finishCleanup();
-                    }
-                }, 0);
-            })
-            .catch(function (flushErr) {
-                clearTimeout(flushWatchdog);
-                offlineJob.flushWatchdog = null;
-                if (flushSettled) return;
-                flushSettled = true;
-                console.warn('Offline encoder flush failed:', flushErr);
+            try {
+                var buffer = offlineJob.target.buffer;
+                if (buffer) {
+                    downloadPresentationRecordingBlob(
+                        new Blob([buffer], { type: offlineJob.mimeType }),
+                        offlineJob.mimeType,
+                        presentationCaptureState.filenamePrefix,
+                    );
+                }
+            } catch (downloadErr) {
+                console.warn('Offline recording download failed:', downloadErr);
                 offlineJob.failed = true;
                 offlineJob.phase = 'failed';
-                refreshPresentationUiBindings();
-                if (offlineJob.encoder && typeof offlineJob.encoder.close === 'function') {
-                    try {
-                        offlineJob.encoder.close();
-                    } catch (closeErr3) {}
-                }
-                finishCleanup();
-            });
+            }
+        }
+        finishCleanup();
     }
 
-    if (offlineJob.encoder && typeof offlineJob.encoder.flush === 'function') {
-        finalizeMuxedOutput();
-        return;
+    if (backlog > 0) {
+        offlineJob.onFinalizeStalled = function () {
+            settle(new Error('The video encoder stopped responding.'));
+        };
+        armOfflineFinalizeWatchdog(offlineJob);
     }
-
-    finishCleanup();
+    if (offlineJob.fileSink) offlineJob.fileSink.finish();
+    offlineJob.output.finalize().then(function () {
+        settle(null);
+    }, settle);
 }
 
 function runOfflinePresentationRecordingLoop() {
     var offlineJob = presentationCaptureState.offlineJob;
     if (!presentationCaptureState.active || !offlineJob) return;
 
-    var frameDt = 1.0 / Math.max(presentationCaptureState.fps, 1);
+    var fps = Math.max(presentationCaptureState.fps, 1);
+    var frameDt = 1.0 / fps;
+
+    function isCurrentJob() {
+        return (
+            presentationCaptureState.active && presentationCaptureState.offlineJob === offlineJob
+        );
+    }
+
+    function abort(message, err) {
+        if (err === undefined) console.warn(message);
+        else console.warn(message, err);
+        offlineJob.failed = true;
+        finalizeOfflinePresentationRecording();
+    }
+
+    function reachedEnd() {
+        if (offlineJob.totalFrames > 0) return offlineJob.frameCount >= offlineJob.totalFrames;
+        if (!presentationCaptureState.autoStopOnPresentationEnd) return false;
+        var state = getPresentationState();
+        return !!state.loaded && !state.playing;
+    }
 
     function encodeNextFrame() {
-        if (
-            !presentationCaptureState.active ||
-            !presentationCaptureState.offlineJob ||
-            presentationCaptureState.offlineJob !== offlineJob
-        ) {
-            return;
-        }
+        if (!isCurrentJob()) return;
 
         if (offlineJob.stopRequested || offlineJob.failed) {
             finalizeOfflinePresentationRecording();
             return;
         }
-
         if (isRendererContextLost()) {
-            console.warn('Offline recording aborted: WebGL context lost (GPU driver reset / TDR).');
-            offlineJob.failed = true;
-            finalizeOfflinePresentationRecording();
+            abort('Offline recording aborted: WebGL context lost (GPU driver reset / TDR).');
             return;
         }
-
         if (!stepPresentationRendererOfflineFrame(frameDt)) {
-            console.warn('Offline recording aborted: renderer stepping API unavailable.');
-            offlineJob.failed = true;
-            finalizeOfflinePresentationRecording();
+            abort('Offline recording aborted: renderer stepping API unavailable.');
             return;
         }
-
         if (!drawPresentationCaptureFrame()) {
-            console.warn('Offline recording aborted: failed to draw capture frame.');
-            offlineJob.failed = true;
-            finalizeOfflinePresentationRecording();
+            abort('Offline recording aborted: failed to draw capture frame.');
             return;
         }
 
-        if (!offlineJob.encoder || offlineJob.encoder.state === 'closed') {
-            offlineJob.failed = true;
-            finalizeOfflinePresentationRecording();
-            return;
-        }
-
-        var frame;
+        // add() copies the canvas synchronously; its promise settles once the encoder and the
+        // writer can take another frame.
+        var added;
         try {
-            frame = new VideoFrame(presentationCaptureState.captureCanvas, {
-                timestamp: offlineJob.nextTimestampUs,
-                duration: offlineJob.frameDurationUs,
-            });
-        } catch (err) {
-            console.warn('Offline recording aborted: failed to create video frame.', err);
-            offlineJob.failed = true;
-            finalizeOfflinePresentationRecording();
+            added = offlineJob.source.add(offlineJob.frameCount / fps, frameDt);
+        } catch (addErr) {
+            abort('Offline recording aborted: failed to encode frame.', addErr);
             return;
         }
-
-        try {
-            var keyEvery = Math.max(1, Math.round(presentationCaptureState.fps));
-            offlineJob.encoder.encode(frame, {
-                keyFrame: offlineJob.frameCount % keyEvery === 0,
-            });
-        } catch (encodeErr) {
-            console.warn('Offline recording aborted: failed to encode frame.', encodeErr);
-            frame.close();
-            offlineJob.failed = true;
-            finalizeOfflinePresentationRecording();
-            return;
-        }
-        frame.close();
-
         offlineJob.frameCount += 1;
-        offlineJob.nextTimestampUs += offlineJob.frameDurationUs;
         offlineJob.lastFrameWallMs = Date.now();
 
-        if (offlineJob.totalFrames > 0 && offlineJob.frameCount >= offlineJob.totalFrames) {
-            offlineJob.stopRequested = true;
-            finalizeOfflinePresentationRecording();
-            return;
-        }
-
-        var autoStopReachedEnd = false;
-        if (
-            offlineJob.totalFrames <= 0 &&
-            presentationCaptureState.autoStopOnPresentationEnd &&
-            typeof getPresentationState === 'function'
-        ) {
-            var state = getPresentationState();
-            autoStopReachedEnd = !!state.loaded && !state.playing;
-        }
-
-        if (offlineJob.stopRequested || autoStopReachedEnd) {
-            finalizeOfflinePresentationRecording();
-            return;
-        }
-
-        // Always yield via setTimeout — never call encodeNextFrame() directly.
-        // This prevents the JS thread from hammering the GPU in tight synchronous bursts,
-        // which is the primary cause of VRAM spikes and TDR (GPU driver reset) on long renders.
-        //
-        // When the encode queue is backing up (hardware encoder falling behind), add a real
-        // delay so the encoder has time to drain VRAM before the next frame is submitted.
-        // Each 2K VideoFrame is ~14 MB of raw data; without back-pressure they accumulate fast.
-        var queueSize = offlineJob.encoder ? offlineJob.encoder.encodeQueueSize : 0;
-        var frameDelay = queueSize >= 3 ? 50 : queueSize >= 1 ? 8 : 0;
-        setTimeout(encodeNextFrame, frameDelay);
+        added.then(
+            function () {
+                if (!isCurrentJob()) return;
+                if (reachedEnd()) {
+                    offlineJob.stopRequested = true;
+                    finalizeOfflinePresentationRecording();
+                    return;
+                }
+                // Yield between frames so the page stays responsive and the GPU is not driven
+                // in long synchronous bursts, which can trigger a driver reset on long renders.
+                setTimeout(encodeNextFrame, 0);
+            },
+            function (encodeErr) {
+                if (!isCurrentJob()) return;
+                abort('Offline recording aborted: failed to encode frame.', encodeErr);
+            },
+        );
     }
 
     encodeNextFrame();
@@ -1303,7 +1198,7 @@ function runOfflinePresentationRecordingLoop() {
 
 export function capturePresentationScreenshot(options) {
     if (!renderer || !renderer.domElement) return false;
-    if (presentationCaptureState.active) {
+    if (presentationCaptureState.active || presentationCaptureState.starting) {
         presentationCaptureState.offlineUnavailableReason =
             'Offline screenshot capture is unavailable while recording is active.';
         refreshPresentationUiBindings();
@@ -1449,11 +1344,33 @@ export function stopPresentationRecording() {
     return true;
 }
 
-export function startPresentationRecording(options) {
-    if (!renderer || !renderer.domElement) return false;
-    if (presentationCaptureState.active) return false;
-
+// Resolves to true once recording has started. options.writableFileStream, when given, is
+// owned by the recording from then on: an offline recording closes it with the finished video
+// or aborts it when it fails. It is aborted straight away when the recording does not start or
+// runs in realtime, because a realtime recording is downloaded instead.
+export async function startPresentationRecording(options) {
     options = options || {};
+    var started = false;
+    if (!presentationCaptureState.active && !presentationCaptureState.starting) {
+        presentationCaptureState.starting = true;
+        try {
+            started = await beginPresentationRecording(options);
+        } catch (err) {
+            console.warn('Presentation recording failed to start:', err);
+        } finally {
+            presentationCaptureState.starting = false;
+        }
+    }
+    var writesToFile = started && presentationCaptureState.mode === 'offline';
+    if (options.writableFileStream && !writesToFile) {
+        options.writableFileStream.abort().catch(function () {});
+    }
+    return started;
+}
+
+async function beginPresentationRecording(options) {
+    if (!renderer || !renderer.domElement) return false;
+
     var fps = parseFloat(options.fps);
     if (!isFinite(fps) || fps <= 0) fps = presentationCaptureState.fps;
     fps = Math.max(10, Math.min(120, fps));
@@ -1477,6 +1394,12 @@ export function startPresentationRecording(options) {
             : options.recordingMode,
     );
     presentationCaptureState.preferredMode = requestedMode;
+    var videoContainer = normalizePresentationVideoContainer(
+        options.videoContainer === undefined
+            ? presentationCaptureState.videoContainer
+            : options.videoContainer,
+    );
+    presentationCaptureState.videoContainer = videoContainer;
 
     var recordingMode = requestedMode;
     presentationCaptureState.offlineUnavailableReason = '';
@@ -1543,7 +1466,7 @@ export function startPresentationRecording(options) {
     var stream = null;
     var compositeTick = null;
     var recorder = null;
-    var mimeType = 'video/webm';
+    var mimeType;
     var offlineJob = null;
     if (includeOverlayInRecording) {
         ensurePresentationAnnotationCanvas();
@@ -1576,6 +1499,38 @@ export function startPresentationRecording(options) {
     if (recordingMode === 'offline') {
         var width = Math.max(1, presentationCaptureState.captureCanvas.width || 1);
         var height = Math.max(1, presentationCaptureState.captureCanvas.height || 1);
+        var bitsPerSecond = Math.round(bitrate * 1000000.0);
+        var containerSpec = PRESENTATION_VIDEO_CONTAINERS[videoContainer];
+
+        var encoderModule = null;
+        var codec = null;
+        try {
+            encoderModule = await import('./offline-video-encoder.js');
+            codec = await encoderModule.selectOfflineVideoCodec(videoContainer, {
+                width: width,
+                height: height,
+                bitrate: bitsPerSecond,
+                frameRate: fps,
+            });
+        } catch (probeErr) {
+            console.warn('Offline recording codec probe failed:', probeErr);
+        }
+        if (!codec) {
+            presentationCaptureState.offlineUnavailableReason =
+                'This browser cannot encode ' +
+                containerSpec.label +
+                ' video at ' +
+                width +
+                '\xd7' +
+                height +
+                '. Choose another format or resolution.';
+            rollbackRecordingQualityOverride();
+            refreshPresentationUiBindings();
+            return false;
+        }
+
+        // The viewport is resized only after the codec check so that a refused recording
+        // leaves it untouched.
         if (resolvedResolution.preset !== 'current') {
             var offlineRuntimeApi = getPresentationRendererRuntimeApi();
             if (
@@ -1586,147 +1541,58 @@ export function startPresentationRecording(options) {
                 presentationCaptureState.rendererResizedForRecording = true;
             }
         }
-        var muxApi = getPresentationWebMMuxerApi();
-        var codecVariants = [
-            { encoder: 'vp09.00.10.08', muxer: 'V_VP9' },
-            { encoder: 'vp8', muxer: 'V_VP8' },
-            { encoder: 'av01.0.08M.08', muxer: 'V_AV1' },
-        ];
 
-        // Phase 1: find a supported codec using lightweight test encoders.
-        // We do this before creating the real muxer+target so that we can use
-        // FileSystemWritableFileStreamTarget (which streams to disk) without
-        // having to discard any partially-written file on codec fallback.
-        var selectedVariant = null;
-        for (var cv = 0; cv < codecVariants.length; cv++) {
-            var testEncoder = null;
-            try {
-                testEncoder = new VideoEncoder({ output: function () {}, error: function () {} });
-                testEncoder.configure({
-                    codec: codecVariants[cv].encoder,
-                    width: width,
-                    height: height,
-                    bitrate: Math.round(bitrate * 1000000.0),
-                    framerate: fps,
-                });
-                selectedVariant = codecVariants[cv];
-                testEncoder.close();
-                break;
-            } catch (codecErr) {
-                if (testEncoder && typeof testEncoder.close === 'function') {
-                    try {
-                        testEncoder.close();
-                    } catch (closeErr) {}
-                }
-            }
-        }
-
-        if (!selectedVariant) {
-            presentationCaptureState.offlineUnavailableReason =
-                'No supported WebCodecs video encoder was found for offline rendering.';
-            rollbackRecordingQualityOverride();
-            refreshPresentationUiBindings();
-            return false;
-        }
-
-        // Phase 2: create the real target, muxer, and encoder with the winning codec.
-        // Prefer FileSystemWritableFileStreamTarget (streams directly to disk, no giant
-        // ArrayBuffer accumulating in RAM) when the caller passed a writable file stream.
-        var writableFileStream = options.writableFileStream || null;
-        var target;
-        var muxer;
-        var encoder = null;
-        try {
-            if (
-                writableFileStream &&
-                typeof muxApi.FileSystemWritableFileStreamTarget === 'function'
-            ) {
-                target = new muxApi.FileSystemWritableFileStreamTarget(writableFileStream);
-            } else {
-                writableFileStream = null;
-                target = new muxApi.ArrayBufferTarget();
-            }
-            muxer = new muxApi.Muxer({
-                target: target,
-                video: {
-                    codec: selectedVariant.muxer,
-                    width: width,
-                    height: height,
-                    frameRate: fps,
-                },
-            });
-            encoder = new VideoEncoder({
-                output: function (chunk, meta) {
-                    try {
-                        if (offlineJob && offlineJob.muxer) {
-                            offlineJob.muxer.addVideoChunk(chunk, meta);
-                        }
-                    } catch (muxErr) {
-                        console.warn('Offline recording mux error:', muxErr);
-                        if (offlineJob) offlineJob.failed = true;
-                    }
-                },
-                error: function (err) {
-                    console.warn('Offline recording encoder error:', err);
-                    if (offlineJob) {
-                        offlineJob.failed = true;
-                        // If the error fires while flush() is already pending (e.g. after a
-                        // GPU context loss), kick the watchdog so cleanup runs immediately
-                        // rather than waiting the full timeout.
-                        if (offlineJob.flushWatchdog) {
-                            clearTimeout(offlineJob.flushWatchdog);
-                            offlineJob.flushWatchdog = null;
-                            offlineJob.phase = 'failed';
-                            refreshPresentationUiBindings();
-                            cleanupPresentationRecordingState();
-                            refreshPresentationUiBindings();
-                        }
-                    }
-                },
-            });
-            encoder.configure({
-                codec: selectedVariant.encoder,
-                width: width,
-                height: height,
-                bitrate: Math.round(bitrate * 1000000.0),
-                framerate: fps,
-            });
-        } catch (setupErr) {
-            console.warn('Offline recording setup failed:', setupErr);
-            if (encoder && typeof encoder.close === 'function') {
-                try {
-                    encoder.close();
-                } catch (e) {}
-            }
-            presentationCaptureState.offlineUnavailableReason =
-                'Failed to initialize offline encoder.';
-            rollbackRecordingQualityOverride();
-            refreshPresentationUiBindings();
-            return false;
-        }
-
-        offlineJob = {
+        var fileSink = options.writableFileStream
+            ? createRecordingFileSink(options.writableFileStream)
+            : null;
+        var job = {
             stopRequested: false,
             finalizing: false,
             failed: false,
             phase: 'preparing',
-            encoder: encoder,
-            muxer: muxer,
-            target: target,
-            writableFileStream: writableFileStream,
-            codec: selectedVariant.encoder,
-            frameDurationUs: Math.max(1, Math.round(1000000.0 / fps)),
-            nextTimestampUs: 0,
+            output: null,
+            source: null,
+            target: null,
+            fileSink: fileSink,
+            mimeType: containerSpec.mimeType,
+            codec: codec,
+            packetsEncoded: 0,
             frameCount: 0,
             totalFrames: 0,
             totalTimelineSeconds: 0,
             wallStartMs: 0,
             lastFrameWallMs: 0,
-            finalizingStartQueue: 0,
-            compositeCanvas: presentationCaptureState.compositeCanvas,
-            compositeCtx: presentationCaptureState.compositeCtx,
-            captureCanvas: presentationCaptureState.captureCanvas,
+            finalizingStartBacklog: 0,
+            finalizeWatchdog: 0,
+            onFinalizeStalled: null,
         };
+        try {
+            var video = await encoderModule.createOfflineVideoOutput({
+                container: videoContainer,
+                codec: codec,
+                canvas: presentationCaptureState.captureCanvas,
+                bitrate: bitsPerSecond,
+                frameRate: fps,
+                writable: fileSink ? fileSink.writable : null,
+                onEncodedPacket: function () {
+                    noteOfflinePacketEncoded(job);
+                },
+            });
+            job.output = video.output;
+            job.source = video.source;
+            job.target = video.target;
+            job.mimeType = video.mimeType;
+        } catch (setupErr) {
+            console.warn('Offline recording setup failed:', setupErr);
+            restorePresentationRendererSize();
+            presentationCaptureState.offlineUnavailableReason =
+                'Failed to initialize the offline video encoder.';
+            rollbackRecordingQualityOverride();
+            refreshPresentationUiBindings();
+            return false;
+        }
+        offlineJob = job;
+        mimeType = job.mimeType;
     } else {
         if (
             !presentationCaptureState.captureCanvas ||
@@ -1742,7 +1608,7 @@ export function startPresentationRecording(options) {
             presentationCaptureState.compositeRaf = requestAnimationFrame(compositeTick);
         };
 
-        mimeType = choosePresentationMimeType();
+        mimeType = choosePresentationMimeType(videoContainer);
         var recorderConfig = {};
         if (mimeType) recorderConfig.mimeType = mimeType;
         recorderConfig.videoBitsPerSecond = Math.round(bitrate * 1000000.0);

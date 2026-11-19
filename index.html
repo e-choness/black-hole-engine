@@ -21,10 +21,6 @@
         />
         <link rel="icon" type="image/svg+xml" href="/icons/black-hole.svg" />
         <link rel="stylesheet" href="/src/styles/main.css" />
-        <link
-            rel="stylesheet"
-            href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css"
-        />
     </head>
     <body>
         <div id="hint-text" class="hidden-phone initially-hidden">
@@ -35,34 +31,49 @@
             <div id="loader">
                 Loading...
                 <div class="disclaimer">
-                    This WebGL application requires a recent version of Chrome or Firefox.
+                    This WebGL 2 application requires a recent version of Chrome, Edge, Firefox or
+                    Safari.
                 </div>
             </div>
         </div>
 
         <div class="link-bar">
             <a href="README" target="_blank"
-                ><i class="fa fa-question-circle fa-lg"></i> What is this?</a
+                ><svg class="link-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="12" cy="12" r="10" />
+                    <path d="M9 9.5a3 2.5 0 016 0c0 2-2 2-3 3.5" />
+                    <path d="M12 17h.01" />
+                </svg>
+                What is this?</a
             >
             |
             <a href="https://github.com/Adriwin06/black-hole" target="_blank"
-                ><i class="fa fa-github fa-lg"></i> Source</a
+                ><svg class="link-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="m18 16 4-4-4-4" />
+                    <path d="m6 8-4 4 4 4" />
+                    <path d="m14.5 4-5 16" />
+                </svg>
+                Source</a
             >
             |
-            <a href="docs/physics.html" target="_blank"><i class="fa fa-lg">&Sigma;</i> Physics</a>
+            <a href="docs/physics.html" target="_blank"
+                ><svg class="link-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path
+                        d="M18 7V5a1 1 0 0 0-1-1H6.5a.5.5 0 0 0-.4.8l4.5 6a2 2 0 0 1 0 2.4l-4.5 6a.5.5 0 0 0 .4.8H17a1 1 0 0 0 1-1v-2"
+                    />
+                </svg>
+                Physics</a
+            >
             |
-            <a href="docs/LEGAL.md" target="_blank"><i class="fa fa-copyright fa-lg"></i> Legal</a>
+            <a href="docs/LEGAL.md" target="_blank"
+                ><svg class="link-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M15 9.354a4 4 0 1 0 0 5.292" />
+                    <circle cx="12" cy="12" r="10" />
+                </svg>
+                Legal</a
+            >
         </div>
 
-        <script src="/vendor/jquery-2.1.4.min.js"></script>
-        <script src="/vendor/three.min.js"></script>
-        <script src="/vendor/OrbitControls.js"></script>
-        <script src="/vendor/Detector.js"></script>
-        <script src="/vendor/stats.min.js"></script>
-        <script src="/vendor/mustache.min.js"></script>
-        <script src="/vendor/dat.gui.min.js"></script>
-        <script src="/vendor/webm-muxer.js"></script>
-        <script src="/vendor/three-js-monkey-patch.js"></script>
         <script type="module" src="/src/app/main.js"></script>
     </body>
 </html>

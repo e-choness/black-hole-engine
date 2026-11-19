@@ -1,6 +1,11 @@
-'use strict';
-
-import { THREE } from '../../vendor.js';
+import * as THREE from 'three';
+import { FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
+import {
+    COPY_FRAGMENT_SHADER,
+    createPassMaterial,
+    createRenderTarget,
+    renderPass,
+} from '../../graphics/post-processing.js';
 
 export function halton(index, base) {
     var f = 1.0;
@@ -14,85 +19,47 @@ export function halton(index, base) {
     return r;
 }
 
-export function setupTemporalAA() {
-    var ppVertexShader = [
-        'varying vec2 vUv;',
-        'void main() {',
-        '    vUv = uv;',
-        '    gl_Position = vec4(position, 1.0);',
-        '}',
-    ].join('\n');
+const BLEND_FRAGMENT_SHADER = /* glsl */ `
+uniform sampler2D tCurrent;
+uniform sampler2D tHistory;
+uniform float historyWeight;
+uniform float historyValid;
+uniform float clipBox;
+in vec2 vUv;
+out vec4 fragColor;
 
-    var blendFS = [
-        'uniform sampler2D tCurrent;',
-        'uniform sampler2D tHistory;',
-        'uniform float historyWeight;',
-        'uniform float historyValid;',
-        'uniform float clipBox;',
-        'varying vec2 vUv;',
-        'void main() {',
-        '    vec3 current = texture2D(tCurrent, vUv).rgb;',
-        '    vec3 history = texture2D(tHistory, vUv).rgb;',
-        '    history = clamp(history, current - vec3(clipBox), current + vec3(clipBox));',
-        '    float lumaCurrent = dot(current, vec3(0.299, 0.587, 0.114));',
-        '    float lumaHistory = dot(history, vec3(0.299, 0.587, 0.114));',
-        '    float reactive = clamp(1.0 - abs(lumaCurrent - lumaHistory) * 5.0, 0.0, 1.0);',
-        '    float w = historyWeight * historyValid * reactive;',
-        '    gl_FragColor = vec4(mix(current, history, w), 1.0);',
-        '}',
-    ].join('\n');
+void main() {
+    vec3 current = texture(tCurrent, vUv).rgb;
+    vec3 history = texture(tHistory, vUv).rgb;
+    history = clamp(history, current - vec3(clipBox), current + vec3(clipBox));
+    float lumaCurrent = dot(current, vec3(0.299, 0.587, 0.114));
+    float lumaHistory = dot(history, vec3(0.299, 0.587, 0.114));
+    float reactive = clamp(1.0 - abs(lumaCurrent - lumaHistory) * 5.0, 0.0, 1.0);
+    float w = historyWeight * historyValid * reactive;
+    fragColor = vec4(mix(current, history, w), 1.0);
+}
+`;
 
-    var copyFS = [
-        'uniform sampler2D tDiffuse;',
-        'varying vec2 vUv;',
-        'void main() {',
-        '    gl_FragColor = texture2D(tDiffuse, vUv);',
-        '}',
-    ].join('\n');
-
-    var rtParams = {
-        minFilter: THREE.LinearFilter,
-        magFilter: THREE.LinearFilter,
-        format: THREE.RGBAFormat,
-    };
-
+export function setupTemporalAA(renderer) {
     function createTarget(w, h) {
-        return new THREE.WebGLRenderTarget(Math.max(1, w), Math.max(1, h), rtParams);
+        return createRenderTarget(renderer, w, h);
     }
 
-    var ppScene = new THREE.Scene();
-    var ppCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-    var ppMesh = new THREE.Mesh(new THREE.PlaneBufferGeometry(2, 2));
-    ppScene.add(ppMesh);
-
-    var blendMat = new THREE.ShaderMaterial({
-        uniforms: {
-            tCurrent: { type: 't', value: null },
-            tHistory: { type: 't', value: null },
-            historyWeight: { type: 'f', value: 0.0 },
-            historyValid: { type: 'f', value: 0.0 },
-            clipBox: { type: 'f', value: 0.08 },
+    var blendMat = createPassMaterial(
+        {
+            tCurrent: { value: null },
+            tHistory: { value: null },
+            historyWeight: { value: 0.0 },
+            historyValid: { value: 0.0 },
+            clipBox: { value: 0.08 },
         },
-        vertexShader: ppVertexShader,
-        fragmentShader: blendFS,
-        depthWrite: false,
-        depthTest: false,
-    });
+        BLEND_FRAGMENT_SHADER,
+    );
 
-    var copyMat = new THREE.ShaderMaterial({
-        uniforms: {
-            tDiffuse: { type: 't', value: null },
-        },
-        vertexShader: ppVertexShader,
-        fragmentShader: copyFS,
-        depthWrite: false,
-        depthTest: false,
-    });
+    var copyMat = createPassMaterial({ tDiffuse: { value: null } }, COPY_FRAGMENT_SHADER);
 
     var pass = {
-        ppScene: ppScene,
-        ppCamera: ppCamera,
-        ppMesh: ppMesh,
+        quad: new FullScreenQuad(),
         blendMat: blendMat,
         copyMat: copyMat,
         currentRT: createTarget(1, 1),
@@ -164,17 +131,15 @@ export function setupTemporalAA() {
             var historyWeight = useHistory ? baseHistoryWeight * motionAttenuation : 0.0;
             var clip = baseClip + Math.min(cameraDelta * motionClipScale, 0.5);
 
-            this.blendMat.uniforms.tCurrent.value = currentTarget;
-            this.blendMat.uniforms.tHistory.value = this.historyRT;
+            this.blendMat.uniforms.tCurrent.value = currentTarget.texture;
+            this.blendMat.uniforms.tHistory.value = this.historyRT.texture;
             this.blendMat.uniforms.historyWeight.value = historyWeight;
             this.blendMat.uniforms.historyValid.value = useHistory ? 1.0 : 0.0;
             this.blendMat.uniforms.clipBox.value = clip;
-            this.ppMesh.material = this.blendMat;
-            rdr.render(this.ppScene, this.ppCamera, this.outputRT, true);
+            renderPass(rdr, this.quad, this.blendMat, this.outputRT);
 
-            this.copyMat.uniforms.tDiffuse.value = this.outputRT;
-            this.ppMesh.material = this.copyMat;
-            rdr.render(this.ppScene, this.ppCamera);
+            this.copyMat.uniforms.tDiffuse.value = this.outputRT.texture;
+            renderPass(rdr, this.quad, this.copyMat, null);
 
             var tmp = this.historyRT;
             this.historyRT = this.outputRT;

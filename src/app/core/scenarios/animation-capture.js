@@ -1,6 +1,4 @@
-'use strict';
-
-import { THREE } from '../../vendor.js';
+import * as THREE from 'three';
 import { camera, cameraPan, observer, shader } from '../runtime/runtime-state.js';
 import { diveState, hoverState, animationTimelineCaptureState } from './scenario-state.js';
 import { getTimelinePanelBinding } from '../runtime/ui-bindings.js';

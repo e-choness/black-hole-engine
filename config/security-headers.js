@@ -5,14 +5,16 @@
 const contentSecurityPolicy = {
     'default-src': ["'self'"],
     'script-src': ["'self'"],
-    // UI code injects <style> elements and inline style attributes. The Font Awesome 4.5
-    // stylesheet and fonts still come from MaxCDN.
-    'style-src': ["'self'", "'unsafe-inline'", 'https://maxcdn.bootstrapcdn.com'],
-    'font-src': ["'self'", 'data:', 'https://maxcdn.bootstrapcdn.com'],
+    // lil-gui injects its stylesheet as a <style> element and the UI sets inline style
+    // attributes.
+    'style-src': ["'self'", "'unsafe-inline'"],
+    // lil-gui's stylesheet embeds its icon font as a data: URL.
+    'font-src': ["'self'", 'data:'],
     'img-src': ["'self'", 'data:', 'blob:'],
     'media-src': ["'self'", 'blob:'],
     'connect-src': ["'self'"],
-    // Service workers, dedicated workers and AudioWorklet/encoder helpers loaded from blobs.
+    // Mediabunny starts its optional helper workers (alpha splitting, media-stream capture)
+    // from blob: URLs.
     'worker-src': ["'self'", 'blob:'],
     'manifest-src': ["'self'"],
     'object-src': ["'none'"],

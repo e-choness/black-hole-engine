@@ -1,6 +1,7 @@
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
+import { openSimulation, trackPageProblems } from './support.js';
 
 const SCREENSHOT_DIR = path.resolve('.cache/screenshots');
 // Enough frames for the temporal anti-aliasing history of the mobile preset to converge.
@@ -31,15 +32,8 @@ function sampleCanvasLuminance() {
 }
 
 test('renders the black hole without console or page errors', async ({ page }, testInfo) => {
-    const problems = [];
-    page.on('console', (message) => {
-        if (message.type() === 'error') problems.push(`console.error: ${message.text()}`);
-    });
-    page.on('pageerror', (error) => problems.push(`pageerror: ${error.message}`));
-
-    await page.goto('./?quality=mobile&e2e=1');
-    await page.waitForFunction(() => window.__BH__ !== undefined);
-    await page.evaluate(() => window.__BH__.ready);
+    const problems = trackPageProblems(page);
+    await openSimulation(page);
     await page.waitForFunction((frames) => window.__BH__.frameCount >= frames, SETTLE_FRAMES);
 
     const quality = await page.evaluate(() => window.__BH__.params.quality);

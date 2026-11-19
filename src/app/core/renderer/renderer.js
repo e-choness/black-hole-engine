@@ -1,10 +1,10 @@
-'use strict';
-
-import { THREE, Stats, Detector, $ } from '../../vendor.js';
+import * as THREE from 'three';
+import Stats from 'three/addons/libs/stats.module.js';
 import { RAYTRACER_VERTEX_SHADER } from '../../../shaders/raytracer/index.js';
 import { Shader } from '../shader.js';
 import { formatThousands, clampObserverDistance, clampPlanetOrbitDistance } from '../observer.js';
 import { initializeCamera, updateCamera } from '../../scene/camera-runtime.js';
+import { ObserverControls } from '../../scene/observer-controls.js';
 import { setupBloom } from '../../graphics/bloom.js';
 import { setupTemporalAA } from './temporal-aa.js';
 import { setupGUI } from '../../ui/gui.js';
@@ -21,7 +21,6 @@ import {
     DISK_TEMPERATURE_MIN,
     DISK_TEMPERATURE_MAX,
     container,
-    stats,
     camera,
     scene,
     renderer,
@@ -50,8 +49,6 @@ import {
     setApplyRenderScaleFromSettings,
     setResetTemporalAAHistory,
 } from '../runtime/runtime-state.js';
-
-if (!Detector.webgl) Detector.addGetWebGLMessage();
 
 var effectLabels = {
     spin: null,
@@ -123,11 +120,7 @@ export function init(glslSource, textures) {
 
     var storedQualityPreset = isE2eMode ? null : readStoredQualityPreset();
     var initialQualityPreset = requestedQualityPreset || storedQualityPreset || 'optimal';
-    if (typeof applyQualityPresetValues === 'function') {
-        applyQualityPresetValues(shader.parameters, initialQualityPreset);
-    } else {
-        shader.parameters.quality = initialQualityPreset;
-    }
+    applyQualityPresetValues(shader.parameters, initialQualityPreset);
 
     var nextContainer = document.createElement('div');
     document.body.appendChild(nextContainer);
@@ -135,66 +128,66 @@ export function init(glslSource, textures) {
 
     setScene(new THREE.Scene());
 
-    var geometry = new THREE.PlaneBufferGeometry(2, 2);
+    var geometry = new THREE.PlaneGeometry(2, 2);
     var uniforms = {
-        time: { type: 'f', value: 0 },
-        turbulence_time_offset: { type: 'f', value: 0.0 },
-        turbulence_loop_enabled: { type: 'f', value: 0.0 },
-        turbulence_loop_seconds: { type: 'f', value: 20.0 },
-        resolution: { type: 'v2', value: new THREE.Vector2() },
-        cam_pos: { type: 'v3', value: new THREE.Vector3() },
-        cam_x: { type: 'v3', value: new THREE.Vector3() },
-        cam_y: { type: 'v3', value: new THREE.Vector3() },
-        cam_z: { type: 'v3', value: new THREE.Vector3() },
-        cam_vel: { type: 'v3', value: new THREE.Vector3() },
-        cam_pan: { type: 'v2', value: new THREE.Vector2() },
-        taa_jitter: { type: 'v2', value: new THREE.Vector2() },
-        interior_mode: { type: 'f', value: 0.0 },
-        planet_distance: { type: 'f' },
-        planet_radius: { type: 'f' },
-        disk_temperature: { type: 'f', value: 10000.0 },
-        accretion_inner_r: { type: 'f', value: 3.0 },
-        bh_spin: { type: 'f', value: 0.9 },
-        bh_spin_strength: { type: 'f', value: 1.0 },
-        bh_rotation_enabled: { type: 'f', value: 1.0 },
-        photon_spin_lensing_scale: { type: 'f', value: 1.0 },
-        look_exposure: { type: 'f', value: 1.0 },
-        look_disk_gain: { type: 'f', value: 1.0 },
-        look_glow: { type: 'f', value: 0.0 },
-        look_doppler_boost: { type: 'f', value: 1.0 },
-        look_aberration_strength: { type: 'f', value: 1.0 },
-        look_star_gain: { type: 'f', value: 1.0 },
-        look_galaxy_gain: { type: 'f', value: 1.0 },
-        look_tonemap_mode: { type: 'f', value: 0.0 },
-        torus_r0: { type: 'f', value: 4.0 },
-        torus_h_ratio: { type: 'f', value: 0.45 },
-        torus_radial_falloff: { type: 'f', value: 2.5 },
-        torus_opacity: { type: 'f', value: 0.015 },
-        torus_outer_radius: { type: 'f', value: 3.5 },
-        slim_h_ratio: { type: 'f', value: 0.15 },
-        slim_opacity: { type: 'f', value: 0.6 },
-        slim_puff_factor: { type: 'f', value: 2.5 },
-        jet_half_angle: { type: 'f', value: 5.0 },
-        jet_lorentz: { type: 'f', value: 3.0 },
-        jet_brightness: { type: 'f', value: 1.2 },
-        jet_length: { type: 'f', value: 30.0 },
-        jet_magnetization: { type: 'f', value: 10.0 },
-        jet_knot_spacing: { type: 'f', value: 6.0 },
-        jet_corona_brightness: { type: 'f', value: 1.5 },
-        jet_base_width: { type: 'f', value: 0.4 },
-        jet_corona_extent: { type: 'f', value: 0.5 },
-        grmhd_r_high: { type: 'f', value: 40.0 },
-        grmhd_magnetic_beta: { type: 'f', value: 10.0 },
-        grmhd_mad_flux: { type: 'f', value: 0.0 },
-        grmhd_density_scale: { type: 'f', value: 1.0 },
-        grmhd_turbulence_amp: { type: 'f', value: 1.0 },
-        grmhd_electron_kappa: { type: 'f', value: 5.0 },
-        grmhd_magnetic_field_str: { type: 'f', value: 1.0 },
-        grav_blueshift_factor: { type: 'f', value: 1.0 },
-        star_texture: { type: 't', value: textures.stars },
-        galaxy_texture: { type: 't', value: textures.galaxy },
-        planet_texture: { type: 't', value: textures.moon },
-        spectrum_texture: { type: 't', value: textures.spectra },
+        time: { value: 0 },
+        turbulence_time_offset: { value: 0.0 },
+        turbulence_loop_enabled: { value: 0.0 },
+        turbulence_loop_seconds: { value: 20.0 },
+        resolution: { value: new THREE.Vector2() },
+        cam_pos: { value: new THREE.Vector3() },
+        cam_x: { value: new THREE.Vector3() },
+        cam_y: { value: new THREE.Vector3() },
+        cam_z: { value: new THREE.Vector3() },
+        cam_vel: { value: new THREE.Vector3() },
+        cam_pan: { value: new THREE.Vector2() },
+        taa_jitter: { value: new THREE.Vector2() },
+        interior_mode: { value: 0.0 },
+        planet_distance: { value: 0.0 },
+        planet_radius: { value: 0.0 },
+        disk_temperature: { value: 10000.0 },
+        accretion_inner_r: { value: 3.0 },
+        bh_spin: { value: 0.9 },
+        bh_spin_strength: { value: 1.0 },
+        bh_rotation_enabled: { value: 1.0 },
+        photon_spin_lensing_scale: { value: 1.0 },
+        look_exposure: { value: 1.0 },
+        look_disk_gain: { value: 1.0 },
+        look_glow: { value: 0.0 },
+        look_doppler_boost: { value: 1.0 },
+        look_aberration_strength: { value: 1.0 },
+        look_star_gain: { value: 1.0 },
+        look_galaxy_gain: { value: 1.0 },
+        look_tonemap_mode: { value: 0.0 },
+        torus_r0: { value: 4.0 },
+        torus_h_ratio: { value: 0.45 },
+        torus_radial_falloff: { value: 2.5 },
+        torus_opacity: { value: 0.015 },
+        torus_outer_radius: { value: 3.5 },
+        slim_h_ratio: { value: 0.15 },
+        slim_opacity: { value: 0.6 },
+        slim_puff_factor: { value: 2.5 },
+        jet_half_angle: { value: 5.0 },
+        jet_lorentz: { value: 3.0 },
+        jet_brightness: { value: 1.2 },
+        jet_length: { value: 30.0 },
+        jet_magnetization: { value: 10.0 },
+        jet_knot_spacing: { value: 6.0 },
+        jet_corona_brightness: { value: 1.5 },
+        jet_base_width: { value: 0.4 },
+        jet_corona_extent: { value: 0.5 },
+        grmhd_r_high: { value: 40.0 },
+        grmhd_magnetic_beta: { value: 10.0 },
+        grmhd_mad_flux: { value: 0.0 },
+        grmhd_density_scale: { value: 1.0 },
+        grmhd_turbulence_amp: { value: 1.0 },
+        grmhd_electron_kappa: { value: 5.0 },
+        grmhd_magnetic_field_str: { value: 1.0 },
+        grav_blueshift_factor: { value: 1.0 },
+        star_texture: { value: textures.stars },
+        galaxy_texture: { value: textures.galaxy },
+        planet_texture: { value: textures.moon },
+        spectrum_texture: { value: textures.spectra },
     };
     setShaderUniforms(uniforms);
 
@@ -321,6 +314,7 @@ export function init(glslSource, textures) {
     setUpdateUniforms(updateUniformsImpl);
 
     var material = new THREE.ShaderMaterial({
+        glslVersion: THREE.GLSL3,
         uniforms: uniforms,
         vertexShader: RAYTRACER_VERTEX_SHADER,
     });
@@ -364,17 +358,17 @@ export function init(glslSource, textures) {
         false,
     );
 
-    setBloomPass(setupBloom());
-    setTaaPass(setupTemporalAA());
+    setBloomPass(setupBloom(renderer));
+    setTaaPass(setupTemporalAA(renderer));
 
     var nextStats = new Stats();
-    nextStats.domElement.style.position = 'fixed';
-    nextStats.domElement.style.top = '0px';
-    nextStats.domElement.style.left = '0px';
-    nextStats.domElement.style.zIndex = '1000';
-    container.appendChild(nextStats.domElement);
+    nextStats.dom.style.position = 'fixed';
+    nextStats.dom.style.top = '0px';
+    nextStats.dom.style.left = '0px';
+    nextStats.dom.style.zIndex = '1000';
+    nextStats.dom.classList.add('hidden-phone');
+    container.appendChild(nextStats.dom);
     setStats(nextStats);
-    $(stats.domElement).addClass('hidden-phone');
 
     effectLabels.spin = document.getElementById('spin-label');
     effectLabels.temperature = document.getElementById('temperature-label');
@@ -389,9 +383,7 @@ export function init(glslSource, textures) {
     setCamera(nextCamera);
     initializeCamera(camera);
 
-    var controls = new THREE.OrbitControls(camera, renderer.domElement);
-    controls.target.set(0, 0, 0);
-    controls.enableZoom = false;
+    var controls = new ObserverControls(camera, renderer.domElement);
     controls.panCallback = function (deltaX, deltaY, width, height) {
         var panSpeed = 0.75;
         var maxPan = 0.45;
@@ -400,7 +392,6 @@ export function init(glslSource, textures) {
         cameraPan.x = Math.max(-maxPan, Math.min(maxPan, cameraPan.x));
         cameraPan.y = Math.max(-maxPan, Math.min(maxPan, cameraPan.y));
         shader.needsUpdate = true;
-        return true;
     };
     controls.zoomCallback = function (dollyDeltaY) {
         var zoomBase = 1.08;
@@ -411,7 +402,6 @@ export function init(glslSource, textures) {
         updateCamera();
         shader.needsUpdate = true;
         updateObserverDistanceBinding();
-        return true;
     };
     controls.addEventListener('change', updateCamera);
     setCameraControls(controls);
