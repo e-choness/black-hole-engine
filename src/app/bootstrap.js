@@ -37,7 +37,6 @@ function loadTexture(symbol, filename, interpolation) {
 
 if (isWebGL2Available()) {
     loadTexture('galaxy', 'textures/milkyway.jpg', THREE.NearestFilter);
-    loadTexture('spectra', 'textures/spectra.png', THREE.LinearFilter);
     loadTexture('moon', 'textures/beach-ball.png', THREE.LinearFilter);
     loadTexture('stars', 'textures/stars.png', THREE.LinearFilter);
 } else {

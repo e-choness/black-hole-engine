@@ -68,7 +68,6 @@ export function presentationPathNeedsCompile(path) {
         case 'kerr_mode':
         case 'accretion_disk':
         case 'accretion_mode':
-        case 'disk_self_irradiation':
         case 'jet.enabled':
         case 'jet.mode':
         case 'grmhd.enabled':

@@ -1,6 +1,12 @@
 {{#accretion_thick_torus}}
 // ADAF/RIAF thick torus: geometrically thick, optically thin accretion flow
 // Models low-luminosity AGN like M87* and Sgr A* (EHT targets)
+
+// Emission optical depth per unit fluid-frame length and unit torus_local_emissivity, so a step
+// adds tau S with the thermal source S = B(g T). A look scale: it puts the M87* and Sgr A*
+// presets near the anchored exposure of a photosphere at the peak temperature.
+const float TORUS_EMISSIVITY_SCALE = 0.012;
+
 float torus_local_emissivity(vec3 p) {
     float cyl_r = length(p.xy);
     float r0 = max(torus_r0, 1.5);
@@ -42,6 +48,6 @@ float torus_temperature(float r) {
     float r0 = max(torus_r0, 1.5);
     // ADAF electron temperature: T_e ~ r^(-0.5) for two-temperature ADAF
     // (Narayan & Yi 1995, Esin et al. 1997)
-    return disk_temperature * pow(r0 / max(r, 1.0), 0.5);
+    return disk_temperature_peak * pow(r0 / max(r, 1.0), 0.5);
 }
 {{/accretion_thick_torus}}

@@ -29,8 +29,7 @@
                 // Temperature: β-dependent variation for color shifts.
                 float h_torus_g = max(cyl_r_t * torus_h_ratio, 0.01);
                 float gas_temp_torus = torus_temperature(r3d);
-                float temperature_t = grmhd_electron_temperature(gas_temp_torus, cyl_r_t, pos.z, h_torus_g, turb_t, angle_t)
-                                    * gravitational_shift_static(r3d);
+                float temperature_t = grmhd_electron_temperature(gas_temp_torus, cyl_r_t, pos.z, h_torus_g, turb_t, angle_t);
 
                 // 3D volumetric turbulence with sqrt() to moderate extremes.
                 // The raw 3D FBM has high dynamic range (~100×) which produces
@@ -54,7 +53,7 @@
                 float sync_mod_t = 1.0 + 0.15 * (sync_corr_t - 1.0);
 
                 // Emissivity: base torus × 3D turbulence × subtle corrections
-                float j_eff = ACCRETION_BRIGHTNESS * 0.05 * torus_j * turbulence_t
+                float j_eff = TORUS_EMISSIVITY_SCALE * torus_j * turbulence_t
                             * nt_mod_t * sync_mod_t;
 
                 // Absorption: turbulence-modulated (denser clumps are more opaque)
@@ -62,67 +61,31 @@
                                 * (0.5 + 0.5 * grmhd_density_scale);
                 {{/grmhd_enabled}}
                 {{^grmhd_enabled}}
-                float temperature_t = torus_temperature(r3d) * gravitational_shift_static(r3d);
+                float temperature_t = torus_temperature(r3d);
                 float turbulence_t = accretion_turbulence(cyl_r_t, angle_t, turb_t);
 
                 // Emission coefficient: optically thin ADAF has low emissivity
-                float j_eff = ACCRETION_BRIGHTNESS * 0.05 * torus_j * turbulence_t;
+                float j_eff = TORUS_EMISSIVITY_SCALE * torus_j * turbulence_t;
                 // Absorption: user-configurable opacity (default low for optically thin)
                 float alpha_abs = torus_opacity * torus_j;
                 {{/grmhd_enabled}}
-                float tau_step = alpha_abs * path_len;
-                float step_T = exp(-tau_step);
-
-                // Sub-Keplerian gas velocity (ADAF: ~50% of Keplerian)
+                // Sub-Keplerian rotation (ADAF: ~50% of Keplerian) as a stationary flow; the
+                // fluid-frame path is dl / g for both the emission and the optical depth.
                 {{#full_kerr}}
-                float transfer_factor_t = max(kerr_orbit_frequency(pos,
+                float g_t = kerr_nu / max(kerr_orbit_frequency(pos,
                     0.5*kerr_kepler_omega(cyl_r_t, kerr_a, disk_rotation_sign()),
-                    kerr_pt, kerr_pphi, kerr_a) / kerr_nu, 0.05);
+                    kerr_pt, kerr_pphi, kerr_a), 1e-6);
                 {{/full_kerr}}
                 {{^full_kerr}}
-                vec3 accretion_v_t;
-                {{#kerr_fast_mode}}
-                float v_kep_t = 1.0 / sqrt(2.0 * max(cyl_r_t - 1.0, 0.01));
-                float v_sub_t = clamp(0.5 * v_kep_t, 0.0, 0.95);
-                accretion_v_t = disk_rotation_sign() *
-                    vec3(-pos.y, pos.x, 0.0) / cyl_r_t * v_sub_t;
-                {{/kerr_fast_mode}}
-                {{#kerr_inspired_velocity}}
-                float rg_cyl_t = max(2.0 * cyl_r_t, 1.0002);
-                float a_M_t = abs(bh_rotation_enabled * bh_spin);
-                float omega_sub_t = 0.5 * disk_rotation_sign() / (pow(rg_cyl_t, 1.5) + a_M_t);
-                float v_phi_t = clamp(rg_cyl_t * omega_sub_t, -0.95, 0.95);
-                vec3 e_phi_t = vec3(-pos.y, pos.x, 0.0) / cyl_r_t;
-                accretion_v_t = e_phi_t * v_phi_t;
-                {{/kerr_inspired_velocity}}
-
-                gamma = 1.0/sqrt(max(1.0-dot(accretion_v_t,accretion_v_t), 0.0001));
-                float doppler_factor_t = gamma*(1.0+dot(ray/ray_l,accretion_v_t));
-                float transfer_factor_t = max(ray_doppler_factor*doppler_factor_t, 0.05);
+                float g_t = binet_flow_shift(pos,
+                    0.5*disk_rotation_sign()*binet_kepler_omega(cyl_r_t), photon_E, photon_Lz);
                 {{/full_kerr}}
-
-                float torus_intensity = j_eff * path_len;
-                {{#beaming}}
-                {{#physical_beaming}}
-                // Liouville D³: chromaticity texture doesn't encode brightness,
-                // so intensity boost must always be applied explicitly.
-                torus_intensity /= pow(clamp(transfer_factor_t, 0.05, 20.0), 3.0);
-                {{/physical_beaming}}
-                {{^physical_beaming}}
-                float cd_t = clamp(transfer_factor_t, 0.62, 1.48);
-                torus_intensity /= pow(cd_t, 1.05 + 1.10*doppler_boost);
-                {{/physical_beaming}}
-                {{/beaming}}
-                {{#doppler_shift}}
-                temperature_t /= transfer_factor_t;
-                {{/doppler_shift}}
-
-                vec4 thermal_color_t = BLACK_BODY_COLOR(temperature_t);
-                torus_intensity *= look_disk_gain;
+                float fluid_len_t = path_len / max(g_t, 0.05);
 
                 // Front-to-back compositing with Beer-Lambert absorption
-                color.rgb += vol_transmittance * thermal_color_t.rgb * torus_intensity;
-                vol_transmittance *= step_T;
+                color.rgb += vol_transmittance * j_eff * fluid_len_t * look_disk_gain *
+                    thermal_radiance(temperature_t, 1.0, g_t);
+                vol_transmittance *= exp(-alpha_abs * fluid_len_t);
             }
         }
         {{/accretion_thick_torus}}

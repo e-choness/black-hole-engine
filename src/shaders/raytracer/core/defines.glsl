@@ -12,21 +12,6 @@
 #define ROT_Y(a) mat3(0, cos(a), sin(a), 1, 0, 0, 0, sin(a), -cos(a))
 
 
-// spectrum texture lookup helper macros
-const float BLACK_BODY_TEXTURE_COORD = 1.0;
-const float SINGLE_WAVELENGTH_TEXTURE_COORD = 0.5;
-const float TEMPERATURE_LOOKUP_RATIO_TEXTURE_COORD = 0.0;
-
-// black-body texture metadata
-const float SPECTRUM_TEX_TEMPERATURE_RANGE = 65504.0;
-const float SPECTRUM_TEX_WAVELENGTH_RANGE = 2048.0;
-const float SPECTRUM_TEX_RATIO_RANGE = 6.48053329012;
-
-// multi-line macros don't seem to work in WebGL :(
-#define BLACK_BODY_COLOR(t) texture(spectrum_texture, vec2((t) / SPECTRUM_TEX_TEMPERATURE_RANGE, BLACK_BODY_TEXTURE_COORD))
-#define SINGLE_WAVELENGTH_COLOR(lambda) texture(spectrum_texture, vec2((lambda) / SPECTRUM_TEX_WAVELENGTH_RANGE, SINGLE_WAVELENGTH_TEXTURE_COORD))
-#define TEMPERATURE_LOOKUP(ratio) (texture(spectrum_texture, vec2((ratio) / SPECTRUM_TEX_RATIO_RANGE, TEMPERATURE_LOOKUP_RATIO_TEXTURE_COORD)).r * SPECTRUM_TEX_TEMPERATURE_RANGE)
-
 uniform vec2 resolution;
 uniform float time;
 uniform float turbulence_time_offset;
@@ -58,17 +43,16 @@ uniform vec4 cam_u_cov, cam_e1_cov, cam_e2_cov, cam_e3_cov;
 uniform vec4 cam_doppler;
 
 uniform float planet_distance, planet_radius;
-uniform float disk_temperature;
 uniform float bh_spin, bh_spin_strength, bh_rotation_enabled;
 uniform float photon_spin_lensing_scale;
 uniform float accretion_inner_r;
-uniform float look_exposure, look_disk_gain, look_glow, look_doppler_boost;
+uniform float look_disk_gain, look_glow, look_doppler_boost;
 uniform float look_aberration_strength;
 uniform float look_star_gain, look_galaxy_gain;
 uniform float look_tonemap_mode;
 uniform float torus_r0, torus_h_ratio, torus_radial_falloff, torus_opacity, torus_outer_radius;
 uniform float slim_h_ratio, slim_opacity, slim_puff_factor;
-uniform float jet_half_angle, jet_lorentz, jet_brightness, jet_length;
+uniform float jet_half_angle, jet_lorentz, jet_brightness, jet_length, jet_spectral_index;
 {{#jet_physical}}
 uniform float jet_magnetization, jet_knot_spacing, jet_corona_brightness;
 uniform float jet_base_width, jet_corona_extent;
@@ -80,8 +64,7 @@ uniform float grmhd_density_scale, grmhd_turbulence_amp;
 uniform float grmhd_electron_kappa, grmhd_magnetic_field_str;
 {{/grmhd_enabled}}
 
-uniform sampler2D galaxy_texture, star_texture,
-    planet_texture, spectrum_texture;
+uniform sampler2D galaxy_texture, star_texture, planet_texture;
 
 // stepping and anti-aliasing parameters
 const int NSTEPS = {{n_steps}};
@@ -100,7 +83,6 @@ const float KERR_VOLUME_STEP = 0.06;
 // Using ISCO from Bardeen-Press-Teukolsky formula: r_ISCO = 3 r_s for Schwarzschild
 const float ACCRETION_WIDTH = 12.0;
 #define ACCRETION_MIN_R accretion_inner_r
-const float ACCRETION_BRIGHTNESS = 0.95;
 
 // Widened range covers L/T-type brown dwarfs (~2500 K) through O-type
 // stars (~40000 K) for more diverse and physically realistic star colours.
@@ -109,9 +91,6 @@ const float STAR_MAX_TEMPERATURE = 40000.0;
 
 const float STAR_BRIGHTNESS = 0.52;
 const float GALAXY_BRIGHTNESS = 0.14;
-const float GLOBAL_EXPOSURE = 0.60;
-const float GALAXY_DOPPLER_STRENGTH = 1.0;
-const float GALAXY_MAX_BOOST = 10.0;
 
 const float PLANET_AMBIENT = 0.0;
 const float PLANET_LIGHTNESS = 1.5;

@@ -195,17 +195,14 @@ vec3 jet_velocity(vec3 p, float sign_z) {
     return v_z + v_phi;
 }
 
-// --- Synchrotron-inspired color proxy ---
-// Real jet spectra are non-thermal. For interactive RGB rendering we map the
-// analytic emissivity model through an effective-temperature colour proxy so
-// the jet can be shaded with the same blackbody lookup texture used elsewhere.
-float jet_effective_temperature(float z, float r3d, float sigma) {
-    // Base is hotter (corona: ~10^9 K effective → maps to UV/X-ray)
-    // Far jet is cooler (synchrotron aging: electrons lose energy)
-    float T_base = 35000.0; // hot corona
-    float T_far = 12000.0;  // aged synchrotron
-    float T_mix = mix(T_base, T_far, smoothstep(2.0, 15.0, z));
-    // Magnetization boost: σ > 1 regions are hotter (reconnection heating)
-    T_mix *= 1.0 + 0.3 * clamp(sigma - 1.0, 0.0, 5.0) / 5.0;
-    return T_mix;
+// --- Synchrotron spectral index ---
+// Radiative ageing steepens the optically thin spectrum by 0.5 above the cooling break
+// (Kardashev 1962), so the outer jet reddens; reconnection in strongly magnetised regions
+// (sigma > 1) hardens it slightly near the base.
+float jet_aged_spectral_index(float cooled, float sigma) {
+    return jet_spectral_index + 0.5 * cooled - 0.2 * clamp(sigma - 1.0, 0.0, 5.0) / 5.0;
+}
+
+float physical_jet_spectral_index(float z, float sigma) {
+    return jet_aged_spectral_index(smoothstep(2.0, 15.0, z), sigma);
 }

@@ -31,8 +31,16 @@ export function Shader(mustacheTemplate) {
         kerr_rtol: 1e-4,
         accretion_disk: true,
         accretion_mode: 'thin_disk',
-        disk_self_irradiation: true,
         disk_temperature: 5000.0,
+        disk: {
+            temperature_mode: 'artist',
+            mass_msun: 1e8,
+            eddington_ratio: 0.1,
+            color_correction: 1.0,
+            limb_darkening: 'chandrasekhar',
+            opacity: 1.0,
+        },
+        radiance_model: 'bolometric',
         torus: {
             r0: 4.0,
             h_ratio: 0.45,
@@ -52,6 +60,7 @@ export function Shader(mustacheTemplate) {
             lorentz_factor: 3.0,
             brightness: 1.2,
             length: 30.0,
+            spectral_index: 0.7,
             magnetization: 10.0,
             knot_spacing: 6.0,
             corona_brightness: 1.5,
@@ -75,7 +84,9 @@ export function Shader(mustacheTemplate) {
         },
         look: {
             tonemap_mode: 1,
-            exposure: 1.0,
+            exposure_mode: 'anchored',
+            exposure_ev: 0.0,
+            ev100: 30.0,
             disk_gain: 1.0,
             glow: 0.0,
             doppler_boost: 1.0,
@@ -148,7 +159,6 @@ export function Shader(mustacheTemplate) {
 
         that.parameters.kerr_fast_mode = that.parameters.kerr_mode === 'fast';
         that.parameters.kerr_inspired_mode = kerrInspiredMode;
-        that.parameters.kerr_inspired_velocity = kerrInspiredMode;
         that.parameters.full_kerr = that.parameters.kerr_mode === 'full_kerr';
 
         var accMode = that.parameters.accretion_mode;
@@ -162,7 +172,6 @@ export function Shader(mustacheTemplate) {
         that.parameters.jet_physical =
             that.parameters.jet.enabled && that.parameters.jet.mode === 'physical';
         that.parameters.grmhd_enabled = !!that.parameters.grmhd.enabled;
-        that.parameters.disk_self_irradiation_enabled = !!that.parameters.disk_self_irradiation;
         that.parameters.kerr_volume_steps =
             that.parameters.full_kerr &&
             (that.parameters.accretion_thick_torus ||

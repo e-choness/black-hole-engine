@@ -81,37 +81,19 @@ vec4 planet_intersection(vec3 old_pos, vec3 ray, float t, float dt,
     float lightness = ((1.0-PLANET_AMBIENT)*diffuse + PLANET_AMBIENT) *
         PLANET_LIGHTNESS * distance_attenuation;
 
+    // The reflected disk light keeps the colour temperature of the irradiation; the planet's
+    // motion shifts it twice (incoming along light_dir, outgoing along the ray) on top of the
+    // frame ratio from the caller, and colour and brightness follow the blackbody rule.
     float light_temperature = planet_irradiation_temperature();
-    float transfer_factor = max(ray_doppler_factor, 0.05);
-    {{#doppler_shift}}
-    float doppler_factor = SQ(PLANET_GAMMA) *
+    float planet_transfer = SQ(PLANET_GAMMA) *
         (1.0 + dot(planet_vel, light_dir)) *
-        (1.0 - dot(planet_vel, normalize(ray)));
-    transfer_factor = max(doppler_factor * ray_doppler_factor, 0.05);
-    light_temperature /= transfer_factor;
-    {{/doppler_shift}}
-    {{#beaming}}
-    {{#physical_beaming}}
-    lightness /= pow(clamp(transfer_factor, 0.05, 20.0), 3.0);
-    {{/physical_beaming}}
-    {{^physical_beaming}}
-    float clamped_planet_doppler = clamp(transfer_factor, 0.62, 1.48);
-    lightness /= pow(clamped_planet_doppler, 1.05 + 1.10*clamp(look_doppler_boost, 0.0, 2.5));
-    {{/physical_beaming}}
-    {{/beaming}}
-
-    vec3 blackbody_rgb = BLACK_BODY_COLOR(light_temperature).rgb;
-    float bb_max = max(max(blackbody_rgb.r, blackbody_rgb.g), blackbody_rgb.b);
-    vec3 physical_tint = vec3(1.0, 1.0, 1.0);
-    if (bb_max > 1e-5) {
-        physical_tint = blackbody_rgb / bb_max;
-    }
-
-    // Use physical blackbody tint for planet illumination
-    vec3 light_tint = physical_tint;
+        (1.0 - dot(planet_vel, normalize(ray))) * ray_doppler_factor;
+    float planet_g = 1.0 / max(planet_transfer, 0.05);
+    vec3 light_color = blackbody(color_shift(planet_g) * light_temperature).rgb *
+        thermal_brightness_ratio(light_temperature, planet_g);
 
     ret = texture(planet_texture, tex_coord) * lightness;
-    ret.rgb *= light_tint;
+    ret.rgb *= light_color * exp2(log2_look_scale);
     if (isec_t < 0.0) isec_t = 0.5;
     ret.w = isec_t;
 

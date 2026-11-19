@@ -19,15 +19,8 @@ float slim_disk_local_emissivity(vec3 p) {
 
     float vert = exp(-0.5 * z_norm * z_norm);
 
-    // Extends inside ISCO with plunging-region emission
-    float radial;
-    if (cyl_r >= ACCRETION_MIN_R) {
-        radial = accretion_flux_profile(cyl_r);
-    } else {
-        // Plunging region: conserved specific energy, decreasing efficiency
-        float f = cyl_r / max(ACCRETION_MIN_R, 1.0);
-        radial = accretion_flux_profile(ACCRETION_MIN_R) * pow(f, 2.5);
-    }
+    // Extends inside the ISCO, where advection carries a finite flux into the plunging region.
+    float radial = disk_relative_flux(cyl_r, DISK_SLIM_STRESS);
 
     float inner = smoothstep(0.9, 1.3, cyl_r);
     float outer_r = ACCRETION_MIN_R + ACCRETION_WIDTH;
@@ -37,12 +30,10 @@ float slim_disk_local_emissivity(vec3 p) {
 }
 
 float slim_disk_temperature(float cyl_r) {
-    if (cyl_r >= ACCRETION_MIN_R) {
-        return accretion_temperature(cyl_r);
-    } else {
-        // Inside ISCO: advection-dominated, T rises as r^(-0.5)
-        float t_isco = accretion_temperature(ACCRETION_MIN_R);
-        return t_isco * pow(ACCRETION_MIN_R / max(cyl_r, 1.0), 0.5);
-    }
+    // Page-Thorne photosphere with an ISCO torque outside the ISCO; inside it the advected
+    // flow heats up as r^-1/2 (Abramowicz+ 1988, Sadowski+ 2009) as a look.
+    if (cyl_r >= ACCRETION_MIN_R) return disk_temperature_at(cyl_r, DISK_SLIM_STRESS);
+    float t_isco = disk_temperature_at(ACCRETION_MIN_R, DISK_SLIM_STRESS);
+    return t_isco * pow(ACCRETION_MIN_R / max(cyl_r, 1.0), 0.5);
 }
 {{/accretion_slim_disk}}

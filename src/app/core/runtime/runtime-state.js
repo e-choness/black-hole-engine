@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import { Observer, bindObserverShader } from '../observer.js';
 
-export const DISK_TEMPERATURE_MIN = 4500.0;
-export const DISK_TEMPERATURE_MAX = 30000.0;
+export const DISK_TEMPERATURE_MIN = 1000.0;
+export const DISK_TEMPERATURE_MAX = 1.0e7;
 
 export let container = null;
 export let stats = null;

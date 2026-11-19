@@ -39,87 +39,50 @@
                 float j_jet = jet_emissivity(pos, sign_z);
                 {{/grmhd_enabled}}
                 if (j_jet > 0.001 && vol_transmittance > 0.005) {
-                    // Jet bulk velocity
+                    // Bulk velocity relative to the local static (Binet) or zero-angular-momentum
+                    // (Full Kerr) frame, whose frequency per camera frequency is exact; the photon
+                    // direction in that frame is approximated by the step chord. With the backward
+                    // chord d, nu_em = nu_frame Gamma (1 + d.v) and g = 1 / nu_em.
                     vec3 v_jet = jet_velocity(pos, sign_z);
-                    float v2_jet = dot(v_jet, v_jet);
-                    float gamma_jet = 1.0 / sqrt(max(1.0 - v2_jet, 0.0001));
-
-                    // Doppler factor: δ = 1 / (Γ(1 - β·n̂))
-                    vec3 ray_dir = ray / max(ray_l, 1e-6);
-                    float doppler_jet = gamma_jet * (1.0 + dot(ray_dir, v_jet));
+                    float gamma_jet = 1.0 / sqrt(max(1.0 - dot(v_jet, v_jet), 0.0001));
                     {{#full_kerr}}
-                    // Full Kerr: the jet speed is taken relative to the local zero-angular-
-                    // momentum frame, whose frequency ratio to the camera is exact.
-                    doppler_jet *= kerr_orbit_frequency(pos, kerr_zamo_omega(length(pos),
+                    float nu_frame_j = kerr_orbit_frequency(pos, kerr_zamo_omega(length(pos),
                         pos.z*pos.z / max(dot(pos, pos), 1e-8), kerr_a),
                         kerr_pt, kerr_pphi, kerr_a) / kerr_nu;
                     {{/full_kerr}}
-
-                    // Synchrotron beaming: I_obs = δ^(2+α) * I_em
-                    // α ≈ 0.7 for typical synchrotron spectral index
-                    float beam_factor = 1.0 / pow(max(doppler_jet, 0.02), 2.7);
+                    {{^full_kerr}}
+                    float nu_frame_j = photon_E / static_redshift(length(pos));
+                    {{/full_kerr}}
+                    float g_jet = 1.0 / max(nu_frame_j * gamma_jet *
+                        (1.0 + dot(ray / max(ray_l, 1e-6), v_jet)), 0.02);
 
                     {{#jet_simple}}
-                    // Simple mode: single-temperature blackbody approximation
-                    float r_jet = max(length(pos), 1.001);
-                    float g_shift_j = gravitational_shift_static(r_jet);
-                    float jet_T = 18000.0 * g_shift_j;
-                    {{#doppler_shift}}
-                    jet_T /= max(doppler_jet, 0.05);
-                    {{/doppler_shift}}
-                    vec4 jet_color = BLACK_BODY_COLOR(jet_T);
-
-                    float alpha_jet = 0.005 * j_jet;
-                    float tau_jet = alpha_jet * path_len_j;
-                    float step_T_jet = exp(-tau_jet);
-
-                    float jet_emit = jet_brightness * 0.35 * j_jet * beam_factor * path_len_j;
-                    jet_emit *= look_disk_gain;
-
-                    color.rgb += vol_transmittance * jet_color.rgb * jet_emit;
-                    vol_transmittance *= step_T_jet;
+                    float alpha_jet = jet_spectral_index;
+                    float tau_jet = 0.005 * j_jet * path_len_j;
+                    float jet_emit = jet_brightness * 0.35 * j_jet;
                     {{/jet_simple}}
-
                     {{#jet_physical}}
-                    // Detailed mode: more elaborate GRMHD-inspired emissivity,
-                    // still coloured via an effective-temperature proxy.
-                    float r_jet_p = max(length(pos), 1.001);
                     float z_abs = abs(pos.z * sign_z);
-                    float g_shift_j = gravitational_shift_static(r_jet_p);
                     float sigma = magnetization(z_abs);
-
                     {{#grmhd_enabled}}
-                    // Full GRMHD jet: BZ power + kink instability + cooling break
-                    float jet_T = grmhd_jet_temperature(z_abs, r_jet_p, sigma) * g_shift_j;
+                    float alpha_jet = grmhd_jet_spectral_index(z_abs, sigma);
                     {{/grmhd_enabled}}
                     {{^grmhd_enabled}}
-                    // Effective temperature with synchrotron aging
-                    float jet_T = jet_effective_temperature(z_abs, r_jet_p, sigma) * g_shift_j;
+                    float alpha_jet = physical_jet_spectral_index(z_abs, sigma);
                     {{/grmhd_enabled}}
-
-                    // Doppler temperature shift for approaching/receding jet
-                    jet_T /= max(doppler_jet, 0.05);
-
-                    vec4 jet_color = BLACK_BODY_COLOR(jet_T);
-
-                    // Absorption: higher in sheath (denser), lower in spine
-                    float sigma_abs_factor = 1.0 / (1.0 + 0.5 * sigma);
-                    float alpha_jet = 0.012 * j_jet * sigma_abs_factor;
-                    float tau_jet = alpha_jet * path_len_j;
-                    float step_T_jet = exp(-tau_jet);
-
-                    // Emissivity: GRMHD calibration with σ-dependent efficiency
-                    float sigma_emit = 1.0 / (1.0 + 0.3 * sigma);
-                    float jet_emit = jet_brightness * 0.5 * j_jet * beam_factor
-                                   * path_len_j * sigma_emit;
-                    jet_emit *= look_disk_gain;
-
-                    // Apply counter-jet disk occultation
-                    jet_emit *= occultation;
-
-                    color.rgb += vol_transmittance * jet_color.rgb * jet_emit;
-                    vol_transmittance *= step_T_jet;
+                    // Absorption is higher in the denser sheath; the emission efficiency falls
+                    // with the magnetization.
+                    float tau_jet = 0.012 * j_jet / (1.0 + 0.5 * sigma) * path_len_j;
+                    float jet_emit = jet_brightness * 0.5 * j_jet / (1.0 + 0.3 * sigma) * occultation;
                     {{/jet_physical}}
+
+                    // Optically thin synchrotron at a fixed observed frequency: I_obs = g^(3+alpha)
+                    // I_em over the fluid-frame path dl / g, so a steady jet brightens as
+                    // g^(2+alpha) (Lind & Blandford 1985); the power-law colour does not shift.
+                    float beam_j = pow(brightness_shift(g_jet), 2.0 + alpha_jet);
+                    color.rgb += vol_transmittance * jet_emit * path_len_j * beam_j * look_disk_gain *
+                        power_law_color(alpha_jet) * exp2(log2_look_scale);
+                    vol_transmittance *= exp(-tau_jet);
                 }
             }
         }

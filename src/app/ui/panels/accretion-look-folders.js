@@ -45,24 +45,67 @@ export function setupAccretionLookFolders(options) {
             observer.turbulenceTimeOffset = -observer.time;
             markShaderDirty();
         },
-        help: 'Thin disk: zero-torque Shakura-Sunyaev / Novikov-Thorne-style proxy (quasars/XRBs). Thick torus: ADAF/RIAF (M87*/Sgr A*). Slim disk: super-Eddington.',
+        help: 'Thin disk: Novikov-Thorne / Page-Thorne disk with the spin-dependent ISCO (quasars/XRBs). Thick torus: ADAF/RIAF (M87*/Sgr A*). Slim disk: super-Eddington.',
     });
-    var diskSelfIrradiationCtrl = addControl(diskFolder, p, 'disk_self_irradiation', {
-        name: 'self-irradiation',
+    var diskTempModeCtrl = addControl(diskFolder, p.disk, 'temperature_mode', {
+        name: 'temperature scale',
+        options: { artist: 'artist', 'physical (M, Mdot)': 'physical' },
         trackBlackHolePreset: true,
         onChange: function () {
-            updateShader();
+            syncDependentVisibility();
+            updateUniformsLive();
         },
-        help: 'Heuristic Cunningham-inspired inner-disk brightening. Increases local flux near the ISCO with a spin-scaled falloff; this is not recursive ray-traced returning radiation.',
+        help: 'Artist: the peak temperature below. Physical: the Novikov-Thorne peak temperature of a hole of the given mass accreting at the given Eddington ratio (Page & Thorne 1974).',
     });
     var diskTempCtrl = addControl(diskFolder, p, 'disk_temperature', {
         min: diskTemperatureMin,
         max: diskTemperatureMax,
         step: 1,
-        name: 'temperature (K)',
+        name: 'peak temperature (K)',
         trackBlackHolePreset: true,
         onChange: updateUniformsLive,
-        help: 'Rest-frame disk color temperature before relativistic shifts.',
+        help: 'Effective temperature at the flux maximum of the Page-Thorne profile, before relativistic shifts.',
+    });
+    var diskMassCtrl = addControl(diskFolder, p.disk, 'mass_msun', {
+        min: 1,
+        name: 'mass (M_sun)',
+        trackBlackHolePreset: true,
+        onChange: updateUniformsLive,
+        help: 'Black hole mass for the physical temperature scale; T_peak scales as M^-1/4.',
+    });
+    var diskEddingtonCtrl = addControl(diskFolder, p.disk, 'eddington_ratio', {
+        min: 0.001,
+        max: 3.0,
+        step: 0.001,
+        name: 'L / L_Edd',
+        trackBlackHolePreset: true,
+        onChange: updateUniformsLive,
+        help: 'Accretion rate as a fraction of the Eddington luminosity, Mdot = L / (eta c^2); T_peak scales as (L / L_Edd)^1/4.',
+    });
+    var diskColorCorrectionCtrl = addControl(diskFolder, p.disk, 'color_correction', {
+        min: 1.0,
+        max: 2.7,
+        step: 0.01,
+        name: 'colour correction f_col',
+        trackBlackHolePreset: true,
+        onChange: updateUniformsLive,
+        help: 'Spectral hardening of the photosphere, I = f_col^-4 B(f_col T): about 1.7 for stellar-mass disks, 1 to 2.7 for AGN.',
+    });
+    var diskLimbCtrl = addControl(diskFolder, p.disk, 'limb_darkening', {
+        name: 'limb darkening',
+        options: ['chandrasekhar', 'eddington', 'none'],
+        trackBlackHolePreset: true,
+        onChange: updateUniformsLive,
+        help: 'Angular emission law in the gas frame, flux-normalised: Chandrasekhar 0.4214 (1 + 2.06 mu), Eddington 0.5 + 0.75 mu, or isotropic.',
+    });
+    var diskOpacityCtrl = addControl(diskFolder, p.disk, 'opacity', {
+        min: 0.0,
+        max: 1.0,
+        step: 0.01,
+        name: 'thin-disk opacity',
+        trackBlackHolePreset: true,
+        onChange: updateUniformsLive,
+        help: 'Fraction of the light behind the thin disk that it blocks: 1 for an optically thick disk, lower values let the images behind it through.',
     });
 
     var torusCenterCtrl = addControl(diskFolder, p.torus, 'r0', {
@@ -230,9 +273,18 @@ export function setupAccretionLookFolders(options) {
         grmhdBFieldCtrl,
     ];
 
+    function syncDiskEmissionRows() {
+        var on = !!p.accretion_disk;
+        var physical = p.disk.temperature_mode === 'physical';
+        setControlVisible(diskTempModeCtrl, on);
+        setControlVisible(diskTempCtrl, on && !physical);
+        setControlsVisible([diskMassCtrl, diskEddingtonCtrl], on && physical);
+        setControlsVisible([diskColorCorrectionCtrl, diskLimbCtrl], on);
+        setControlVisible(diskOpacityCtrl, on && p.accretion_mode === 'thin_disk');
+    }
+
     setControlVisible(accretionModeCtrl, !!p.accretion_disk);
-    setControlVisible(diskSelfIrradiationCtrl, !!p.accretion_disk);
-    setControlVisible(diskTempCtrl, !!p.accretion_disk);
+    syncDiskEmissionRows();
     setControlsVisible(torusRows, !!p.accretion_disk && p.accretion_mode === 'thick_torus');
     setControlsVisible(slimRows, !!p.accretion_disk && p.accretion_mode === 'slim_disk');
     setControlVisible(grmhdEnabledCtrl, !!p.accretion_disk);
@@ -295,6 +347,15 @@ export function setupAccretionLookFolders(options) {
         onChange: updateUniformsLive,
         help: 'Visible jet length in Schwarzschild radii.',
     });
+    var jetSpectralIndexCtrl = addControl(jetFolder, p.jet, 'spectral_index', {
+        min: -0.5,
+        max: 2.5,
+        step: 0.01,
+        name: 'spectral index',
+        trackBlackHolePreset: true,
+        onChange: updateUniformsLive,
+        help: 'Optically thin synchrotron slope alpha, F_nu ~ nu^-alpha: sets the jet colour, which no Doppler shift changes, and the steady-jet beaming g^(2+alpha).',
+    });
     var jetMagCtrl = addControl(jetFolder, p.jet, 'magnetization', {
         min: 1.0,
         max: 50.0,
@@ -340,7 +401,14 @@ export function setupAccretionLookFolders(options) {
         onChange: updateUniformsLive,
         help: 'Radial spread of the corona base emission.',
     });
-    var jetCommonCtrls = [jetModeCtrl, jetAngleCtrl, jetLorentzCtrl, jetBrightCtrl, jetLengthCtrl];
+    var jetCommonCtrls = [
+        jetModeCtrl,
+        jetAngleCtrl,
+        jetLorentzCtrl,
+        jetBrightCtrl,
+        jetLengthCtrl,
+        jetSpectralIndexCtrl,
+    ];
     var jetPhysicalCtrls = [
         jetMagCtrl,
         jetKnotCtrl,
@@ -387,14 +455,38 @@ export function setupAccretionLookFolders(options) {
         onChange: updateUniformsLive,
         help: 'ACES: classic cinematic. AgX: better saturation handling for extreme HDR. Scientific: logarithmic false-color like EHT papers.',
     });
-    addControl(lookFolder, p.look, 'exposure', {
-        min: 0.6,
-        max: 2.5,
-        step: 0.01,
+    var exposureEvCtrl;
+    var ev100Ctrl;
+    function syncExposureRows() {
+        setControlVisible(exposureEvCtrl, p.look.exposure_mode !== 'manual');
+        setControlVisible(ev100Ctrl, p.look.exposure_mode === 'manual');
+    }
+    addControl(lookFolder, p.look, 'exposure_mode', {
         name: 'exposure',
-        onChange: updateUniformsLive,
-        help: 'Overall tone-mapped brightness.',
+        options: { 'anchored to disk': 'anchored', 'manual EV100': 'manual' },
+        onChange: function () {
+            syncExposureRows();
+            updateUniformsLive();
+        },
+        help: 'Anchored: the disk photosphere at its peak temperature sets the exposure, so the image level stays put while the true relative dimming and brightening show. Manual: a photometric camera exposure EV100 on absolute luminance in cd/m^2.',
     });
+    exposureEvCtrl = addControl(lookFolder, p.look, 'exposure_ev', {
+        min: -6.0,
+        max: 6.0,
+        step: 0.05,
+        name: 'exposure (EV)',
+        onChange: updateUniformsLive,
+        help: 'Exposure compensation in stops (factors of 2).',
+    });
+    ev100Ctrl = addControl(lookFolder, p.look, 'ev100', {
+        min: -10.0,
+        max: 70.0,
+        step: 0.1,
+        name: 'EV100',
+        onChange: updateUniformsLive,
+        help: 'Camera exposure value at ISO 100: H = 1 / (1.2 * 2^EV100). A 5000 K photosphere (9e8 cd/m^2) needs about 30.5.',
+    });
+    syncExposureRows();
     var lookDiskGainCtrl = addControl(lookFolder, p.look, 'disk_gain', {
         min: 0.4,
         max: 4.0,
@@ -488,8 +580,7 @@ export function setupAccretionLookFolders(options) {
 
     return {
         accretionModeCtrl: accretionModeCtrl,
-        diskSelfIrradiationCtrl: diskSelfIrradiationCtrl,
-        diskTempCtrl: diskTempCtrl,
+        syncDiskEmissionRows: syncDiskEmissionRows,
         torusRows: torusRows,
         slimRows: slimRows,
         grmhdEnabledCtrl: grmhdEnabledCtrl,

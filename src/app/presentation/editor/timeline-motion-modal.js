@@ -194,16 +194,23 @@ export function setupTimelineMotionModal(options) {
                 },
                 {
                     id: 'from',
-                    label: 'From exposure',
+                    label: 'From exposure (EV)',
                     type: 'number',
-                    min: 0,
-                    step: 0.05,
+                    min: -8,
+                    step: 0.1,
                     defaultFn: function () {
-                        var value = getPresentationPathValue('look.exposure');
-                        return (typeof value === 'number' ? value : 1.0).toFixed(3);
+                        var value = getPresentationPathValue('look.exposure_ev');
+                        return (typeof value === 'number' ? value : 0.0).toFixed(2);
                     },
                 },
-                { id: 'to', label: 'To exposure', type: 'number', min: 0, step: 0.05, def: 1.5 },
+                {
+                    id: 'to',
+                    label: 'To exposure (EV)',
+                    type: 'number',
+                    min: -8,
+                    step: 0.1,
+                    def: 1.0,
+                },
                 {
                     id: 'ease',
                     label: 'Ease',
@@ -404,12 +411,12 @@ export function setupTimelineMotionModal(options) {
             );
         } else if (type === 'exposure') {
             var exposureFrom = getMotionParam('from');
-            if (!isFinite(exposureFrom)) exposureFrom = 1.0;
+            if (!isFinite(exposureFrom)) exposureFrom = 0.0;
             var exposureTo = getMotionParam('to');
-            if (!isFinite(exposureTo)) exposureTo = 1.5;
-            upsertKey('look.exposure', start, exposureFrom, 'linear');
-            upsertKey('look.exposure', start + duration, exposureTo, ease);
-            setSelectedTrack('look.exposure');
+            if (!isFinite(exposureTo)) exposureTo = 1.0;
+            upsertKey('look.exposure_ev', start, exposureFrom, 'linear');
+            upsertKey('look.exposure_ev', start + duration, exposureTo, ease);
+            setSelectedTrack('look.exposure_ev');
             setStatus(
                 'Exposure: ' + exposureFrom + ' -> ' + exposureTo + ' over ' + duration + 's.',
                 '',

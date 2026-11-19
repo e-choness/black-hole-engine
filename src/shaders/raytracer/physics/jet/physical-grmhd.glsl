@@ -35,15 +35,11 @@ float grmhd_kink_instability(float z, float cyl_r, float jet_r) {
 }
 
 // --- Synchrotron cooling break ---
-// Electrons lose energy as t_cool ∝ 1/(B² γ_e) → spectral steepening
-// at high frequencies. Creates a characteristic "cooling break" in the
-// spectrum. Visual effect: jet becomes progressively redder with distance.
-float grmhd_cooling_break_temp_modifier(float z, float sigma) {
-    // Cooling is faster in high-B (low-σ) regions near the base
+// Electrons cool as t_cool ~ 1/(B^2 gamma_e), faster in the high-B (low-sigma) base, so the
+// break moves to lower frequencies with distance. Returns the cooled fraction in [0, 0.7].
+float grmhd_cooling_fraction(float z, float sigma) {
     float cool_rate = 1.0 + 0.5 / max(sigma, 0.1);
-    // Temperature decreases with distance due to radiative losses
-    float cooling = exp(-0.05 * cool_rate * max(z - 3.0, 0.0));
-    return max(cooling, 0.3);
+    return 1.0 - max(exp(-0.05 * cool_rate * max(z - 3.0, 0.0)), 0.3);
 }
 
 // --- Enhanced GRMHD jet emissivity ---
@@ -89,12 +85,10 @@ float grmhd_jet_emissivity(vec3 p, float sign_z) {
     return j;
 }
 
-// --- GRMHD jet effective temperature ---
-// Incorporates synchrotron cooling break and non-thermal broadening.
-float grmhd_jet_temperature(float z, float r3d, float sigma) {
-    float T_base = jet_effective_temperature(z, r3d, sigma);
-    float cooling = grmhd_cooling_break_temp_modifier(z, sigma);
-    return T_base * cooling;
+// --- GRMHD jet spectral index ---
+// The cooled fraction of the B-dependent cooling break sets the ageing.
+float grmhd_jet_spectral_index(float z, float sigma) {
+    return jet_aged_spectral_index(grmhd_cooling_fraction(z, sigma) / 0.7, sigma);
 }
 {{/grmhd_enabled}}
 {{/jet_physical}}

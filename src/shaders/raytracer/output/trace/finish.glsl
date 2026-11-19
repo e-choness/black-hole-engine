@@ -69,33 +69,22 @@
         float bg_doppler = ray_doppler_factor * grav_blueshift_factor;
     {{/full_kerr}}
 
+        // Light from static sources at infinity arrives with g = nu_obs / nu_emit = 1 / bg_doppler;
+        // stars and galaxy follow the blackbody rule of every other emitter (no clamp, no D^3).
+        float sky_g = 1.0 / max(bg_doppler, 1e-4);
         vec2 tex_coord = sphere_map(ray * BG_COORDS);
-        float t_coord;
-
-        // Liouville invariant (I_nu / nu^3 = const along a ray):
-        // D = f_obs/f_emit = 1/bg_doppler is the TOTAL frequency ratio
-        // from infinity to the observer, combining gravitational blueshift
-        // with kinematic Doppler.  Intensity scales as D^3.
-        // The spectrum texture stores chromaticity (normalized colour), not
-        // absolute Planck radiance, so the temperature shift alone only
-        // changes the hue.  The D^3 brightness factor must be applied
-        // explicitly.  Clamping prevents blow-ups for extreme D values
-        // (near-horizon freefall where T shifts far into UV anyway).
-        float safe_bg_doppler = max(abs(bg_doppler), 0.01);
-        float bg_D = 1.0 / safe_bg_doppler;
-        float bg_boost = min(bg_D * bg_D * bg_D, 10000.0);
+        vec3 sky = shifted_sky_radiance(texture(galaxy_texture, tex_coord).rgb, sky_g) *
+            GALAXY_BRIGHTNESS * look_galaxy_gain;
 
         vec4 star_color = texture(star_texture, tex_coord);
         if (star_color.r > 0.0) {
-            t_coord = (STAR_MIN_TEMPERATURE +
-                (STAR_MAX_TEMPERATURE-STAR_MIN_TEMPERATURE) * star_color.g)
-                 / safe_bg_doppler;
-
-            color += BLACK_BODY_COLOR(t_coord) * star_color.r * STAR_BRIGHTNESS * look_star_gain * vol_transmittance * bg_boost;
+            float star_t = STAR_MIN_TEMPERATURE +
+                (STAR_MAX_TEMPERATURE - STAR_MIN_TEMPERATURE) * star_color.g;
+            sky += blackbody(color_shift(sky_g) * star_t).rgb * star_color.r * STAR_BRIGHTNESS *
+                look_star_gain * thermal_brightness_ratio(star_t, sky_g);
         }
-
-        color += galaxy_color(tex_coord, bg_doppler) * GALAXY_BRIGHTNESS * look_galaxy_gain * vol_transmittance * bg_boost;
+        color.rgb += vol_transmittance * sky * exp2(log2_look_scale);
     }
 
-    return color*ray_intensity;
+    return color;
 }

@@ -187,12 +187,6 @@
     {
       "t": 0.0,
       "action": "set",
-      "path": "disk_self_irradiation",
-      "value": true
-    },
-    {
-      "t": 0.0,
-      "action": "set",
       "path": "planet.enabled",
       "value": false
     },
@@ -415,8 +409,8 @@
     {
       "t": 0.01,
       "action": "set",
-      "path": "look.exposure",
-      "value": 1.0
+      "path": "look.exposure_ev",
+      "value": 0.0
     },
     {
       "t": 0.01,
@@ -714,19 +708,15 @@
     {
       "t": 52.0,
       "action": "set",
-      "path": "disk_self_irradiation",
-      "value": false
-    },
-    {
-      "t": 52.03,
-      "action": "updateShader"
+      "path": "radiance_model",
+      "value": "visible"
     },
     {
       "t": 52.3,
       "action": "annotation",
       "note": {
-        "title": "Returning Radiation OFF",
-        "text": "Self-irradiation is disabled to reduce inner-disk reheating and flatten the hottest emission region.",
+        "title": "Photometric Radiance",
+        "text": "Brightness now follows the eye's band luminance Y(gT) instead of the bolometric g^4: on a 5000 K disk the redshifted side fades about ten times more and the blueshifted side brightens a little more.",
         "anchor": {
           "mode": "world",
           "target": "disk"
@@ -739,12 +729,8 @@
     {
       "t": 58.0,
       "action": "set",
-      "path": "disk_self_irradiation",
-      "value": true
-    },
-    {
-      "t": 58.03,
-      "action": "updateShader"
+      "path": "radiance_model",
+      "value": "bolometric"
     },
     {
       "t": 66.0,

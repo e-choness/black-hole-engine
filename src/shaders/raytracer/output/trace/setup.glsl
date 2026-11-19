@@ -7,8 +7,6 @@ vec4 trace_ray(vec3 ray) {
     vec3 pos = cam_pos;
     float u = 1.0 / length(pos), old_u;
 
-    float ray_intensity = 1.0;
-    float doppler_boost = clamp(look_doppler_boost, 0.0, 2.5);
     float gamma = 1.0;
     float ray_doppler_factor = 1.0;
     float step = 0.01;
@@ -46,6 +44,7 @@ vec4 trace_ray(vec3 ray) {
     vec3 kerr_dp;
     kerr_rhs(kerr_x, kerr_p, kerr_pt, kerr_a, kerr_dx, kerr_dp);
     vec4 kerr_x_old = kerr_x;
+    vec3 kerr_p_old = kerr_p;
     vec4 kerr_dx_old = kerr_dx;
     float kerr_r = ks_radius(kerr_x.xyz, kerr_a);
     float kerr_rdot = dot(ks_radius_gradient(kerr_x.xyz, kerr_r, kerr_a), kerr_dx.xyz);
@@ -111,6 +110,17 @@ vec4 trace_ray(vec3 ray) {
         radial_rate = dot(ray, normal_vec) * sqrt(max(1.0 - u, 0.0));
     }
 
+    // Conserved photon energy E and angular momenta Lz and L (code units) per unit camera
+    // frequency, for the covariant redshift of the emitters. The frame the look direction d is
+    // given in measures nu_frame: E = nu_frame sqrt(1 - r_s/r) in the static frame and
+    // E = 1 + beta d_r in the rain frame. The photon travels along -d, so L = nu_frame (d x r) in
+    // both, since a radial boost leaves the tangential momentum unchanged.
+    float photon_nu_frame = rain_frame ? 1.0 : ray_doppler_factor;
+    float photon_E = rain_frame ? photon_energy : ray_doppler_factor * sqrt(max(1.0 - u, 0.0));
+    vec3 photon_L_vec = photon_nu_frame * cross(ray, pos);
+    float photon_Lz = photon_L_vec.z;
+    float photon_L = length(photon_L_vec);
+
     // Tangential component of ray (perpendicular to radial direction).
     // For near-radial rays the cross product is tiny → degenerate tangent_vec.
     // Guard with a fallback perpendicular direction.
@@ -164,21 +174,6 @@ vec4 trace_ray(vec3 ray) {
     float phi_inf = 0.0;
     {{/full_kerr}}
 
-    {{#beaming}}
-    {{#physical_beaming}}
-    // Observer beaming is already accounted for via transfer_factor
-    // in each emission source. The temperature shift of blackbody sources
-    // captures the full Doppler effect. No additional ray_intensity scaling.
-    {{/physical_beaming}}
-    {{^physical_beaming}}
-    float beaming_factor = clamp(ray_doppler_factor, 0.84, 1.16);
-    ray_intensity /= pow(beaming_factor, 0.65 + 0.75*doppler_boost);
-    {{/physical_beaming}}
-    {{/beaming}}
-    {{^doppler_shift}}
-    ray_doppler_factor = 1.0;
-    {{/doppler_shift}}
-
     vec3 old_pos = pos;
 
     for (int j=0; j < NSTEPS; j++) {
@@ -212,6 +207,7 @@ vec4 trace_ray(vec3 ray) {
         kerr_h = h*min(h_scale, 5.0);
         kerr_h_used = h;
         kerr_x_old = kerr_x;
+        kerr_p_old = kerr_p;
         kerr_dx_old = kerr_dx;
         kerr_x = x_new;
         kerr_p = p_new;
@@ -345,14 +341,14 @@ vec4 trace_ray(vec3 ray) {
                 kerr_zamo_omega(PLANET_DISTANCE, 0.0, kerr_a), kerr_pt, kerr_pphi, kerr_a) / kerr_nu;
             {{/full_kerr}}
             {{^full_kerr}}
-            float planet_frame_doppler = ray_doppler_factor;
+            float planet_frame_doppler = photon_E / static_redshift(PLANET_DISTANCE);
             {{/full_kerr}}
             vec4 planet_isec = planet_intersection(old_pos, ray, t, dt,
                     planet_pos0, planet_frame_doppler);
             if (planet_isec.w > 0.0) {
                 solid_isec_t = planet_isec.w;
                 planet_isec.w = 1.0;
-                color += planet_isec;
+                color.rgb += vol_transmittance * planet_isec.rgb;
             }
         }
         {{/planetEnabled}}

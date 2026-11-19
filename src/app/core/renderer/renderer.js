@@ -19,6 +19,16 @@ import { updateObserverDistanceBinding } from '../runtime/ui-bindings.js';
 import { isE2eMode, requestedQualityPreset } from '../runtime/test-hooks.js';
 import { diveState, hoverState } from '../scenarios/scenario-state.js';
 import { SHADER_MASS, iscoRadius } from '../physics/kerr.js';
+import {
+    EMISSION_LUT,
+    LIMB_DARKENING_LAWS,
+    bolometricLog2Coefficient,
+    diskPeakTemperature,
+    diskSpin,
+    exposureLog2,
+    pageThorneUniforms,
+    referenceLog2Luminance,
+} from '../physics/emission.js';
 import { kerrCameraFrame } from '../physics/kerr-camera.js';
 import {
     DISK_TEMPERATURE_MIN,
@@ -64,13 +74,25 @@ function updateEffectLabels() {
     var spinPercent = shader.parameters.black_hole.spin * 100.0;
     effectLabels.spin.textContent = 'a/M = ' + spinPercent.toFixed(1) + '%';
     effectLabels.temperature.textContent =
-        'T = ' + formatThousands(shader.parameters.disk_temperature) + ' K';
+        'T = ' + formatThousands(diskPeakTemperature(shader.parameters)) + ' K';
 
     if (shader.parameters.black_hole.spin_enabled) {
         effectLabels.spin.classList.remove('is-disabled');
     } else {
         effectLabels.spin.classList.add('is-disabled');
     }
+}
+
+// Two RGBA32F rows sampled with texelFetch: blackbody colour and luminance on a log-T grid, and
+// the colour of synchrotron power laws.
+function createEmissionLutTexture() {
+    var size = EMISSION_LUT.size;
+    var data = new Float32Array(size * 8);
+    data.set(EMISSION_LUT.blackbody, 0);
+    data.set(EMISSION_LUT.powerLaw, size * 4);
+    var texture = new THREE.DataTexture(data, size, 2, THREE.RGBAFormat, THREE.FloatType);
+    texture.needsUpdate = true;
+    return texture;
 }
 
 function resetTemporalAAHistoryImpl() {
@@ -155,13 +177,27 @@ export function init(glslSource, textures) {
         cam_doppler: { value: new THREE.Vector4(0, 0, 0, 1) },
         planet_distance: { value: 0.0 },
         planet_radius: { value: 0.0 },
-        disk_temperature: { value: 10000.0 },
+        emission_lut: { value: createEmissionLutTexture() },
+        log2_exposure: { value: 0.0 },
+        log2_look_scale: { value: 0.0 },
+        radiance_visible: { value: 0.0 },
+        bolometric_log2_coeff: { value: bolometricLog2Coefficient() },
+        disk_temperature_peak: { value: 5000.0 },
+        disk_color_correction: { value: 1.0 },
+        disk_limb: { value: new THREE.Vector2(1, 0) },
+        disk_opacity: { value: 1.0 },
+        disk_spin_a: { value: 0.0 },
+        disk_pt_x0: { value: Math.sqrt(6) },
+        disk_pt_roots: { value: new THREE.Vector3() },
+        disk_pt_coeffs: { value: new THREE.Vector3() },
+        disk_flux_max: { value: 1.0 },
+        disk_isco_el: { value: new THREE.Vector2() },
+        jet_spectral_index: { value: 0.7 },
         accretion_inner_r: { value: 3.0 },
         bh_spin: { value: 0.9 },
         bh_spin_strength: { value: 1.0 },
         bh_rotation_enabled: { value: 1.0 },
         photon_spin_lensing_scale: { value: 1.0 },
-        look_exposure: { value: 1.0 },
         look_disk_gain: { value: 1.0 },
         look_glow: { value: 0.0 },
         look_doppler_boost: { value: 1.0 },
@@ -197,9 +233,38 @@ export function init(glslSource, textures) {
         star_texture: { value: textures.stars },
         galaxy_texture: { value: textures.galaxy },
         planet_texture: { value: textures.moon },
-        spectrum_texture: { value: textures.spectra },
     };
     setShaderUniforms(uniforms);
+
+    // Disk temperature scale, Page-Thorne coefficients of the spin and the exposure that puts the
+    // reference emitter (the disk photosphere at its peak temperature) at a fixed display level.
+    function updateEmissionUniforms(diskA) {
+        var p = shader.parameters;
+        var pt = pageThorneUniforms(diskA);
+        uniforms.disk_spin_a.value = diskA;
+        uniforms.disk_pt_x0.value = pt.x0;
+        uniforms.disk_pt_roots.value.fromArray(pt.roots);
+        uniforms.disk_pt_coeffs.value.fromArray(pt.coeffs);
+        uniforms.disk_flux_max.value = pt.fluxMax;
+        uniforms.disk_isco_el.value.set(pt.iscoEnergy, pt.iscoAngularMomentum);
+
+        var peakTemperature = diskPeakTemperature(p);
+        var colorCorrection = Math.max(p.disk.color_correction, 1.0);
+        var log2Reference = referenceLog2Luminance(
+            peakTemperature,
+            colorCorrection,
+            p.radiance_model,
+        );
+        var log2Exposure = exposureLog2(p.look, log2Reference);
+        uniforms.log2_exposure.value = log2Exposure;
+        uniforms.log2_look_scale.value = log2Exposure + log2Reference;
+        uniforms.radiance_visible.value = p.radiance_model === 'visible' ? 1.0 : 0.0;
+        uniforms.disk_temperature_peak.value = peakTemperature;
+        uniforms.disk_color_correction.value = colorCorrection;
+        var limb = LIMB_DARKENING_LAWS[p.disk.limb_darkening] || LIMB_DARKENING_LAWS.chandrasekhar;
+        uniforms.disk_limb.value.set(limb[0], limb[1]);
+        uniforms.disk_opacity.value = Math.min(Math.max(p.disk.opacity, 0.0), 1.0);
+    }
 
     function updateUniformsImpl() {
         shader.parameters.disk_temperature = Math.max(
@@ -211,7 +276,6 @@ export function init(glslSource, textures) {
         );
         uniforms.planet_distance.value = shader.parameters.planet.distance;
         uniforms.planet_radius.value = shader.parameters.planet.radius;
-        uniforms.disk_temperature.value = shader.parameters.disk_temperature;
         shader.parameters.observer.distance = clampObserverDistance(
             shader.parameters.observer.distance,
             shader.parameters.observer.motion,
@@ -219,15 +283,13 @@ export function init(glslSource, textures) {
 
         var spin = shader.parameters.black_hole.spin;
         var spinEnabled = shader.parameters.black_hole.spin_enabled;
-        var spinMagnitude = Math.abs(spin);
-        uniforms.accretion_inner_r.value = spinEnabled
-            ? iscoRadius(spinMagnitude * SHADER_MASS)
-            : 3.0;
+        var diskA = diskSpin(shader.parameters);
+        uniforms.accretion_inner_r.value = iscoRadius(diskA * SHADER_MASS);
+        updateEmissionUniforms(diskA);
 
         uniforms.bh_spin.value = shader.parameters.black_hole.spin;
         uniforms.bh_spin_strength.value = shader.parameters.black_hole.spin_strength;
         uniforms.bh_rotation_enabled.value = spinEnabled ? 1.0 : 0.0;
-        uniforms.look_exposure.value = shader.parameters.look.exposure;
         uniforms.look_disk_gain.value = shader.parameters.look.disk_gain;
         uniforms.look_glow.value = shader.parameters.look.glow;
         uniforms.look_doppler_boost.value = shader.parameters.look.doppler_boost;
@@ -250,6 +312,7 @@ export function init(glslSource, textures) {
         uniforms.jet_lorentz.value = shader.parameters.jet.lorentz_factor;
         uniforms.jet_brightness.value = shader.parameters.jet.brightness;
         uniforms.jet_length.value = shader.parameters.jet.length;
+        uniforms.jet_spectral_index.value = shader.parameters.jet.spectral_index;
         uniforms.jet_magnetization.value = shader.parameters.jet.magnetization;
         uniforms.jet_knot_spacing.value = shader.parameters.jet.knot_spacing;
         uniforms.jet_corona_brightness.value = shader.parameters.jet.corona_brightness;

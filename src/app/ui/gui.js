@@ -181,8 +181,8 @@ export function setupGUI() {
             black_hole: deepClonePlain(p.black_hole),
             accretion_disk: p.accretion_disk,
             accretion_mode: p.accretion_mode,
-            disk_self_irradiation: p.disk_self_irradiation,
             disk_temperature: p.disk_temperature,
+            disk: deepClonePlain(p.disk),
             torus: deepClonePlain(p.torus),
             slim: deepClonePlain(p.slim),
             jet: deepClonePlain(p.jet),
@@ -206,9 +206,8 @@ export function setupGUI() {
         p.black_hole.spin_strength = state.black_hole.spin_strength;
         p.accretion_disk = state.accretion_disk;
         p.accretion_mode = state.accretion_mode;
-        if (state.disk_self_irradiation !== undefined)
-            p.disk_self_irradiation = state.disk_self_irradiation;
         p.disk_temperature = state.disk_temperature;
+        if (state.disk) Object.assign(p.disk, state.disk);
         p.torus.r0 = state.torus.r0;
         p.torus.h_ratio = state.torus.h_ratio;
         p.torus.radial_falloff = state.torus.radial_falloff;
@@ -223,6 +222,7 @@ export function setupGUI() {
         p.jet.lorentz_factor = state.jet.lorentz_factor;
         p.jet.brightness = state.jet.brightness;
         p.jet.length = state.jet.length;
+        if (state.jet.spectral_index !== undefined) p.jet.spectral_index = state.jet.spectral_index;
         p.jet.magnetization = state.jet.magnetization;
         p.jet.knot_spacing = state.jet.knot_spacing;
         p.jet.corona_brightness = state.jet.corona_brightness;
@@ -448,8 +448,7 @@ export function setupGUI() {
         diskTemperatureMax: DISK_TEMPERATURE_MAX,
     });
     var accretionModeCtrl = accretionLookFolders.accretionModeCtrl;
-    var diskSelfIrradiationCtrl = accretionLookFolders.diskSelfIrradiationCtrl;
-    var diskTempCtrl = accretionLookFolders.diskTempCtrl;
+    var syncDiskEmissionRows = accretionLookFolders.syncDiskEmissionRows;
     var torusRows = accretionLookFolders.torusRows;
     var slimRows = accretionLookFolders.slimRows;
     var grmhdEnabledCtrl = accretionLookFolders.grmhdEnabledCtrl;
@@ -485,6 +484,7 @@ export function setupGUI() {
         p.accretion_disk = preset.accretion_disk;
         p.accretion_mode = preset.accretion_mode;
         p.disk_temperature = preset.disk_temperature;
+        if (preset.disk) Object.assign(p.disk, preset.disk);
         p.torus.r0 = preset.torus.r0;
         p.torus.h_ratio = preset.torus.h_ratio;
         p.torus.radial_falloff = preset.torus.radial_falloff;
@@ -499,6 +499,8 @@ export function setupGUI() {
         p.jet.lorentz_factor = preset.jet.lorentz_factor;
         p.jet.brightness = preset.jet.brightness;
         p.jet.length = preset.jet.length;
+        p.jet.spectral_index =
+            preset.jet.spectral_index !== undefined ? preset.jet.spectral_index : 0.7;
         p.jet.magnetization = preset.jet.magnetization;
         p.jet.knot_spacing = preset.jet.knot_spacing;
         p.jet.corona_brightness = preset.jet.corona_brightness;
@@ -564,8 +566,7 @@ export function setupGUI() {
         var slimDiskEnabled = diskEnabled && p.accretion_mode === 'slim_disk';
 
         setControlVisible(accretionModeCtrl, diskEnabled);
-        setControlVisible(diskSelfIrradiationCtrl, diskEnabled);
-        setControlVisible(diskTempCtrl, diskEnabled);
+        syncDiskEmissionRows();
         setControlsVisible(torusRows, thickTorusEnabled);
         setControlsVisible(slimRows, slimDiskEnabled);
 

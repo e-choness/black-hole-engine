@@ -64,22 +64,31 @@ export function setupSimulationFolders(options) {
             syncDependentVisibility();
             updateShader();
         },
-        help: 'Applies relativistic intensity boosting/dimming to thermal emitters and the background-sky proxy. Jet branches keep their own synchrotron beaming model.',
+        help: 'Scales the brightness of every emitter with the frequency ratio g = nu_obs / nu_emit: g^4 (bolometric) or Y(gT) / Y(T) (visible band) for thermal sources, g^(2+alpha) for synchrotron jets.',
     });
     var physicalBeamingCtrl = addControl(folder, p, 'physical_beaming', {
-        name: 'physical (D3 Liouville)',
+        name: 'physical beaming',
         trackBlackHolePreset: true,
         onChange: function () {
             syncDependentVisibility();
             updateShader();
         },
-        help: 'Uses physically motivated Liouville transfer scaling for thermal emitters and the background-sky proxy instead of the softened cinematic curve.',
+        help: 'Exact relativistic beaming from the invariance of I_nu / nu^3. Off: a softened cinematic curve limited to g in [0.68, 1.61].',
     });
     addControl(folder, p, 'doppler_shift', {
         name: 'doppler shift (color)',
         trackBlackHolePreset: true,
         onChange: updateShader,
-        help: 'Shifts thermal emitters and the background-sky proxy by red/blue shift factors. Physical jet mode keeps its own synchrotron temperature-proxy shift.',
+        help: 'Colour of thermal emitters at the shifted temperature g T. Synchrotron power laws keep their colour under any shift.',
+    });
+    addControl(folder, p, 'radiance_model', {
+        name: 'radiance model',
+        options: { 'bolometric (g^4)': 'bolometric', 'visible band Y(gT)': 'visible' },
+        onChange: function () {
+            updateUniforms();
+            markShaderDirty();
+        },
+        help: 'Bolometric: brightness follows the total radiated power, sigma (g T)^4 / pi. Visible: brightness is the CIE luminance of the shifted blackbody, as the eye would see it.',
     });
     addControl(folder, p, 'gravitational_time_dilation', {
         name: 'time dilation',

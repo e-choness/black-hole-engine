@@ -113,7 +113,7 @@ float screen_dither() {
 
 vec4 finalize_color(vec4 color) {
     {{#cinematic_tonemap}}
-    vec3 exposed = max(color.rgb * (GLOBAL_EXPOSURE * look_exposure), vec3(0.0));
+    vec3 exposed = max(color.rgb, vec3(0.0));
     vec3 mapped;
 
     if (look_tonemap_mode < 0.5) {
@@ -131,7 +131,7 @@ vec4 finalize_color(vec4 color) {
         mapped = pow(mapped, vec3(1.0/2.2));
     } else {
         // Mode 2 — Logarithmic Scientific (false-color)
-        mapped = tonemap_log_scientific(exposed, look_exposure);
+        mapped = tonemap_log_scientific(exposed, 1.0);
     }
 
     mapped += vec3(screen_dither());

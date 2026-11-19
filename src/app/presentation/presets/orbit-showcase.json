@@ -24,12 +24,12 @@
       ]
     },
     {
-      "path": "look.exposure",
+      "path": "look.exposure_ev",
       "keys": [
-        { "t": 0, "v": 0.88 },
-        { "t": 14, "v": 1.08, "ease": "smoother" },
-        { "t": 27, "v": 1.22, "ease": "smooth" },
-        { "t": 42, "v": 1.0, "ease": "smoother" }
+        { "t": 0, "v": -0.18 },
+        { "t": 14, "v": 0.11, "ease": "smoother" },
+        { "t": 27, "v": 0.29, "ease": "smooth" },
+        { "t": 42, "v": 0.0, "ease": "smoother" }
       ]
     },
     {
@@ -140,7 +140,6 @@
     { "t": 0, "action": "set", "path": "kerr_mode", "value": "kerr_inspired_disk_velocity" },
     { "t": 0, "action": "set", "path": "accretion_disk", "value": true },
     { "t": 0, "action": "set", "path": "accretion_mode", "value": "thin_disk" },
-    { "t": 0, "action": "set", "path": "disk_self_irradiation", "value": true },
     { "t": 0, "action": "set", "path": "jet.enabled", "value": false },
     { "t": 0, "action": "set", "path": "grmhd.enabled", "value": true },
     { "t": 0, "action": "set", "path": "planet.enabled", "value": false },

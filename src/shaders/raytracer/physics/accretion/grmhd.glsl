@@ -92,7 +92,7 @@ float grmhd_r_high_emissivity(float cyl_r, float z, float disk_h) {
 // temperature ratio.  This keeps B in the range O(0.1–3) so that
 // downstream factors like (1 + c·B) stay well-behaved.
 float grmhd_B_field(float density, float temperature, float beta) {
-    float T_norm = max(temperature, 1.0) / max(disk_temperature, 1.0);
+    float T_norm = max(temperature, 1.0) / max(disk_temperature_peak, 1.0);
     return grmhd_magnetic_field_str * sqrt(2.0 * density * T_norm / max(beta, 0.01));
 }
 

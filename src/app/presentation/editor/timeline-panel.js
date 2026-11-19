@@ -67,7 +67,7 @@ var PRESENTATION_EDITOR_COMMON_PATHS = [
     'observer.distance',
     'observer.orbital_inclination',
     'observer.motion',
-    'look.exposure',
+    'look.exposure_ev',
     'look.disk_gain',
     'look.glow',
     'black_hole.spin',

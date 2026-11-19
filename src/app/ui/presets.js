@@ -11,8 +11,15 @@ export var BH_PRESETS = {
         spin_strength: 1.0,
         accretion_disk: true,
         accretion_mode: 'thin_disk',
-        disk_self_irradiation: true,
         disk_temperature: 5000,
+        disk: {
+            temperature_mode: 'artist',
+            mass_msun: 1e8,
+            eddington_ratio: 0.1,
+            color_correction: 1.0,
+            limb_darkening: 'chandrasekhar',
+            opacity: 1.0,
+        },
         torus: { r0: 4.0, h_ratio: 0.45, radial_falloff: 2.5, opacity: 0.015, outer_radius: 3.5 },
         slim: { h_ratio: 0.15, opacity: 0.6, puff_factor: 2.5 },
         jet: {
@@ -56,8 +63,15 @@ export var BH_PRESETS = {
         spin_strength: 1.0,
         accretion_disk: true,
         accretion_mode: 'thick_torus',
-        disk_self_irradiation: true,
         disk_temperature: 20000,
+        disk: {
+            temperature_mode: 'artist',
+            mass_msun: 1e8,
+            eddington_ratio: 0.1,
+            color_correction: 1.0,
+            limb_darkening: 'chandrasekhar',
+            opacity: 1.0,
+        },
         torus: { r0: 4.0, h_ratio: 0.45, radial_falloff: 2.5, opacity: 0.02, outer_radius: 3.5 },
         slim: { h_ratio: 0.15, opacity: 0.6, puff_factor: 2.5 },
         jet: {
@@ -104,8 +118,15 @@ export var BH_PRESETS = {
         spin_strength: 1.0,
         accretion_disk: true,
         accretion_mode: 'thick_torus',
-        disk_self_irradiation: true,
         disk_temperature: 15000,
+        disk: {
+            temperature_mode: 'artist',
+            mass_msun: 1e8,
+            eddington_ratio: 0.1,
+            color_correction: 1.0,
+            limb_darkening: 'chandrasekhar',
+            opacity: 1.0,
+        },
         torus: { r0: 3.5, h_ratio: 0.5, radial_falloff: 2.8, opacity: 0.012, outer_radius: 3.0 },
         slim: { h_ratio: 0.15, opacity: 0.6, puff_factor: 2.5 },
         jet: {
@@ -144,15 +165,23 @@ export var BH_PRESETS = {
     },
     'Cygnus X-1': {
         // Near-extremal thin-disk X-ray-binary preset inspired by continuum-fitting
-        // work on Cygnus X-1. The visible-light temperature is a rendering proxy,
-        // not the true X-ray disk temperature.
+        // work on Cygnus X-1 (M = 21.2 M_sun, Miller-Jones+ 2021). The physical
+        // temperature scale puts the disk peak near 5e6 K, an X-ray photosphere whose
+        // visible colour is the Rayleigh-Jeans blue-white; f_col = 1.7 (Shimura & Takahara 1995).
         spin_enabled: true,
         spin: 0.99,
         spin_strength: 1.0,
         accretion_disk: true,
         accretion_mode: 'thin_disk',
-        disk_self_irradiation: true,
         disk_temperature: 12000,
+        disk: {
+            temperature_mode: 'physical',
+            mass_msun: 21.2,
+            eddington_ratio: 0.02,
+            color_correction: 1.7,
+            limb_darkening: 'chandrasekhar',
+            opacity: 1.0,
+        },
         torus: { r0: 4.0, h_ratio: 0.45, radial_falloff: 2.5, opacity: 0.015, outer_radius: 3.5 },
         slim: { h_ratio: 0.15, opacity: 0.6, puff_factor: 2.5 },
         jet: {
@@ -190,14 +219,22 @@ export var BH_PRESETS = {
     },
     'GRS 1915+105': {
         // Near-extremal slim-disk microquasar preset inspired by continuum-fitting
-        // and superluminal-jet observations of GRS 1915+105.
+        // and superluminal-jet observations of GRS 1915+105 (M = 12.4 M_sun, Reid+ 2014);
+        // the physical temperature scale gives T_peak = 1.1e7 K at L = 0.3 L_Edd.
         spin_enabled: true,
         spin: 0.98,
         spin_strength: 1.0,
         accretion_disk: true,
         accretion_mode: 'slim_disk',
-        disk_self_irradiation: true,
         disk_temperature: 22000,
+        disk: {
+            temperature_mode: 'physical',
+            mass_msun: 12.4,
+            eddington_ratio: 0.3,
+            color_correction: 1.7,
+            limb_darkening: 'chandrasekhar',
+            opacity: 1.0,
+        },
         torus: { r0: 4.0, h_ratio: 0.45, radial_falloff: 2.5, opacity: 0.015, outer_radius: 3.5 },
         slim: { h_ratio: 0.18, opacity: 0.7, puff_factor: 3.0 },
         jet: {
@@ -239,8 +276,15 @@ export var BH_PRESETS = {
         spin_strength: 1.0,
         accretion_disk: true,
         accretion_mode: 'thin_disk',
-        disk_self_irradiation: true,
         disk_temperature: 4500,
+        disk: {
+            temperature_mode: 'artist',
+            mass_msun: 1e8,
+            eddington_ratio: 0.1,
+            color_correction: 1.0,
+            limb_darkening: 'chandrasekhar',
+            opacity: 1.0,
+        },
         torus: { r0: 4.0, h_ratio: 0.45, radial_falloff: 2.5, opacity: 0.015, outer_radius: 3.5 },
         slim: { h_ratio: 0.15, opacity: 0.6, puff_factor: 2.5 },
         jet: {
@@ -283,8 +327,15 @@ export var BH_PRESETS = {
         spin_strength: 1.0,
         accretion_disk: true,
         accretion_mode: 'thin_disk',
-        disk_self_irradiation: true,
         disk_temperature: 5000,
+        disk: {
+            temperature_mode: 'artist',
+            mass_msun: 1e8,
+            eddington_ratio: 0.1,
+            color_correction: 1.0,
+            limb_darkening: 'chandrasekhar',
+            opacity: 1.0,
+        },
         torus: { r0: 4.0, h_ratio: 0.45, radial_falloff: 2.5, opacity: 0.015, outer_radius: 3.5 },
         slim: { h_ratio: 0.15, opacity: 0.6, puff_factor: 2.5 },
         jet: {
