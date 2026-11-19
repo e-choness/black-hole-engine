@@ -1,0 +1,226 @@
+{
+  "version": 1,
+  "presets": [
+    {
+      "id": "m87-star",
+      "name": "M87*",
+      "aliases": ["M87", "Messier 87"],
+      "category": "supermassive",
+      "massSolar": 6.5e9,
+      "massUncertainty": { "plus": 0.7e9, "minus": 0.7e9 },
+      "spin": 0.9,
+      "spinStatus": "assumed",
+      "eddingtonRatio": 0.1,
+      "eddingtonRatioStatus": "illustrative",
+      "accretionState": "riaf",
+      "distance": { "value": 16.8, "unit": "Mpc" },
+      "ringDiameter": { "value": 42, "uncertainty": 3, "unit": "µas" },
+      "jetViewingAngle": { "value": 17, "unit": "deg" },
+      "notes": "Mass and distance from the EHT shadow. Spin is not measured: the EHT model library uses a ∈ {−0.94, −0.5, 0, 0.5, 0.94}, so 0.9 is a placeholder. The real flow is radiatively inefficient, so thin-disk temperatures are what-if values.",
+      "references": {
+        "mass": ["EHT19-VI"],
+        "distance": ["EHT19-VI"],
+        "spin": ["EHT19-V"],
+        "ringDiameter": ["EHT19-I"],
+        "jetViewingAngle": ["Wal18"]
+      }
+    },
+    {
+      "id": "sgr-a-star",
+      "name": "Sgr A*",
+      "aliases": ["Sagittarius A*", "SgrA*"],
+      "category": "supermassive",
+      "massSolar": 4.297e6,
+      "spin": 0.9,
+      "spinStatus": "assumed",
+      "eddingtonRatio": 0.1,
+      "eddingtonRatioStatus": "illustrative",
+      "accretionState": "riaf",
+      "distance": { "value": 8.277, "unit": "kpc" },
+      "ringDiameter": { "value": 51.8, "uncertainty": 2.3, "unit": "µas" },
+      "notes": "Mass and distance from stellar orbits measured with GRAVITY. Spin is not measured: EHT model comparisons span |a| ≤ 0.94, so 0.9 is a placeholder. The real flow is radiatively inefficient and far below the Eddington rate, so thin-disk temperatures are what-if values.",
+      "references": {
+        "mass": ["GRAV22"],
+        "distance": ["GRAV22"],
+        "spin": ["EHT22-V"],
+        "ringDiameter": ["EHT22-I"]
+      }
+    },
+    {
+      "id": "cygnus-x-1",
+      "name": "Cygnus X-1",
+      "aliases": ["Cyg X-1"],
+      "category": "stellar",
+      "massSolar": 21.2,
+      "massUncertainty": { "plus": 2.2, "minus": 2.2 },
+      "spin": 0.998,
+      "spinStatus": "lower-limit",
+      "spinLowerLimit": 0.9985,
+      "eddingtonRatio": 0.1,
+      "eddingtonRatioStatus": "illustrative",
+      "accretionState": "thin-disk",
+      "notes": "Mass from radio parallax and orbital modelling. Continuum fitting gives a > 0.9985; the preset uses the Thorne limit a = 0.998.",
+      "references": {
+        "mass": ["MJ21"],
+        "spin": ["Zha21"]
+      }
+    },
+    {
+      "id": "grs-1915-105",
+      "name": "GRS 1915+105",
+      "aliases": ["GRS1915+105"],
+      "category": "stellar",
+      "massSolar": 12.4,
+      "massUncertainty": { "plus": 2, "minus": 1.8 },
+      "spin": 0.98,
+      "spinStatus": "lower-limit",
+      "spinLowerLimit": 0.98,
+      "eddingtonRatio": 0.1,
+      "eddingtonRatioStatus": "illustrative",
+      "accretionState": "thin-disk",
+      "notes": "Mass from a radio parallax distance and the binary orbit. Continuum fitting gives a > 0.98. Its jets were the first apparently superluminal motion found in the Galaxy.",
+      "references": {
+        "mass": ["Rei14"],
+        "spin": ["McC06"],
+        "jets": ["MR94"]
+      }
+    },
+    {
+      "id": "3c-273",
+      "name": "3C 273",
+      "aliases": ["3C273"],
+      "category": "quasar",
+      "massSolar": 2.6e8,
+      "massUncertainty": { "plus": 1.1e8, "minus": 1.1e8 },
+      "spin": 0.9,
+      "spinStatus": "assumed",
+      "eddingtonRatio": 0.3,
+      "eddingtonRatioStatus": "illustrative",
+      "accretionState": "thin-disk",
+      "redshift": 0.158,
+      "jetApparentSpeed": { "max": 14.84, "median": 8.3, "unit": "c" },
+      "notes": "Mass from the GRAVITY model of the broad-line region, which depends on the modelled inclination. Spin is not measured, so 0.9 is a placeholder.",
+      "references": {
+        "mass": ["GRAV18"],
+        "redshift": ["MOJAVE"],
+        "jetApparentSpeed": ["MOJAVE", "Lis21"]
+      }
+    },
+    {
+      "id": "ton-618",
+      "name": "TON 618",
+      "aliases": ["Ton 618", "TON618"],
+      "category": "quasar",
+      "massSolar": 4.07e10,
+      "alternativeMasses": [{ "massSolar": 6.6e10, "method": "Hβ", "references": ["She04"] }],
+      "spin": 0.9,
+      "spinStatus": "assumed",
+      "eddingtonRatio": 0.3,
+      "eddingtonRatioStatus": "illustrative",
+      "accretionState": "thin-disk",
+      "redshift": 2.219,
+      "notes": "Mass from the C IV line width; the Hβ line gives 6.6 × 10¹⁰ M☉. Spin is not measured, so 0.9 is a placeholder. The redshift comes from a secondary source.",
+      "references": {
+        "mass": ["Ge19"],
+        "redshift": ["Wiki-TON618"]
+      }
+    },
+    {
+      "id": "stellar-10",
+      "name": "10 M☉ black hole",
+      "aliases": ["Stellar 10", "10 Msun"],
+      "category": "stellar",
+      "massSolar": 10,
+      "spin": 0,
+      "spinStatus": "illustrative",
+      "eddingtonRatio": 0.1,
+      "eddingtonRatioStatus": "illustrative",
+      "accretionState": "thin-disk",
+      "notes": "A typical non-spinning stellar-mass black hole for scale comparisons, not a specific object.",
+      "references": {}
+    }
+  ],
+  "references": {
+    "EHT19-I": {
+      "citation": "Event Horizon Telescope Collaboration, ApJL 875, L1 (2019)",
+      "arxiv": "1906.11238",
+      "doi": "10.3847/2041-8213/ab0ec7"
+    },
+    "EHT19-V": {
+      "citation": "Event Horizon Telescope Collaboration, ApJL 875, L5 (2019)",
+      "arxiv": "1906.11242",
+      "doi": "10.3847/2041-8213/ab0f43"
+    },
+    "EHT19-VI": {
+      "citation": "Event Horizon Telescope Collaboration, ApJL 875, L6 (2019)",
+      "arxiv": "1906.11243",
+      "doi": "10.3847/2041-8213/ab1141"
+    },
+    "EHT22-I": {
+      "citation": "Event Horizon Telescope Collaboration, ApJL 930, L12 (2022)",
+      "arxiv": "2311.08680",
+      "doi": "10.3847/2041-8213/ac6674"
+    },
+    "EHT22-V": {
+      "citation": "Event Horizon Telescope Collaboration, ApJL 930, L16 (2022)",
+      "arxiv": "2311.09478",
+      "doi": "10.3847/2041-8213/ac6672"
+    },
+    "GRAV18": {
+      "citation": "GRAVITY Collaboration, Nature 563, 657 (2018)",
+      "arxiv": "1811.11195",
+      "doi": "10.1038/s41586-018-0731-9"
+    },
+    "GRAV22": {
+      "citation": "GRAVITY Collaboration, A&A 657, L12 (2022)",
+      "arxiv": "2112.07478",
+      "doi": "10.1051/0004-6361/202142465"
+    },
+    "Ge19": {
+      "citation": "Ge et al., AJ 157, 148 (2019)",
+      "doi": "10.3847/1538-3881/ab0956"
+    },
+    "Lis21": {
+      "citation": "Lister et al., ApJ 923, 30 (2021)",
+      "doi": "10.3847/1538-4357/ac230f"
+    },
+    "McC06": {
+      "citation": "McClintock et al., ApJ 652, 518 (2006)",
+      "arxiv": "astro-ph/0606076"
+    },
+    "MJ21": {
+      "citation": "Miller-Jones et al., Science 371, 1046 (2021)",
+      "arxiv": "2102.09091"
+    },
+    "MOJAVE": {
+      "citation": "MOJAVE source page for 1226+023 (3C 273)",
+      "url": "https://www.cv.nrao.edu/MOJAVE/sourcepages/1226+023.shtml"
+    },
+    "MR94": {
+      "citation": "Mirabel & Rodríguez, Nature 371, 46 (1994)",
+      "doi": "10.1038/371046a0"
+    },
+    "Rei14": {
+      "citation": "Reid et al., ApJ 796, 2 (2014)",
+      "arxiv": "1409.2453"
+    },
+    "She04": {
+      "citation": "Shemmer et al., ApJ 614, 547 (2004)",
+      "doi": "10.1086/423607"
+    },
+    "Wal18": {
+      "citation": "Walker et al., ApJ 855, 128 (2018)",
+      "arxiv": "1802.06166",
+      "doi": "10.3847/1538-4357/aaafcc"
+    },
+    "Wiki-TON618": {
+      "citation": "Wikipedia, TON 618 (secondary source)",
+      "url": "https://en.wikipedia.org/wiki/TON_618"
+    },
+    "Zha21": {
+      "citation": "Zhao et al., ApJ 908, 117 (2021)",
+      "arxiv": "2102.09093",
+      "doi": "10.3847/1538-4357/abbcd6"
+    }
+  }
+}
