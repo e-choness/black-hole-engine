@@ -12,6 +12,42 @@ export const TONE_MAPPERS = { agx: 0, neutral: 1, aces: 2, scientific: 3 };
 // display-referred anchor level of the disk photosphere.
 export const SCIENTIFIC_RANGE_STOPS = 12;
 export const SCIENTIFIC_HEADROOM_STOPS = 3;
+const SCIENTIFIC_LOG2_MAX = Math.log2(ANCHOR_LUMINANCE) + SCIENTIFIC_HEADROOM_STOPS;
+
+// Polynomial fit of matplotlib's Inferno map in powers of t, lowest first, giving sRGB-encoded
+// values. Inferno is perceptually uniform and stays ordered in lightness under colour-vision
+// deficiencies. The shader and the on-screen colour bar both evaluate it from here.
+export const INFERNO_COEFFICIENTS = [
+    [0.0002189403691192265, 0.001651004631001012, -0.01948089843709184],
+    [0.1065134194856116, 0.5639564367884091, 3.932712388889277],
+    [11.60249308247187, -3.972853965665698, -15.9423941062914],
+    [-41.70399613139459, 17.43639888205313, 44.35414519872813],
+    [77.16275788913913, -33.40235894210092, -81.80730925738993],
+    [-71.31942824499214, 32.62606426397723, 73.20951985803202],
+    [25.13112622477341, -12.24266895238567, -23.07032500287172],
+];
+
+export function infernoColor(t) {
+    const x = Math.min(Math.max(t, 0), 1);
+    return [0, 1, 2].map((channel) => {
+        let v = 0;
+        for (let i = INFERNO_COEFFICIENTS.length - 1; i >= 0; i--) {
+            v = v * x + INFERNO_COEFFICIENTS[i][channel];
+        }
+        return Math.min(Math.max(v, 0), 1);
+    });
+}
+
+// log2 of the luminance (cd/m^2) at the dark and bright ends of the scientific window: the trace
+// stores luminance times the pre-exposure H.
+export function scientificLuminanceRange(log2Exposure) {
+    const log2Max = SCIENTIFIC_LOG2_MAX - log2Exposure;
+    return { log2Min: log2Max - SCIENTIFIC_RANGE_STOPS, log2Max };
+}
+
+const INFERNO_GLSL = INFERNO_COEFFICIENTS.map(
+    (c, i) => `    const vec3 c${i} = vec3(${c.join(', ')});`,
+).join('\n');
 
 const VERTEX_SHADER = /* glsl */ `
 precision highp float;
@@ -59,16 +95,8 @@ vec3 bloom_tent(vec2 uv) {
     return s * (1.0 / 16.0);
 }
 
-// Polynomial fit of matplotlib's Inferno map, which returns sRGB-encoded values. Inferno is
-// perceptually uniform and stays ordered in lightness under colour-vision deficiencies.
 vec3 inferno(float t) {
-    const vec3 c0 = vec3(0.0002189403691192265, 0.001651004631001012, -0.01948089843709184);
-    const vec3 c1 = vec3(0.1065134194856116, 0.5639564367884091, 3.932712388889277);
-    const vec3 c2 = vec3(11.60249308247187, -3.972853965665698, -15.9423941062914);
-    const vec3 c3 = vec3(-41.70399613139459, 17.43639888205313, 44.35414519872813);
-    const vec3 c4 = vec3(77.16275788913913, -33.40235894210092, -81.80730925738993);
-    const vec3 c5 = vec3(-71.31942824499214, 32.62606426397723, 73.20951985803202);
-    const vec3 c6 = vec3(25.13112622477341, -12.24266895238567, -23.07032500287172);
+${INFERNO_GLSL}
     return c0 + t * (c1 + t * (c2 + t * (c3 + t * (c4 + t * (c5 + t * c6)))));
 }
 
@@ -129,7 +157,7 @@ export function setupOutputPass() {
             whiteBalance: { value: new THREE.Matrix3() },
             toneMapper: { value: TONE_MAPPERS.agx },
             toneMappingExposure: { value: 1 },
-            scientificLog2Max: { value: Math.log2(ANCHOR_LUMINANCE) + SCIENTIFIC_HEADROOM_STOPS },
+            scientificLog2Max: { value: SCIENTIFIC_LOG2_MAX },
             scientificStops: { value: SCIENTIFIC_RANGE_STOPS },
             frameIndex: { value: 0 },
         },

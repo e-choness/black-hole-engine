@@ -337,7 +337,9 @@ applied to the linear frame before tone mapping. A blackbody at `T_wb` comes out
 
 Inferno (van der Walt and Smith 2015) is perceptually uniform, monotonic in lightness and
 readable with the common colour-vision deficiencies, so the Scientific mode doubles as a
-colour-blind-safe false-colour luminance map. The display modes end with the sRGB OETF
+colour-blind-safe false-colour luminance map. Its colour bar labels the window in cd/m^2 at whole
+decades: the traced value is luminance times the pre-exposure, so the window ends at
+`L_max = 0.5 2^3 / H`, which follows both exposure modes. The display modes end with the sRGB OETF
 (IEC 61966-2-1), and every mode adds triangular-PDF dither of one 8-bit step from a per-frame
 hash before quantisation, which removes banding in the dark sky and the bloom gradients.
 
@@ -392,9 +394,12 @@ out that line of sight runs inside the jet, so the preset views it from 12 degre
   `eta = 1 - E_isco`, the physical peak temperatures, the face-on ISCO redshift `1 / u^t`,
   normalised circular and plunging 4-velocities, and `g = 1 / (u^t (E - Omega L_z))`.
 - `tests/unit/emission.test.js`: the per-spin bracket coefficients, the bolometric efficacy, the
-  `f_col^4` dimming at fixed colour and both exposure modes.
+  `f_col^4` dimming at fixed colour, both exposure modes, the Scientific window in cd/m^2 and an
+  Inferno map whose luminance rises monotonically.
 - `tests/e2e/accumulation.spec.js`: a static view accumulates up to `max_frames` and restarts
   when the view changes.
+- `tests/e2e/scientific-legend.spec.js`: the colour bar appears only with the Scientific tone
+  mapper and moves one stop down in luminance per stop of exposure.
 
 ## Performance
 
@@ -443,6 +448,7 @@ at mobile, high and cinematic against 20 ms, 510 ms and 1.5 s for the Kerr-inspi
 - The sky's stars are part of the map, so bright stars are blurred to the map resolution instead
   of being drawn as point sources.
 - Exposure is manual or anchored; there is no automatic exposure with adaptation.
+- The Scientific colour bar is a page overlay, so recordings and canvas captures leave it out.
 - Without float render targets the HDR frame falls back to RGBA8 and clips at 1.
 
 ## References

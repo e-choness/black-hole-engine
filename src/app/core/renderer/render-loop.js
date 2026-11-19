@@ -31,6 +31,7 @@ import { resizePasses, resizeRendererAndPasses, updateAxesGizmo } from './render
 import { whiteBalance } from '../physics/emission.js';
 import { registerBlackHoleRuntimeApi } from '../runtime/runtime-registry.js';
 import { isE2eMode, notifyFrameRendered } from '../runtime/test-hooks.js';
+import { updateScientificLegend } from '../../ui/widgets/scientific-legend.js';
 
 var lastCameraMat = new THREE.Matrix4().identity();
 var resetRendererFrameClock = function () {};
@@ -269,6 +270,7 @@ function render() {
         toneMapper: shader.parameters.look.tone_mapper,
         whiteBalance: whiteBalance(shader.parameters.look),
     });
+    updateScientificLegend(shader.parameters, shaderUniforms.log2_exposure.value);
     updateAxesGizmo();
     notifyFrameRendered();
 }

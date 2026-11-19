@@ -6,6 +6,7 @@ import {
     referenceLog2Luminance,
 } from '../../src/app/core/physics/emission.js';
 import { pageThorneBracket } from '../../src/app/core/physics/thin-disk.js';
+import { infernoColor, scientificLuminanceRange } from '../../src/app/graphics/output-pass.js';
 
 describe('emission uniforms', () => {
     it('let the shader evaluate the Page-Thorne bracket from per-spin coefficients', () => {
@@ -49,5 +50,42 @@ describe('emission uniforms', () => {
         expect(anchored + log2Reference).toBeCloseTo(Math.log2(ANCHOR_LUMINANCE) + 1.5, 12);
         const manual = exposureLog2({ exposure_mode: 'manual', exposure_ev: 0, ev100: 30 }, 0);
         expect(2 ** manual).toBeCloseTo(1 / (1.2 * 2 ** 30), 20);
+    });
+});
+
+describe('scientific false colour', () => {
+    it('spans 12 stops of luminance ending 3 stops above the anchored reference emitter', () => {
+        const log2Reference = 22.4;
+        for (const ev of [0, 2.5]) {
+            const range = scientificLuminanceRange(
+                exposureLog2(
+                    { exposure_mode: 'anchored', exposure_ev: ev, ev100: 0 },
+                    log2Reference,
+                ),
+            );
+            expect(range.log2Max).toBeCloseTo(log2Reference + 3 - ev, 12);
+            expect(range.log2Max - range.log2Min).toBe(12);
+        }
+    });
+
+    it('labels the manual exposure window in absolute luminance', () => {
+        const range = scientificLuminanceRange(
+            exposureLog2({ exposure_mode: 'manual', exposure_ev: 0, ev100: 10 }, 0),
+        );
+        expect(2 ** range.log2Max).toBeCloseTo(ANCHOR_LUMINANCE * 8 * 1.2 * 2 ** 10, 6);
+    });
+
+    it('rises monotonically in luminance from black to the Inferno yellow', () => {
+        const decode = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+        let previous = -1;
+        for (let i = 0; i <= 512; i++) {
+            const [r, g, b] = infernoColor(i / 512).map(decode);
+            const y = 0.2126729 * r + 0.7151522 * g + 0.072175 * b;
+            expect(y, `t = ${i / 512}`).toBeGreaterThan(previous);
+            previous = y;
+        }
+        expect(Math.max(...infernoColor(0))).toBeLessThan(0.01);
+        const top = infernoColor(1);
+        [0.988, 0.998, 0.645].forEach((v, i) => expect(top[i]).toBeCloseTo(v, 1));
     });
 });

@@ -69,6 +69,68 @@ a:hover {
     visibility: hidden;
 }
 
+/* Colour bar of the Scientific tone mapper, below the hint line; it never takes pointer input. */
+.scientific-legend {
+    position: fixed;
+    top: 44px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 40;
+    width: min(320px, 72vw);
+    padding: 6px 16px 4px;
+    box-sizing: border-box;
+    background: rgba(0, 0, 0, 0.6);
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: normal;
+    pointer-events: none;
+}
+
+.scientific-legend[hidden] {
+    display: none;
+}
+
+.scientific-legend-bar {
+    height: 10px;
+}
+
+.scientific-legend-ticks {
+    position: relative;
+    height: 16px;
+}
+
+.scientific-legend-ticks span {
+    position: absolute;
+    top: 4px;
+    transform: translateX(-50%);
+    white-space: nowrap;
+}
+
+.scientific-legend-ticks span::before {
+    content: '';
+    position: absolute;
+    top: -4px;
+    left: 50%;
+    width: 1px;
+    height: 4px;
+    background: #fff;
+}
+
+.scientific-legend-caption {
+    margin-top: 2px;
+    text-align: center;
+    color: #cccccc;
+}
+
+/* Narrow layouts put the orientation widget in the top-right corner, so the bar moves above the
+   panel buttons at the bottom. */
+@media screen and (max-width: 960px) {
+    .scientific-legend {
+        top: auto;
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 104px);
+    }
+}
+
 @media screen and (max-width: 800px) {
     .hidden-phone {
         visibility: hidden;
