@@ -430,4 +430,13 @@ body.has-timeline-panel .shell-footer {
         clip-path: inset(50%);
         white-space: nowrap;
     }
+
+    /* The timeline editor is hidden here, so it takes no room even if it was left open. */
+    body.has-timeline-panel .shell {
+        padding-bottom: 0;
+    }
+
+    body.has-timeline-panel .shell-footer {
+        display: block;
+    }
 }

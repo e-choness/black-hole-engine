@@ -20,6 +20,8 @@ setup into a scripted presentation that can be recorded to video.
   zoom. On touch screens one finger orbits, two fingers pan and a pinch zooms.
 - Presentation timeline with keyframed parameters, camera motion, annotations, bundled tours and
   JSON import/export.
+- An interface with a searchable parameter inspector, a command palette (Ctrl/Cmd+K), keyboard
+  shortcuts (?), physics notes, sound that follows the simulation and a layout for phones.
 - Capture: PNG screenshots, frame-exact offline rendering to MP4 (H.264) or WebM (VP9 or AV1)
   through WebCodecs and [Mediabunny](https://mediabunny.dev), and real-time recording through
   MediaRecorder. Where the File System Access API is available, offline renders stream straight
@@ -116,9 +118,12 @@ src/app/core/            renderer, render loop, runtime state, observer physics,
 src/app/graphics/        bloom and the shared full-screen pass helpers
 src/app/presentation/    timeline editor, presentation runtime and recording, bundled presets
 src/app/scene/           camera runtime and the mouse and touch observer controls
-src/app/ui/              lil-gui control panels, quality presets, widgets
+src/app/ui/              engine actions for the interface, quality presets, colour-bar widget
+src/ui/                  React interface: top bar, mode rail, inspector, time bar and dialogs
+src/features/            units, clocks, sonification, view links and the offline app
+src/content/             physics notes shown in the app
 src/shaders/raytracer/   GLSL ES 3.00 ray tracer; index.js sets the order the shards are joined in
-src/styles/              stylesheets
+src/styles/              stylesheets of the page and the timeline editor
 public/                  files served as-is: textures and icons
 tests/unit/              Vitest unit tests
 tests/e2e/               Playwright tests: rendering, controls, recording, missing WebGL 2

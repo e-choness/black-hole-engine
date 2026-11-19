@@ -5,10 +5,10 @@
 const contentSecurityPolicy = {
     'default-src': ["'self'"],
     'script-src': ["'self'"],
-    // lil-gui injects its stylesheet as a <style> element and the UI sets inline style
-    // attributes.
+    // Sonner and the scroll lock of Radix UI dialogs inject <style> elements, and the interface
+    // sets inline style attributes.
     'style-src': ["'self'", "'unsafe-inline'"],
-    // lil-gui's stylesheet embeds its icon font as a data: URL.
+    // The build inlines font files under 4 KiB, such as a subset of JetBrains Mono, as data: URLs.
     'font-src': ["'self'", 'data:'],
     'img-src': ["'self'", 'data:', 'blob:'],
     'media-src': ["'self'", 'blob:'],

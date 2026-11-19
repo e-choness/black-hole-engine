@@ -1,5 +1,11 @@
 import { toast } from 'sonner';
-import { enterMode, presentationBusy, timelinePanel, type ObserverMode } from '../engine/engine';
+import {
+    enterMode,
+    presentationBusy,
+    timelinePanel,
+    toggleTimeline,
+    type ObserverMode,
+} from '../engine/engine';
 import { togglePlayback } from '../engine/playback';
 import { toggleFullscreen } from '../lib/fullscreen';
 import { saveScreenshot, toggleRecording } from './capture-actions';
@@ -106,7 +112,7 @@ function handleKeyDown(event: KeyboardEvent): void {
     } else if (key === 'f') {
         toggleFullscreen();
     } else if (key === 't') {
-        timelinePanel()?.toggle();
+        toggleTimeline();
     } else if (key === 'p') {
         saveScreenshot();
     } else if (key === 'r') {

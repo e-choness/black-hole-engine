@@ -1,7 +1,13 @@
 import { useState } from 'react';
 import { ToggleGroup } from 'radix-ui';
 import { ArrowDownToLine, ChartGantt, Crosshair, Info, Orbit, Video } from 'lucide-react';
-import { currentMode, enterMode, timelinePanel, type ObserverMode } from '../engine/engine';
+import {
+    currentMode,
+    enterMode,
+    timelinePanel,
+    toggleTimeline,
+    type ObserverMode,
+} from '../engine/engine';
 import { useEngineValue } from '../engine/hooks';
 import { useFrameSampler } from '../engine/telemetry';
 import { useUi } from '../state/ui-store';
@@ -12,10 +18,6 @@ const MODES: { value: ObserverMode; label: string; icon: typeof Orbit; key: stri
     { value: 'hover', label: 'Hover', icon: Crosshair, key: '2' },
     { value: 'dive', label: 'Dive', icon: ArrowDownToLine, key: '3' },
 ];
-
-export function toggleTimeline(): void {
-    timelinePanel()?.toggle();
-}
 
 // The editor opens and closes itself too (its close button, Esc), so its state is polled.
 export function useTimelineOpen(): boolean {

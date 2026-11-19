@@ -74,6 +74,12 @@ test('keyboard shortcuts drive playback, modes, the interface and the help sheet
     await page.keyboard.press('1');
     await expect(hud).toContainText('Observer · at rest');
 
+    const body = page.locator('body');
+    await page.keyboard.press('t');
+    await expect(body).toHaveClass(/has-timeline-panel/);
+    await page.keyboard.press('t');
+    await expect(body).not.toHaveClass(/has-timeline-panel/);
+
     await page.keyboard.press('h');
     await expect(page.locator('.shell')).toHaveAttribute('data-ui-hidden', 'true');
     await page.keyboard.press('h');
@@ -89,4 +95,24 @@ test('keyboard shortcuts drive playback, modes, the interface and the help sheet
     await page.keyboard.press('Escape');
     await expect(sheet).toBeHidden();
     expect(problems).toEqual([]);
+});
+
+// Phones have no room for the timeline editor, so neither its shortcut nor the palette opens it.
+test.describe('on a phone', () => {
+    test.use({ viewport: { width: 390, height: 844 } });
+
+    test('the timeline editor is not offered', async ({ page }) => {
+        const problems = trackPageProblems(page);
+        await openSimulation(page);
+        await page.keyboard.press('t');
+
+        await page
+            .getByRole('button', { name: 'Search parameters, scenarios and actions' })
+            .click();
+        const palette = page.getByRole('dialog', { name: 'Command palette' });
+        await page.keyboard.type('presentation keyframes');
+        await expect(palette).toContainText('Nothing matches “presentation keyframes”');
+        await expect(page.locator('body')).not.toHaveClass(/has-timeline-panel/);
+        expect(problems).toEqual([]);
+    });
 });

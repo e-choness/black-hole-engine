@@ -133,16 +133,6 @@ export function advanceQualityBenchmark(frameDt) {
     }
 }
 
-export function isLikelyMobileDevice() {
-    var ua = (window.navigator && window.navigator.userAgent) || '';
-    var uaMobile = /(Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile)/i.test(
-        ua,
-    );
-    var coarsePointer = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
-    var smallViewport = Math.min(window.innerWidth || 0, window.innerHeight || 0) <= 900;
-    return uaMobile || (coarsePointer && smallViewport);
-}
-
 export function clampResolutionScale(value) {
     return Math.max(0.35, Math.min(2.0, value || 1.0));
 }

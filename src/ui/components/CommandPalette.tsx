@@ -9,7 +9,8 @@ import {
     qualityPresetLabels,
     resetCamera,
     resetSimulationClock,
-    timelinePanel,
+    timelineAvailable,
+    toggleTimeline,
 } from '../engine/engine';
 import { stepPlayback, togglePlayback } from '../engine/playback';
 import { setSoundEnabled, soundEnabled } from '../engine/sound';
@@ -65,6 +66,17 @@ function recordingActions(): Action[] {
 
 function actions(): Action[] {
     const ui = useUi.getState();
+    const timeline: Action[] = timelineAvailable()
+        ? [
+              {
+                  id: 'timeline',
+                  label: 'Timeline editor',
+                  keys: ['T'],
+                  keywords: 'presentation keyframes',
+                  run: toggleTimeline,
+              },
+          ]
+        : [];
     return [
         { id: 'play', label: 'Play or pause', keys: ['Space'], run: togglePlayback },
         { id: 'step', label: 'Step forward', run: () => stepPlayback(1) },
@@ -87,13 +99,7 @@ function actions(): Action[] {
             keywords: 'inspector panel',
             run: () => ui.setInspectorOpen(!ui.inspectorOpen),
         },
-        {
-            id: 'timeline',
-            label: 'Timeline editor',
-            keys: ['T'],
-            keywords: 'presentation keyframes',
-            run: () => timelinePanel()?.toggle(),
-        },
+        ...timeline,
         {
             id: 'hide',
             label: 'Hide the interface',

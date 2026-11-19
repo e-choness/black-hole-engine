@@ -61,7 +61,7 @@ const { clampSlider, initParams, isModified, readParam, resetParam, setParam } =
     await import('../../src/ui/params/params');
 const { parseNumber, editableNumber } = await import('../../src/ui/lib/number-input');
 
-// Every control of the lil-gui panels, the observer widget and the animations panel, with the
+// Every control of the former lil-gui panels, observer widget and animations panel, with the
 // surface that replaces it. The inspector rows are checked against the registry below.
 const LEGACY_INSPECTOR_PATHS = [
     'quality',

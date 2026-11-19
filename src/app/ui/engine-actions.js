@@ -67,7 +67,7 @@ export function setEngineNoticeHandler(handler) {
     noticeHandler = handler;
 }
 
-export function engineNotice(text, options) {
+function engineNotice(text, options) {
     if (noticeHandler) noticeHandler(text, options || {});
 }
 

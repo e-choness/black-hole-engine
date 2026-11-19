@@ -223,6 +223,19 @@ export function timelinePanel(): TimelinePanelBinding | null {
     return getTimelinePanelBinding() as TimelinePanelBinding | null;
 }
 
+// Phones have no room for the editor, which its stylesheet hides below this width; one left open
+// by a window that has since narrowed can still be closed.
+const TIMELINE_QUERY = '(min-width: 761px)';
+
+export function timelineAvailable(): boolean {
+    return window.matchMedia(TIMELINE_QUERY).matches;
+}
+
+export function toggleTimeline(): void {
+    const panel = timelinePanel();
+    if (panel && (panel.isOpen() || timelineAvailable())) panel.toggle();
+}
+
 export const playbackSpeed = actions.getPlaybackSpeed as () => number;
 export const setPlaybackSpeed = actions.setPlaybackSpeed as (speed: number) => void;
 

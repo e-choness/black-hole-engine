@@ -19,7 +19,6 @@ export let outputPass = null;
 export let hdrTarget = null;
 export let shaderUniforms = null;
 export const baseDevicePixelRatio = Math.max(window.devicePixelRatio || 1.0, 1.0);
-export let isMobileClient = false;
 export let rendererContextLost = false;
 export const lastTaaCameraMat = new THREE.Matrix4().identity();
 
@@ -63,9 +62,6 @@ export function setHdrTarget(value) {
 }
 export function setShaderUniforms(value) {
     shaderUniforms = value;
-}
-export function setIsMobileClient(value) {
-    isMobileClient = !!value;
 }
 export function setRendererContextLost(value) {
     rendererContextLost = !!value;

@@ -169,7 +169,7 @@ function installFakeSavePicker() {
     };
 }
 
-// The timeline editor is only offered on wide layouts.
+// The editor is not offered on phones, and this size leaves room for the dialog above it.
 test.describe('timeline editor', () => {
     test.use({ viewport: { width: 1280, height: 800 } });
 

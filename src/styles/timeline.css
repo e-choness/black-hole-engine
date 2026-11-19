@@ -1441,11 +1441,29 @@ select.tl-motion-input {
     .tl-inspector {
         width: 220px;
     }
+
+    /* The tools wrap below the scrubber, and the close button keeps the top right corner. */
+    .tl-transport-center {
+        margin-right: 40px;
+    }
+
+    .tl-transport-right {
+        flex-shrink: 1;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        min-width: 0;
+    }
+
+    #tl-btn-close {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+    }
 }
 
+/* Phones have no room for the editor, and the interface does not offer it there. */
 @media (max-width: 760px) {
-    .tl-tracks,
-    .tl-inspector {
+    .tl-panel {
         display: none;
     }
 }

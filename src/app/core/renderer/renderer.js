@@ -17,7 +17,6 @@ import {
 import { applyQualityPresetValues } from '../../ui/quality-presets.js';
 import {
     beginQualityBenchmarkIfNeeded,
-    isLikelyMobileDevice,
     initialQualityPreset,
     clampResolutionScale,
 } from './renderer-quality.js';
@@ -63,7 +62,6 @@ import {
     setOutputPass,
     setHdrTarget,
     setShaderUniforms,
-    setIsMobileClient,
     setRendererContextLost,
     setUpdateUniforms,
     setApplyRenderScaleFromSettings,
@@ -126,12 +124,7 @@ setApplyRenderScaleFromSettings(applyRenderScaleFromSettingsImpl);
 setResetTemporalAAHistory(resetTemporalAAHistoryImpl);
 
 export function init(glslSource, textures) {
-    var mobileClient = isLikelyMobileDevice();
     setShader(new Shader(glslSource));
-    setIsMobileClient(mobileClient);
-    if (mobileClient) {
-        document.body.classList.add('mobile-ui');
-    }
 
     applyQualityPresetValues(shader.parameters, initialQualityPreset(), { selectSolver: true });
 
