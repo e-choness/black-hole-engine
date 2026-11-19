@@ -11,7 +11,6 @@ export function capturePresentationQualitySnapshot() {
         sample_count: p.sample_count,
         max_revolutions: p.max_revolutions,
         rk4_integration: p.rk4_integration,
-        cinematic_tonemap: p.cinematic_tonemap,
         resolution_scale: p.resolution_scale,
         taa_enabled: p.taa_enabled,
         taa: {
@@ -32,7 +31,6 @@ export function restorePresentationQualitySnapshot(snapshot) {
     p.sample_count = snapshot.sample_count;
     p.max_revolutions = snapshot.max_revolutions;
     p.rk4_integration = snapshot.rk4_integration;
-    p.cinematic_tonemap = snapshot.cinematic_tonemap;
     p.resolution_scale = snapshot.resolution_scale;
     p.taa_enabled = snapshot.taa_enabled;
     p.taa.history_weight = snapshot.taa.history_weight;

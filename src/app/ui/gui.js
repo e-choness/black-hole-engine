@@ -153,7 +153,6 @@ export function setupGUI() {
             sample_count: p.sample_count,
             max_revolutions: p.max_revolutions,
             rk4_integration: p.rk4_integration,
-            cinematic_tonemap: p.cinematic_tonemap,
             resolution_scale: p.resolution_scale,
             taa_enabled: p.taa_enabled,
             taa: deepClonePlain(p.taa),
@@ -166,7 +165,6 @@ export function setupGUI() {
         p.sample_count = state.sample_count;
         p.max_revolutions = state.max_revolutions;
         p.rk4_integration = state.rk4_integration;
-        p.cinematic_tonemap = state.cinematic_tonemap;
         p.resolution_scale = state.resolution_scale;
         p.taa_enabled = state.taa_enabled;
         p.taa.history_weight = state.taa.history_weight;
@@ -193,7 +191,9 @@ export function setupGUI() {
             look: {
                 disk_gain: p.look.disk_gain,
                 glow: p.look.glow,
-                tonemap_mode: p.look.tonemap_mode,
+                tone_mapper: p.look.tone_mapper,
+                white_balance_enabled: p.look.white_balance_enabled,
+                white_balance_k: p.look.white_balance_k,
             },
             bloom: deepClonePlain(p.bloom),
         };
@@ -243,10 +243,11 @@ export function setupGUI() {
         p.doppler_shift = state.doppler_shift;
         p.look.disk_gain = state.look.disk_gain;
         p.look.glow = state.look.glow;
-        p.look.tonemap_mode = state.look.tonemap_mode;
+        p.look.tone_mapper = state.look.tone_mapper;
+        p.look.white_balance_enabled = state.look.white_balance_enabled;
+        p.look.white_balance_k = state.look.white_balance_k;
         p.bloom.enabled = state.bloom.enabled;
         p.bloom.strength = state.bloom.strength;
-        p.bloom.threshold = state.bloom.threshold;
         p.bloom.radius = state.bloom.radius;
     }
 
@@ -462,7 +463,6 @@ export function setupGUI() {
     var lookDopplerBoostCtrl = accretionLookFolders.lookDopplerBoostCtrl;
     var lookAberrationStrengthCtrl = accretionLookFolders.lookAberrationStrengthCtrl;
     var bloomStrengthCtrl = accretionLookFolders.bloomStrengthCtrl;
-    var bloomThresholdCtrl = accretionLookFolders.bloomThresholdCtrl;
     var bloomRadiusCtrl = accretionLookFolders.bloomRadiusCtrl;
 
     applyBlackHolePreset = function (name) {
@@ -524,12 +524,13 @@ export function setupGUI() {
         p.doppler_shift = preset.doppler_shift;
         p.look.disk_gain = preset.disk_gain;
         p.look.glow = preset.glow;
-        p.look.tonemap_mode = preset.tonemap_mode;
+        p.look.tone_mapper = preset.tone_mapper;
+        p.look.white_balance_enabled = preset.white_balance_k !== undefined;
+        if (preset.white_balance_k !== undefined) p.look.white_balance_k = preset.white_balance_k;
 
         if (preset.bloom) {
             p.bloom.enabled = preset.bloom.enabled;
             p.bloom.strength = preset.bloom.strength;
-            p.bloom.threshold = preset.bloom.threshold;
             p.bloom.radius = preset.bloom.radius;
         }
 
@@ -585,7 +586,7 @@ export function setupGUI() {
         setControlVisible(spinStrengthCtrl, spinEnabled && p.kerr_mode !== 'full_kerr');
 
         var bloomEnabled = !!p.bloom.enabled;
-        setControlsVisible([bloomStrengthCtrl, bloomThresholdCtrl, bloomRadiusCtrl], bloomEnabled);
+        setControlsVisible([bloomStrengthCtrl, bloomRadiusCtrl], bloomEnabled);
 
         var beamingEnabled = !!p.beaming;
         var physicalBeamingEnabled = beamingEnabled && !!p.physical_beaming;

@@ -25,7 +25,6 @@ export function Shader(mustacheTemplate) {
         },
         max_revolutions: 2.0,
         rk4_integration: false,
-        cinematic_tonemap: true,
         quality: 'high',
         kerr_mode: 'kerr_inspired_disk_velocity',
         kerr_rtol: 1e-4,
@@ -83,7 +82,9 @@ export function Shader(mustacheTemplate) {
             spin_strength: 1.0,
         },
         look: {
-            tonemap_mode: 1,
+            tone_mapper: 'agx',
+            white_balance_enabled: false,
+            white_balance_k: 6500,
             exposure_mode: 'anchored',
             exposure_ev: 0.0,
             ev100: 30.0,
@@ -96,9 +97,8 @@ export function Shader(mustacheTemplate) {
         },
         bloom: {
             enabled: true,
-            strength: 0.35,
-            threshold: 0.65,
-            radius: 0.85,
+            strength: 0.04,
+            radius: 0.7,
         },
         planet: {
             enabled: true,

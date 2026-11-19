@@ -1,7 +1,8 @@
-// Role: GLSL entry point. Drives the multi-sample anti-aliasing loop — for
-//       each sample it computes a jittered ray, calls trace_ray(), accumulates
-//       the result, then passes the averaged colour to finalize_color().
-//       Also initialises the mutable planet orbital constants from uniforms
+// Role: GLSL entry point. Drives the multi-sample anti-aliasing loop: for each
+//       sample it computes a jittered ray, calls trace_ray() and accumulates the
+//       result, then writes the mean pre-exposed linear Rec.709 radiance to the
+//       RGBA16F scene target that the TAA, bloom and output passes read. Also
+//       initialises the mutable planet orbital constants from uniforms
 //       (PLANET_RADIUS, PLANET_DISTANCE, etc.) before any ray is traced.
 
 // Halton-like low-discrepancy jitter pattern for MSAA sub-pixel sampling.
@@ -13,6 +14,14 @@ vec2 sample_offset(int i, vec2 pixel) {
     float radius = 0.5 * sqrt((fi + 0.5) / sample_count_f);
     float base_angle = 2.0*M_PI*fract(fi*0.61803398875 + hash12(pixel*0.5));
     return radius * vec2(cos(base_angle), sin(base_angle));
+}
+
+// Largest value written to the half-float target (max 65504), which also drops NaN and
+// negative values so they cannot spread through the TAA history or the bloom chain.
+const float HDR_MAX = 6.0e4;
+
+vec3 finite_radiance(vec3 c) {
+    return mix(vec3(0.0), min(c, vec3(HDR_MAX)), greaterThanEqual(c, vec3(0.0)));
 }
 
 out vec4 fragColor;
@@ -44,5 +53,5 @@ void main() {
     }
 
     vec4 color = accumulated / float(SAMPLE_COUNT);
-    fragColor = finalize_color(color);
+    fragColor = vec4(finite_radiance(color.rgb), 1.0);
 }

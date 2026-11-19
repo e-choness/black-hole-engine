@@ -17,6 +17,8 @@ export let distanceController = null;
 export let refreshAllControllersGlobal = null;
 export let bloomPass = null;
 export let taaPass = null;
+export let outputPass = null;
+export let hdrTarget = null;
 export let shaderUniforms = null;
 export const baseDevicePixelRatio = Math.max(window.devicePixelRatio || 1.0, 1.0);
 export let isMobileClient = false;
@@ -60,6 +62,12 @@ export function setBloomPass(value) {
 }
 export function setTaaPass(value) {
     taaPass = value;
+}
+export function setOutputPass(value) {
+    outputPass = value;
+}
+export function setHdrTarget(value) {
+    hdrTarget = value;
 }
 export function setShaderUniforms(value) {
     shaderUniforms = value;

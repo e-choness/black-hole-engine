@@ -13,7 +13,6 @@ export var QUALITY_PRESETS = {
             rk4_integration: false,
             kerr_rtol: 1e-3,
         },
-        cinematic_tonemap: true,
         resolution_scale: 0.55,
         taa_enabled: true,
         taa: {
@@ -35,7 +34,6 @@ export var QUALITY_PRESETS = {
             rk4_integration: true,
             kerr_rtol: 1e-4,
         },
-        cinematic_tonemap: true,
         resolution_scale: 1.0,
         taa_enabled: false,
         taa: {
@@ -58,7 +56,6 @@ export var QUALITY_PRESETS = {
             kerr_rtol: 1e-4,
         },
         prefer_full_kerr: true,
-        cinematic_tonemap: true,
         resolution_scale: 1.0,
         taa_enabled: false,
         taa: {
@@ -80,7 +77,6 @@ export var QUALITY_PRESETS = {
             rk4_integration: true,
             kerr_rtol: 3e-4,
         },
-        cinematic_tonemap: true,
         resolution_scale: 0.8,
         taa_enabled: true,
         taa: {
@@ -103,7 +99,6 @@ export var QUALITY_PRESETS = {
             kerr_rtol: 1e-5,
         },
         prefer_full_kerr: true,
-        cinematic_tonemap: true,
         resolution_scale: 1.0,
         taa_enabled: false,
         taa: {
@@ -126,7 +121,6 @@ export var QUALITY_PRESETS = {
             kerr_rtol: 1e-5,
         },
         prefer_full_kerr: true,
-        cinematic_tonemap: true,
         resolution_scale: 1.0,
         taa_enabled: false,
         taa: {
@@ -176,7 +170,6 @@ export function applyQualityPresetValues(parameters, presetName, options) {
     parameters.max_revolutions = modeValues.max_revolutions;
     parameters.rk4_integration = modeValues.rk4_integration;
     if (modeValues.kerr_rtol !== undefined) parameters.kerr_rtol = modeValues.kerr_rtol;
-    parameters.cinematic_tonemap = preset.cinematic_tonemap;
     parameters.resolution_scale = preset.resolution_scale;
     parameters.taa_enabled = preset.taa_enabled;
     parameters.taa.history_weight = preset.taa.history_weight;

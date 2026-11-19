@@ -8,6 +8,8 @@ import {
     observer,
     bloomPass,
     taaPass,
+    outputPass,
+    hdrTarget,
     shaderUniforms,
     lastTaaCameraMat,
     rendererContextLost,
@@ -25,7 +27,8 @@ import { updateHover, advanceTimelineDrivenHoverObserverTime } from '../scenario
 import { updateCamera, frobeniusDistance } from '../../scene/camera-runtime.js';
 import { advanceQualityBenchmark } from './renderer-quality.js';
 import { updateAnimationTimelineCaptureFrame } from '../scenarios/animation-capture.js';
-import { resizeRendererAndPasses, updateAxesGizmo } from './renderer.js';
+import { resizePasses, resizeRendererAndPasses, updateAxesGizmo } from './renderer.js';
+import { whiteBalance } from '../physics/emission.js';
 import { registerBlackHoleRuntimeApi } from '../runtime/runtime-registry.js';
 import { isE2eMode, notifyFrameRendered } from '../runtime/test-hooks.js';
 
@@ -159,15 +162,6 @@ export function animate() {
     drawRendererFrame(false);
 }
 
-function renderSceneToTarget(target) {
-    if (shader.parameters.bloom.enabled && bloomPass) {
-        bloomPass.render(renderer, scene, camera, shader.parameters.bloom, target);
-    } else {
-        renderer.setRenderTarget(target);
-        renderer.render(scene, camera);
-    }
-}
-
 function render() {
     var taaEnabled = !!shader.parameters.taa_enabled && !!taaPass;
     if (shaderUniforms && shaderUniforms.taa_jitter) {
@@ -181,20 +175,37 @@ function render() {
 
     updateUniforms();
 
+    // Trace into the HDR target, resolve it temporally, then glare and tone map it.
+    renderer.setRenderTarget(hdrTarget);
+    renderer.render(scene, camera);
+    var resolved = hdrTarget.texture;
     if (taaEnabled) {
-        renderSceneToTarget(taaPass.currentRT);
-        taaPass.render(
+        resolved = taaPass.render(
             renderer,
-            taaPass.currentRT,
+            hdrTarget,
             frobeniusDistance(camera.matrixWorldInverse, lastTaaCameraMat),
             shader.parameters.taa,
         );
-        lastTaaCameraMat.copy(camera.matrixWorldInverse);
-    } else {
-        renderSceneToTarget(null);
-        if (taaPass && taaPass.historyValid) taaPass.reset();
-        lastTaaCameraMat.copy(camera.matrixWorldInverse);
+    } else if (taaPass && taaPass.historyValid) {
+        taaPass.reset();
     }
+    lastTaaCameraMat.copy(camera.matrixWorldInverse);
+
+    var bloomSettings = shader.parameters.bloom;
+    var bloom = null;
+    if (bloomSettings.enabled && bloomSettings.strength > 0 && bloomPass) {
+        var level = bloomPass.render(renderer, resolved, bloomSettings.radius);
+        bloom = {
+            texture: level.texture,
+            width: level.width,
+            height: level.height,
+            strength: bloomSettings.strength,
+        };
+    }
+    outputPass.render(renderer, resolved, bloom, {
+        toneMapper: shader.parameters.look.tone_mapper,
+        whiteBalance: whiteBalance(shader.parameters.look),
+    });
     updateAxesGizmo();
     notifyFrameRendered();
 }
@@ -213,10 +224,7 @@ export var blackHoleRendererRuntime = {
         renderer.setPixelRatio(1);
         renderer.setSize(w, h, false);
         renderer.domElement.style.objectFit = 'contain';
-        var rw = renderer.domElement.width;
-        var rh = renderer.domElement.height;
-        if (bloomPass) bloomPass.resize(rw, rh);
-        if (taaPass) taaPass.resize(rw, rh);
+        resizePasses(renderer.domElement.width, renderer.domElement.height);
         if (camera) {
             camera.aspect = w / h;
             camera.updateProjectionMatrix();

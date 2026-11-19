@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import { FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 import {
-    COPY_FRAGMENT_SHADER,
     createPassMaterial,
     createRenderTarget,
     renderPass,
@@ -56,13 +55,9 @@ export function setupTemporalAA(renderer) {
         BLEND_FRAGMENT_SHADER,
     );
 
-    var copyMat = createPassMaterial({ tDiffuse: { value: null } }, COPY_FRAGMENT_SHADER);
-
     var pass = {
         quad: new FullScreenQuad(),
         blendMat: blendMat,
-        copyMat: copyMat,
-        currentRT: createTarget(1, 1),
         historyRT: createTarget(1, 1),
         outputRT: createTarget(1, 1),
         historyValid: false,
@@ -75,10 +70,8 @@ export function setupTemporalAA(renderer) {
         },
 
         resize: function (w, h) {
-            this.currentRT.dispose();
             this.historyRT.dispose();
             this.outputRT.dispose();
-            this.currentRT = createTarget(w, h);
             this.historyRT = createTarget(w, h);
             this.outputRT = createTarget(w, h);
             this.reset();
@@ -138,13 +131,11 @@ export function setupTemporalAA(renderer) {
             this.blendMat.uniforms.clipBox.value = clip;
             renderPass(rdr, this.quad, this.blendMat, this.outputRT);
 
-            this.copyMat.uniforms.tDiffuse.value = this.outputRT.texture;
-            renderPass(rdr, this.quad, this.copyMat, null);
-
             var tmp = this.historyRT;
             this.historyRT = this.outputRT;
             this.outputRT = tmp;
             this.historyValid = true;
+            return this.historyRT.texture;
         },
     };
 

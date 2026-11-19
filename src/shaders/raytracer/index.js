@@ -15,7 +15,6 @@ const SHARD_ORDER = [
     'physics/jet/simple.glsl',
     'physics/jet/physical-core.glsl',
     'physics/jet/physical-grmhd.glsl',
-    'output/tonemapping.glsl',
     'physics/planet.glsl',
     'output/trace/setup.glsl',
     'output/trace/accretion-thin.glsl',

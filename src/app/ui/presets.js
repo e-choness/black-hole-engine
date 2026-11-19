@@ -51,8 +51,8 @@ export var BH_PRESETS = {
         doppler_shift: true,
         disk_gain: 1.0,
         glow: 0.0,
-        tonemap_mode: 1,
-        bloom: { enabled: true, strength: 0.35, threshold: 0.65, radius: 0.85 },
+        tone_mapper: 'agx',
+        bloom: { enabled: true, strength: 0.04, radius: 0.7 },
     },
     'M87*': {
         // Illustrative M87*-inspired preset:
@@ -105,8 +105,8 @@ export var BH_PRESETS = {
         doppler_shift: true,
         disk_gain: 1.0,
         glow: 0.0,
-        tonemap_mode: 1,
-        bloom: { enabled: true, strength: 0.4, threshold: 0.55, radius: 0.9 },
+        tone_mapper: 'agx',
+        bloom: { enabled: true, strength: 0.05, radius: 0.75 },
     },
     'Sgr A*': {
         // Illustrative Sgr A*-inspired preset:
@@ -160,8 +160,8 @@ export var BH_PRESETS = {
         doppler_shift: true,
         disk_gain: 1.0,
         glow: 0.0,
-        tonemap_mode: 1,
-        bloom: { enabled: true, strength: 0.35, threshold: 0.6, radius: 0.85 },
+        tone_mapper: 'agx',
+        bloom: { enabled: true, strength: 0.04, radius: 0.7 },
     },
     'Cygnus X-1': {
         // Near-extremal thin-disk X-ray-binary preset inspired by continuum-fitting
@@ -214,8 +214,8 @@ export var BH_PRESETS = {
         doppler_shift: true,
         disk_gain: 1.0,
         glow: 0.0,
-        tonemap_mode: 1,
-        bloom: { enabled: true, strength: 0.3, threshold: 0.6, radius: 0.8 },
+        tone_mapper: 'agx',
+        bloom: { enabled: true, strength: 0.035, radius: 0.65 },
     },
     'GRS 1915+105': {
         // Near-extremal slim-disk microquasar preset inspired by continuum-fitting
@@ -267,8 +267,8 @@ export var BH_PRESETS = {
         doppler_shift: true,
         disk_gain: 1.0,
         glow: 0.0,
-        tonemap_mode: 1,
-        bloom: { enabled: true, strength: 0.35, threshold: 0.55, radius: 0.85 },
+        tone_mapper: 'agx',
+        bloom: { enabled: true, strength: 0.04, radius: 0.7 },
     },
     'Gargantua (Interstellar visuals)': {
         spin_enabled: true,
@@ -316,8 +316,8 @@ export var BH_PRESETS = {
         doppler_shift: false,
         disk_gain: 2.0,
         glow: 1.0,
-        tonemap_mode: 0,
-        bloom: { enabled: true, strength: 0.65, threshold: 0.45, radius: 0.92 },
+        tone_mapper: 'aces',
+        bloom: { enabled: true, strength: 0.06, radius: 0.8 },
     },
     Schwarzschild: {
         // Idealised non-rotating black hole (a/M = 0).
@@ -368,7 +368,7 @@ export var BH_PRESETS = {
         doppler_shift: true,
         disk_gain: 1.0,
         glow: 0.0,
-        tonemap_mode: 1,
-        bloom: { enabled: true, strength: 0.3, threshold: 0.65, radius: 0.8 },
+        tone_mapper: 'agx',
+        bloom: { enabled: true, strength: 0.035, radius: 0.65 },
     },
 };

@@ -1,4 +1,4 @@
-// Shared pieces of the full-screen post-processing passes (bloom, temporal AA).
+// Shared pieces of the full-screen post-processing passes (temporal AA, bloom).
 
 import * as THREE from 'three';
 
@@ -8,16 +8,6 @@ out vec2 vUv;
 void main() {
     vUv = uv;
     gl_Position = vec4(position, 1.0);
-}
-`;
-
-export const COPY_FRAGMENT_SHADER = /* glsl */ `
-uniform sampler2D tDiffuse;
-in vec2 vUv;
-out vec4 fragColor;
-
-void main() {
-    fragColor = texture(tDiffuse, vUv);
 }
 `;
 
@@ -32,9 +22,10 @@ export function createPassMaterial(uniforms, fragmentShader) {
     });
 }
 
-// Intermediate targets are half float whenever the GPU can render to them, which keeps the
-// bloom blur chain and the TAA history free of 8-bit quantisation. WebGLRenderer requests both
-// colour-buffer extensions at start-up, so has() reports what the context supports.
+// HDR targets are RGBA16F whenever the GPU can render to them (EXT_color_buffer_float, or the
+// half-float variant on some mobile GPUs); linear filtering of RGBA16F is core in WebGL2.
+// WebGLRenderer requests both colour-buffer extensions at start-up, so has() reports what the
+// context supports. Without them the targets fall back to RGBA8 and clip at 1.
 export function createRenderTarget(renderer, width, height) {
     const halfFloat =
         renderer.extensions.has('EXT_color_buffer_float') ||

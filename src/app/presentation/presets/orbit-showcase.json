@@ -102,25 +102,17 @@
     {
       "path": "bloom.strength",
       "keys": [
-        { "t": 0, "v": 0.3 },
-        { "t": 26, "v": 0.45, "ease": "smooth" },
-        { "t": 42, "v": 0.35, "ease": "smooth" }
-      ]
-    },
-    {
-      "path": "bloom.threshold",
-      "keys": [
-        { "t": 0, "v": 0.66 },
-        { "t": 26, "v": 0.58, "ease": "smooth" },
-        { "t": 42, "v": 0.62, "ease": "smooth" }
+        { "t": 0, "v": 0.034 },
+        { "t": 26, "v": 0.051, "ease": "smooth" },
+        { "t": 42, "v": 0.04, "ease": "smooth" }
       ]
     },
     {
       "path": "bloom.radius",
       "keys": [
-        { "t": 0, "v": 0.82 },
-        { "t": 26, "v": 0.94, "ease": "smooth" },
-        { "t": 42, "v": 0.88, "ease": "smooth" }
+        { "t": 0, "v": 0.67 },
+        { "t": 26, "v": 0.79, "ease": "smooth" },
+        { "t": 42, "v": 0.73, "ease": "smooth" }
       ]
     },
     {
@@ -147,8 +139,7 @@
     { "t": 0, "action": "set", "path": "physical_beaming", "value": true },
     { "t": 0, "action": "set", "path": "aberration", "value": true },
     { "t": 0, "action": "set", "path": "doppler_shift", "value": true },
-    { "t": 0, "action": "set", "path": "cinematic_tonemap", "value": true },
-    { "t": 0, "action": "set", "path": "look.tonemap_mode", "value": 1 },
+    { "t": 0, "action": "set", "path": "look.tone_mapper", "value": "agx" },
     { "t": 0, "action": "set", "path": "cameraPan.x", "value": 0.0 },
     { "t": 0, "action": "set", "path": "cameraPan.y", "value": 0.02 },
     { "t": 0.02, "action": "updateShader" },
@@ -189,7 +180,7 @@
         "width": 330
       }
     },
-    { "t": 32, "action": "set", "path": "look.tonemap_mode", "value": 0 },
+    { "t": 32, "action": "set", "path": "look.tone_mapper", "value": "aces" },
     {
       "t": 32.2,
       "action": "annotation",
@@ -202,7 +193,7 @@
         "width": 320
       }
     },
-    { "t": 36, "action": "set", "path": "look.tonemap_mode", "value": 1 },
+    { "t": 36, "action": "set", "path": "look.tone_mapper", "value": "agx" },
     {
       "t": 36.2,
       "action": "annotation",

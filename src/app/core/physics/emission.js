@@ -3,7 +3,7 @@
 // the display range. Units: temperatures in K, luminance in cd/m^2, exposure as log2 factors.
 
 import lut from './emission-lut.json';
-import { STEFAN_BOLTZMANN, sampleBlackbodyLut } from './colorimetry.js';
+import { STEFAN_BOLTZMANN, sampleBlackbodyLut, whiteBalanceMatrix } from './colorimetry.js';
 import {
     circularAngularMomentum,
     circularEnergy,
@@ -29,6 +29,10 @@ export const LIMB_DARKENING_LAWS = {
 // Display-referred luminance the reference emitter maps to at 0 EV in the anchored mode.
 export const ANCHOR_LUMINANCE = 0.5;
 
+// Range of the camera white balance in K.
+export const WHITE_BALANCE_MIN = 1500;
+export const WHITE_BALANCE_MAX = 40000;
+
 const LOG2_10 = Math.log2(10);
 
 // Single-entry cache for the per-frame uniform updates, which rarely change their inputs.
@@ -46,6 +50,7 @@ function memoizeLast(fn) {
 }
 
 const cachedPeakTemperature = memoizeLast(peakEffectiveTemperature);
+const cachedWhiteBalance = memoizeLast(whiteBalanceMatrix);
 
 export function diskSpin(params) {
     const bh = params.black_hole;
@@ -105,4 +110,11 @@ export function referenceLog2Luminance(temperature, colorCorrection, model) {
 export function exposureLog2(look, log2Reference) {
     if (look.exposure_mode === 'manual') return -Math.log2(1.2) - look.ev100;
     return Math.log2(ANCHOR_LUMINANCE) + look.exposure_ev - log2Reference;
+}
+
+// Linear-sRGB white-balance matrix of the camera (row-major), or null when it is off.
+export function whiteBalance(look) {
+    if (!look.white_balance_enabled) return null;
+    const t = Math.min(Math.max(look.white_balance_k, WHITE_BALANCE_MIN), WHITE_BALANCE_MAX);
+    return cachedWhiteBalance(t);
 }

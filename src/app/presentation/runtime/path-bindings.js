@@ -79,7 +79,6 @@ export function presentationPathNeedsCompile(path) {
         case 'light_travel_time':
         case 'gravitational_time_dilation':
         case 'lorentz_contraction':
-        case 'cinematic_tonemap':
         case 'observer.motion':
         case 'quality':
         case 'taa_enabled':

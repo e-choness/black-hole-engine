@@ -215,7 +215,6 @@ function normalizePresentationTimeline(timeline) {
         sample_count: true,
         max_revolutions: true,
         rk4_integration: true,
-        cinematic_tonemap: true,
         resolution_scale: true,
         taa_enabled: true,
         'taa.history_weight': true,

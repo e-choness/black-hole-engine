@@ -6,11 +6,14 @@ import {
     blackbodyXYZ,
     buildEmissionLut,
     chromaticity,
+    invertMatrix,
     luminance,
     planckRadiance,
     powerLawSrgb,
     sampleBlackbodyLut,
     spectrumXYZ,
+    whiteBalanceMatrix,
+    xyzToLinearSrgb,
 } from '../../src/app/core/physics/colorimetry.js';
 import committedLut from '../../src/app/core/physics/emission-lut.json';
 
@@ -98,5 +101,39 @@ describe('emission LUT', () => {
         const steep = powerLawSrgb(2);
         expect(luminance(flat)).toBeCloseTo(1, 6);
         expect(steep[0] / steep[2]).toBeGreaterThan(flat[0] / flat[2]);
+    });
+});
+
+describe('camera white balance', () => {
+    const apply = (m, v) => m.map((row) => row[0] * v[0] + row[1] * v[1] + row[2] * v[2]);
+
+    it('renders the chosen blackbody neutral (Bradford adaptation to D65)', () => {
+        for (const t of [2000, 4500, 6500, 12000]) {
+            const rgb = apply(whiteBalanceMatrix(t), xyzToLinearSrgb(blackbodyXYZ(t, 1)));
+            expect(rgb[0] / rgb[1], `R/G at ${t} K`).toBeCloseTo(1, 9);
+            expect(rgb[2] / rgb[1], `B/G at ${t} K`).toBeCloseTo(1, 9);
+        }
+    });
+
+    it('stays within the locus offset of identity at the 6504 K CCT of D65', () => {
+        // D65 lies Duv = +0.0032 off the Planckian locus, which moves entries by up to 3.1%.
+        whiteBalanceMatrix(6504).forEach((row, i) =>
+            row.forEach((v, j) => expect(Math.abs(v - (i === j ? 1 : 0))).toBeLessThan(0.035)),
+        );
+    });
+
+    it('inverts 3x3 matrices', () => {
+        const m = [
+            [2, -1, 0.5],
+            [0.3, 4, -2],
+            [1, 0, 3],
+        ];
+        const inv = invertMatrix(m);
+        m.forEach((row, i) =>
+            [0, 1, 2].forEach((j) => {
+                const v = row[0] * inv[0][j] + row[1] * inv[1][j] + row[2] * inv[2][j];
+                expect(v).toBeCloseTo(i === j ? 1 : 0, 12);
+            }),
+        );
     });
 });

@@ -448,13 +448,38 @@ export function setupAccretionLookFolders(options) {
     spinFolder.open();
 
     var lookFolder = gui.addFolder('Look');
-    addControl(lookFolder, p.look, 'tonemap_mode', {
-        options: { 'ACES Filmic': 0, AgX: 1, 'Scientific (Log)': 2 },
-        name: 'tonemapper',
+    addControl(lookFolder, p.look, 'tone_mapper', {
+        options: {
+            AgX: 'agx',
+            'Khronos PBR Neutral': 'neutral',
+            'ACES filmic': 'aces',
+            'Scientific (log, Inferno)': 'scientific',
+        },
+        name: 'tone mapper',
         trackBlackHolePreset: true,
-        onChange: updateUniformsLive,
-        help: 'ACES: classic cinematic. AgX: better saturation handling for extreme HDR. Scientific: logarithmic false-color like EHT papers.',
+        onChange: markShaderDirty,
+        help: 'AgX: rolls saturated blackbody colours towards white without hue skew. Neutral: keeps hue and saturation below the highlight shoulder. ACES: filmic contrast with some hue shift in bright saturated colours. Scientific: false colour of log2 luminance over 12 stops through the Inferno map, which is perceptually uniform and stays readable with colour-vision deficiency.',
     });
+    var whiteBalanceKCtrl;
+    addControl(lookFolder, p.look, 'white_balance_enabled', {
+        name: 'white balance',
+        trackBlackHolePreset: true,
+        onChange: function () {
+            setControlVisible(whiteBalanceKCtrl, p.look.white_balance_enabled);
+            markShaderDirty();
+        },
+        help: 'Bradford chromatic adaptation that renders a blackbody at the chosen temperature as neutral white. Off: the camera is balanced for D65.',
+    });
+    whiteBalanceKCtrl = addControl(lookFolder, p.look, 'white_balance_k', {
+        min: 1500,
+        max: 20000,
+        step: 50,
+        name: 'white point (K)',
+        trackBlackHolePreset: true,
+        onChange: markShaderDirty,
+        help: 'Blackbody temperature that appears white.',
+    });
+    setControlVisible(whiteBalanceKCtrl, p.look.white_balance_enabled);
     var exposureEvCtrl;
     var ev100Ctrl;
     function syncExposureRows() {
@@ -547,34 +572,25 @@ export function setupAccretionLookFolders(options) {
             syncDependentVisibility();
             markShaderDirty();
         },
-        help: 'Screen-space Gaussian bloom approximating lens glow and optical spill.',
+        help: 'Energy-conserving glare of the camera optics, applied to the HDR frame before tone mapping: (1 - k) image + k blurred image, with no threshold.',
     });
     var bloomStrengthCtrl = addControl(ppFolder, p.bloom, 'strength', {
         min: 0.0,
-        max: 2.0,
-        step: 0.01,
+        max: 0.25,
+        step: 0.005,
         name: 'bloom strength',
         trackBlackHolePreset: true,
         onChange: markShaderDirty,
-        help: 'Overall intensity of the bloom glow added to the image.',
-    });
-    var bloomThresholdCtrl = addControl(ppFolder, p.bloom, 'threshold', {
-        min: 0.0,
-        max: 1.0,
-        step: 0.01,
-        name: 'bloom threshold',
-        trackBlackHolePreset: true,
-        onChange: markShaderDirty,
-        help: 'Minimum pixel brightness that contributes to bloom.',
+        help: 'Fraction k of all light spread into the glare (typical lenses 0.02 to 0.05).',
     });
     var bloomRadiusCtrl = addControl(ppFolder, p.bloom, 'radius', {
         min: 0.0,
-        max: 1.0,
+        max: 0.95,
         step: 0.01,
         name: 'bloom radius',
         trackBlackHolePreset: true,
         onChange: markShaderDirty,
-        help: 'Controls the width of the bloom halo.',
+        help: 'Share of the glare passed on to each twice-as-wide blur level; higher values give wider halos.',
     });
     ppFolder.open();
 
@@ -594,7 +610,6 @@ export function setupAccretionLookFolders(options) {
         lookDopplerBoostCtrl: lookDopplerBoostCtrl,
         lookAberrationStrengthCtrl: lookAberrationStrengthCtrl,
         bloomStrengthCtrl: bloomStrengthCtrl,
-        bloomThresholdCtrl: bloomThresholdCtrl,
         bloomRadiusCtrl: bloomRadiusCtrl,
     };
 }

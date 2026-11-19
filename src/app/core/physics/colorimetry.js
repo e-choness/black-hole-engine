@@ -109,6 +109,47 @@ export function luminance(rgb) {
     return SRGB_LUMINANCE[0] * rgb[0] + SRGB_LUMINANCE[1] * rgb[1] + SRGB_LUMINANCE[2] * rgb[2];
 }
 
+// Bradford cone-response matrix (Lam 1985), as tabulated by Lindbloom.
+const BRADFORD = [
+    [0.8951, 0.2664, -0.1614],
+    [-0.7502, 1.7135, 0.0367],
+    [0.0389, -0.0685, 1.0296],
+];
+
+function applyMatrix(m, v) {
+    return m.map((row) => row[0] * v[0] + row[1] * v[1] + row[2] * v[2]);
+}
+
+function multiplyMatrices(a, b) {
+    return a.map((row) =>
+        [0, 1, 2].map((j) => row[0] * b[0][j] + row[1] * b[1][j] + row[2] * b[2][j]),
+    );
+}
+
+export function invertMatrix(m) {
+    const [[a, b, c], [d, e, f], [g, h, i]] = m;
+    const adjugate = [
+        [e * i - f * h, c * h - b * i, b * f - c * e],
+        [f * g - d * i, a * i - c * g, c * d - a * f],
+        [d * h - e * g, b * g - a * h, a * e - b * d],
+    ];
+    const det = a * adjugate[0][0] + b * adjugate[1][0] + c * adjugate[2][0];
+    return adjugate.map((row) => row.map((v) => v / det));
+}
+
+// White balance as a row-major linear-sRGB matrix: Bradford adaptation (Lindbloom) from the white
+// of a blackbody at `temperature` to the D65 white of sRGB, so that blackbody renders neutral.
+// M = RGB<-XYZ . B^-1 diag(B w_D65 / B w_bb) B . XYZ<-RGB.
+export function whiteBalanceMatrix(temperature) {
+    const toXyz = invertMatrix(XYZ_TO_LINEAR_SRGB);
+    const [x, y] = chromaticity(blackbodyXYZ(temperature, 1));
+    const coneD65 = applyMatrix(BRADFORD, applyMatrix(toXyz, [1, 1, 1]));
+    const coneSource = applyMatrix(BRADFORD, [x / y, 1, (1 - x - y) / y]);
+    const scaled = BRADFORD.map((row, k) => row.map((v) => (v * coneD65[k]) / coneSource[k]));
+    const adapt = multiplyMatrices(invertMatrix(BRADFORD), scaled);
+    return multiplyMatrices(XYZ_TO_LINEAR_SRGB, multiplyMatrices(adapt, toXyz));
+}
+
 export function lutTemperature(index) {
     return LUT_T_MIN * (LUT_T_MAX / LUT_T_MIN) ** (index / (LUT_SIZE - 1));
 }

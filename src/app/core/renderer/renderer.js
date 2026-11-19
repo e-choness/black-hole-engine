@@ -6,6 +6,8 @@ import { formatThousands, clampObserverDistance, clampPlanetOrbitDistance } from
 import { initializeCamera, updateCamera } from '../../scene/camera-runtime.js';
 import { ObserverControls } from '../../scene/observer-controls.js';
 import { setupBloom } from '../../graphics/bloom.js';
+import { setupOutputPass } from '../../graphics/output-pass.js';
+import { createRenderTarget } from '../../graphics/post-processing.js';
 import { setupTemporalAA } from './temporal-aa.js';
 import { setupGUI } from '../../ui/gui.js';
 import { applyQualityPresetValues } from '../../ui/quality-presets.js';
@@ -42,6 +44,7 @@ import {
     cameraPan,
     bloomPass,
     taaPass,
+    hdrTarget,
     shaderUniforms,
     baseDevicePixelRatio,
     lastTaaCameraMat,
@@ -55,6 +58,8 @@ import {
     setShader,
     setBloomPass,
     setTaaPass,
+    setOutputPass,
+    setHdrTarget,
     setShaderUniforms,
     setIsMobileClient,
     setRendererContextLost,
@@ -112,9 +117,12 @@ export function resizeRendererAndPasses() {
     renderer.setPixelRatio(baseDevicePixelRatio * scale);
     renderer.setSize(window.innerWidth, window.innerHeight);
 
-    var w = renderer.domElement.width;
-    var h = renderer.domElement.height;
+    resizePasses(renderer.domElement.width, renderer.domElement.height);
+}
 
+// The scene target, the TAA history and the bloom chain all run at the drawing-buffer size.
+export function resizePasses(w, h) {
+    if (hdrTarget) hdrTarget.setSize(w, h);
     if (bloomPass) bloomPass.resize(w, h);
     if (taaPass) taaPass.resize(w, h);
 }
@@ -204,7 +212,6 @@ export function init(glslSource, textures) {
         look_aberration_strength: { value: 1.0 },
         look_star_gain: { value: 1.0 },
         look_galaxy_gain: { value: 1.0 },
-        look_tonemap_mode: { value: 0.0 },
         torus_r0: { value: 4.0 },
         torus_h_ratio: { value: 0.45 },
         torus_radial_falloff: { value: 2.5 },
@@ -296,7 +303,6 @@ export function init(glslSource, textures) {
         uniforms.look_aberration_strength.value = shader.parameters.look.aberration_strength;
         uniforms.look_star_gain.value = shader.parameters.look.star_gain;
         uniforms.look_galaxy_gain.value = shader.parameters.look.galaxy_gain;
-        uniforms.look_tonemap_mode.value = parseFloat(shader.parameters.look.tonemap_mode);
 
         uniforms.torus_r0.value = shader.parameters.torus.r0;
         uniforms.torus_h_ratio.value = shader.parameters.torus.h_ratio;
@@ -433,8 +439,9 @@ export function init(glslSource, textures) {
     fullscreenQuad.frustumCulled = false;
     scene.add(fullscreenQuad);
 
+    // Every pass draws a full-screen quad, so a multisampled canvas would only cost memory.
     var nextRenderer = new THREE.WebGLRenderer({
-        antialias: true,
+        antialias: false,
         powerPreference: 'high-performance',
     });
     nextRenderer.domElement.id = 'bh-canvas';
@@ -462,8 +469,10 @@ export function init(glslSource, textures) {
         false,
     );
 
+    setHdrTarget(createRenderTarget(renderer, 1, 1));
     setBloomPass(setupBloom(renderer));
     setTaaPass(setupTemporalAA(renderer));
+    setOutputPass(setupOutputPass());
 
     var nextStats = new Stats();
     nextStats.dom.style.position = 'fixed';
