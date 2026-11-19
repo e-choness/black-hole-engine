@@ -12,6 +12,8 @@
     overflow-y: auto;
     border-radius: var(--radius-lg);
     background: var(--color-panel-solid);
+    border: 1px solid rgb(255 255 255 / 0.1);
+    box-shadow: 0 30px 80px rgb(0 0 0 / 0.6);
     transform: translate(-50%, -50%);
 }
 
@@ -151,6 +153,8 @@
     padding: 14px;
     border-radius: 14px;
     background: var(--color-panel-solid);
+    border: 1px solid rgb(255 255 255 / 0.1);
+    box-shadow: 0 16px 40px rgb(0 0 0 / 0.5);
 }
 
 body.has-timeline-panel .capture-progress {

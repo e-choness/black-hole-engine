@@ -38,7 +38,7 @@ function CaptureProgress() {
     }
 
     return (
-        <section className="capture-progress glass bh-ui" aria-label="Capture progress">
+        <section className="capture-progress bh-ui" aria-label="Capture progress">
             <p className="sr-only" role="status">
                 {title}
             </p>

@@ -323,7 +323,7 @@ function PaletteContent({ onClose }: { onClose: () => void }) {
     return (
         <Dialog.Content
             ref={content}
-            className="palette glass bh-ui"
+            className="palette bh-ui"
             aria-describedby={undefined}
             onEscapeKeyDown={(event) => {
                 if (adjusting) {

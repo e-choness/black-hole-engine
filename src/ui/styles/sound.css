@@ -1,6 +1,6 @@
 /* Sound controls: a popover beside the rail, or beside the action column on phones. */
 .sound-panel {
-    width: min(320px, calc(100vw - 24px));
+    width: min(320px, var(--radix-popover-content-available-width, calc(100vw - 24px)));
     max-height: min(620px, var(--radix-popover-content-available-height, 100dvh));
     padding: 12px 14px 14px;
     overflow-y: auto;

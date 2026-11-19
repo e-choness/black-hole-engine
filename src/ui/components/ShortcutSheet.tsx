@@ -18,7 +18,7 @@ export function ShortcutSheet() {
         <Dialog.Root open={open} onOpenChange={setOpen}>
             <Dialog.Portal container={portalContainer()}>
                 <Dialog.Overlay className="dialog-overlay" />
-                <Dialog.Content className="sheet glass bh-ui" aria-describedby={undefined}>
+                <Dialog.Content className="sheet bh-ui" aria-describedby={undefined}>
                     <div className="sheet-head">
                         <Dialog.Title className="sheet-title">Keyboard shortcuts</Dialog.Title>
                         <Dialog.Close className="icon-btn" aria-label="Close">
