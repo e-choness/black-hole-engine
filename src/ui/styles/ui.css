@@ -49,13 +49,15 @@
     box-sizing: border-box;
 }
 
-.bh-ui :where(button, input, select, textarea) {
+/* Element defaults have zero specificity so that component classes override them whatever the
+   order in which the stylesheets are imported. */
+:where(.bh-ui) :where(button, input, select, textarea) {
     font: inherit;
     color: inherit;
     letter-spacing: inherit;
 }
 
-.bh-ui :where(button) {
+:where(.bh-ui) :where(button) {
     margin: 0;
     padding: 0;
     border: 0;
@@ -63,20 +65,20 @@
     cursor: pointer;
 }
 
-.bh-ui :where(button:disabled) {
+:where(.bh-ui) :where(button:disabled) {
     cursor: default;
 }
 
-.bh-ui :where(h1, h2, h3, p, ul, ol, dl, dd, figure) {
+:where(.bh-ui) :where(h1, h2, h3, p, ul, ol, dl, dd, figure) {
     margin: 0;
     padding: 0;
 }
 
-.bh-ui :where(ul, ol) {
+:where(.bh-ui) :where(ul, ol) {
     list-style: none;
 }
 
-.bh-ui :where(a) {
+:where(.bh-ui) :where(a) {
     color: var(--color-doppler);
 }
 
