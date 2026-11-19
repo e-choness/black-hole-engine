@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { ToggleGroup } from 'radix-ui';
-import { ArrowDownToLine, ChartGantt, Crosshair, Orbit } from 'lucide-react';
+import { ArrowDownToLine, ChartGantt, Crosshair, Orbit, Video } from 'lucide-react';
 import { currentMode, enterMode, timelinePanel, type ObserverMode } from '../engine/engine';
 import { useEngineValue } from '../engine/hooks';
 import { useFrameSampler } from '../engine/telemetry';
+import { useUi } from '../state/ui-store';
 
 const MODES: { value: ObserverMode; label: string; icon: typeof Orbit; key: string }[] = [
     { value: 'orbit', label: 'Orbit', icon: Orbit, key: '1' },
@@ -28,6 +29,7 @@ export function useTimelineOpen(): boolean {
 export function ModeRail() {
     const mode = useEngineValue(currentMode);
     const timelineOpen = useTimelineOpen();
+    const setCaptureOpen = useUi((state) => state.setCaptureOpen);
     return (
         <nav className="rail glass" aria-label="Modes">
             <ToggleGroup.Root
@@ -61,6 +63,15 @@ export function ModeRail() {
             >
                 <ChartGantt size={20} aria-hidden="true" />
                 Timeline
+            </button>
+            <button
+                type="button"
+                className="rail-btn"
+                aria-haspopup="dialog"
+                onClick={() => setCaptureOpen(true)}
+            >
+                <Video size={20} aria-hidden="true" />
+                Capture
             </button>
         </nav>
     );

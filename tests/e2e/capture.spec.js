@@ -164,7 +164,10 @@ test('a timeline render streams into the picked file and can be cancelled', asyn
     let downloads = 0;
     page.on('download', () => (downloads += 1));
 
-    await page.keyboard.press('r');
+    await page
+        .getByRole('navigation', { name: 'Modes' })
+        .getByRole('button', { name: 'Capture' })
+        .click();
     const dialog = page.getByRole('dialog', { name: 'Capture' });
     await dialog.getByRole('radio', { name: 'WebM · VP9' }).click();
     await choose(page, dialog, /^Resolution/, 'Match window');
