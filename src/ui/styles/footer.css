@@ -333,12 +333,17 @@
     }
 }
 
-/* Until the compact mobile time bar exists, phones show the time bar alone, centred. */
+/* Phones get a compact time bar in one row: play, the speed, both clocks and the clock rate. It
+   sits on the parameter sheet when that is open and on the bottom edge when not. */
 @media (max-width: 760px) {
     .shell-footer,
     .shell[data-inspector-open='true'] .shell-footer {
         grid-area: 3 / 1 / 4 / 2;
-        padding: 0 8px calc(8px + env(safe-area-inset-bottom));
+        padding: 0 12px 10px;
+    }
+
+    .shell[data-inspector-open='false'] .shell-footer {
+        padding-bottom: max(10px, env(safe-area-inset-bottom));
     }
 
     .footer-layout,
@@ -346,11 +351,60 @@
         align-items: stretch;
     }
 
-    .hud {
+    .hud,
+    .timebar-divider,
+    .timebar > .icon-btn,
+    .speed-equivalent,
+    .clock-word,
+    .clock-bar {
         display: none;
     }
 
-    .timebar-divider {
-        display: none;
+    .timebar {
+        justify-content: flex-start;
+        gap: 4px;
+        padding: 6px;
+    }
+
+    .play-btn {
+        width: 44px;
+        height: 44px;
+    }
+
+    .speed-btn {
+        height: 44px;
+        margin-left: 2px;
+        padding: 0 9px;
+    }
+
+    .clock {
+        padding: 0 4px;
+    }
+
+    .clock-value {
+        min-width: 0;
+        font-size: 12.5px;
+    }
+
+    .clock--rate {
+        justify-content: center;
+        min-width: 0;
+        margin-left: auto;
+        padding: 6px 8px;
+        border-radius: 8px;
+        background: rgb(255 255 255 / 0.05);
+    }
+
+    .clock-rate-label {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+    }
+
+    .clock-rate {
+        font-size: 12px;
     }
 }

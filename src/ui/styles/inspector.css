@@ -405,11 +405,88 @@
     border-top: 1px solid var(--color-hairline);
 }
 
-/* Until the mobile bottom sheet exists, narrow screens dock the inspector at the bottom. */
+/* Phones only: the handle that closes the parameter sheet and the mode switch it carries. */
+.sheet-handle,
+.mode-switch {
+    display: none;
+}
+
+/* Phones show the parameters as a sheet along the bottom edge, with its groups as pills. */
 @media (max-width: 760px) {
     .inspector {
         grid-area: 4 / 1 / 5 / 2;
-        max-height: 46dvh;
-        margin: 0 8px calc(8px + env(safe-area-inset-bottom));
+        max-height: 52dvh;
+        margin: 0;
+        padding-bottom: env(safe-area-inset-bottom);
+        border-bottom: 0;
+        border-radius: 22px 22px 0 0;
+    }
+
+    .sheet-handle {
+        position: relative;
+        display: block;
+        flex: none;
+        width: 100%;
+        height: 24px;
+    }
+
+    .sheet-handle::before {
+        content: '';
+        position: absolute;
+        top: 9px;
+        left: 50%;
+        width: 40px;
+        height: 4px;
+        margin-left: -20px;
+        border-radius: var(--radius-pill);
+        background: rgb(255 255 255 / 0.22);
+    }
+
+    .inspector .inspector-tabs {
+        gap: 6px;
+        padding: 0 12px 6px;
+        border-bottom: 0;
+    }
+
+    .inspector .inspector-tab {
+        flex: none;
+        min-height: 36px;
+        padding: 0 14px;
+        border-bottom: 0;
+        border-radius: var(--radius-pill);
+        font-size: 13px;
+    }
+
+    .inspector .inspector-tab[data-state='active'] {
+        background: rgb(255 255 255 / 0.1);
+        color: #f2f4f8;
+        font-weight: 600;
+    }
+
+    /* The command palette searches the parameters on phones. */
+    .inspector-filter {
+        display: none;
+    }
+
+    .inspector-body {
+        padding-top: 6px;
+    }
+
+    .mode-switch {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 10px 14px 4px;
+        border-top: 1px solid var(--color-hairline);
+    }
+
+    .mode-switch .segmented-item {
+        min-height: 40px;
+        font-size: 13px;
+    }
+
+    .inspector-footer {
+        padding: 8px 12px;
+        border-top: 0;
     }
 }

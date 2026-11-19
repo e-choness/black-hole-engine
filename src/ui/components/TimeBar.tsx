@@ -195,21 +195,24 @@ function Clocks() {
         <>
             <div className="clock">
                 <span className="clock-label">
-                    Distant clock t <span className="clock-note" ref={tNoteRef} />
+                    Distant <span className="clock-word">clock </span>t{' '}
+                    <span className="clock-note" ref={tNoteRef} />
                 </span>
                 <span className="num clock-value" ref={tRef}>
                     –
                 </span>
             </div>
             <div className="clock">
-                <span className="clock-label">Your clock τ</span>
+                <span className="clock-label">
+                    Your <span className="clock-word">clock </span>τ
+                </span>
                 <span className="num clock-value clock-value--own" ref={tauRef}>
                     –
                 </span>
             </div>
             <div className="clock clock--rate">
                 <span className="clock-label">
-                    dτ/dt{' '}
+                    <span className="clock-rate-label">dτ/dt </span>
                     <span className="num clock-rate" ref={rateRef}>
                         –
                     </span>

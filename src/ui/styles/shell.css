@@ -228,6 +228,11 @@ body.has-timeline-panel .shell-footer {
     font-size: 12px;
 }
 
+/* Phones only; see the narrow layout below. */
+.fabs {
+    display: none;
+}
+
 .rail {
     grid-area: 2 / 1 / 4 / 2;
     align-self: start;
@@ -295,11 +300,20 @@ body.has-timeline-panel .shell-footer {
 /* Tablet widths drop the title and the solver detail; narrow screens get the compact top bar of
    the mobile board. */
 @media (max-width: 1024px) {
-    .scenario-btn-detail {
+    .scenario-btn-detail,
+    .topbar .search-trigger-key {
         display: none;
     }
 
-    .brand h1 {
+    /* The search shrinks to its icon; the palette it opens is the same. */
+    .search-trigger {
+        justify-content: center;
+        width: 40px;
+        padding: 0;
+    }
+
+    .brand h1,
+    .topbar .search-trigger-text {
         position: absolute;
         width: 1px;
         height: 1px;
@@ -313,6 +327,51 @@ body.has-timeline-panel .shell-footer {
     .shell {
         grid-template-columns: minmax(0, 1fr);
         grid-template-rows: auto minmax(0, 1fr) auto auto;
+    }
+
+    /* Touch targets: the top bar keeps to 40px buttons so that it fits a 360px screen. */
+    .topbar .icon-btn,
+    .scenario-btn,
+    .quality-chip {
+        height: 40px;
+    }
+
+    .topbar .icon-btn {
+        width: 40px;
+    }
+
+    .quality-chip {
+        gap: 6px;
+        padding: 0 8px;
+    }
+
+    .brand {
+        padding: 0 4px 0 6px;
+    }
+
+    .fabs {
+        grid-area: 2 / 1 / 3 / 2;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        align-self: start;
+        justify-self: end;
+        margin: 4px max(12px, env(safe-area-inset-right)) 0 0;
+    }
+
+    .fabs .icon-btn {
+        width: 44px;
+        height: 44px;
+        border: 1px solid var(--color-hairline);
+        border-radius: var(--radius-md);
+        background: var(--color-panel);
+        backdrop-filter: blur(18px) saturate(140%);
+        -webkit-backdrop-filter: blur(18px) saturate(140%);
+        color: #dce1ea;
+    }
+
+    .fabs .icon-btn:hover {
+        background: rgb(28 31 40 / 0.92);
     }
 
     .topbar {
@@ -332,22 +391,16 @@ body.has-timeline-panel .shell-footer {
     .topbar .quality-chip-cost,
     .topbar .topbar-fullscreen,
     .topbar .topbar-capture,
-    .topbar .search-trigger-key {
+    .topbar .topbar-help {
         display: none;
     }
 
     .topbar-center {
-        flex: none;
+        flex: 1;
+        justify-content: flex-end;
     }
 
-    .search-trigger {
-        justify-content: center;
-        width: 40px;
-        padding: 0;
-    }
-
-    .quality-chip-name,
-    .topbar .search-trigger-text {
+    .quality-chip-name {
         position: absolute;
         width: 1px;
         height: 1px;

@@ -29,6 +29,7 @@ import {
 } from '../../params/params';
 import { copyViewLink } from '../../state/share';
 import { useUi } from '../../state/ui-store';
+import { ModeSwitch } from '../ModeRail';
 import { ParamRow } from './ParamRow';
 
 function Section({ name, defs, title }: { name: string; defs: ParamDef[]; title?: string }) {
@@ -180,6 +181,7 @@ export function resetAll(): void {
 
 export function Inspector() {
     const open = useUi((state) => state.inspectorOpen);
+    const setOpen = useUi((state) => state.setInspectorOpen);
     const tab = useUi((state) => state.inspectorTab);
     const setTab = useUi((state) => state.setInspectorTab);
     const query = useUi((state) => state.inspectorFilter);
@@ -188,6 +190,12 @@ export function Inspector() {
     if (!open) return null;
     return (
         <aside id="inspector" className="inspector glass" aria-label="Parameters">
+            <button
+                type="button"
+                className="sheet-handle"
+                aria-label="Hide parameters"
+                onClick={() => setOpen(false)}
+            />
             <Tabs.Root
                 className="inspector-tabs-root"
                 value={tab}
@@ -237,6 +245,7 @@ export function Inspector() {
                     </Tabs.Content>
                 ))}
             </Tabs.Root>
+            <ModeSwitch />
             <footer className="inspector-footer">
                 <button type="button" className="btn btn--ghost" onClick={resetAll}>
                     <RotateCcw size={15} aria-hidden="true" />

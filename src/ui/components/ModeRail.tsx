@@ -65,3 +65,33 @@ export function ModeRail() {
         </nav>
     );
 }
+
+// Phones have no rail, so the parameter sheet carries the mode switch.
+export function ModeSwitch() {
+    const mode = useEngineValue(currentMode);
+    return (
+        <div className="mode-switch">
+            <span id="mode-switch-label" className="caps-label">
+                Mode
+            </span>
+            <ToggleGroup.Root
+                type="single"
+                value={mode}
+                onValueChange={(value) => value && enterMode(value as ObserverMode)}
+                aria-labelledby="mode-switch-label"
+                className="segmented"
+            >
+                {MODES.map(({ value, label, key }) => (
+                    <ToggleGroup.Item
+                        key={value}
+                        value={value}
+                        className="segmented-item"
+                        aria-keyshortcuts={key}
+                    >
+                        {label}
+                    </ToggleGroup.Item>
+                ))}
+            </ToggleGroup.Root>
+        </div>
+    );
+}

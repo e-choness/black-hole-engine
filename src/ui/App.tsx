@@ -8,7 +8,7 @@ import { Inspector } from './components/inspector/Inspector';
 import { ModeRail } from './components/ModeRail';
 import { Notices } from './components/Notices';
 import { ShortcutSheet } from './components/ShortcutSheet';
-import { TopBar } from './components/TopBar';
+import { MobileActions, TopBar } from './components/TopBar';
 import { installCaptureRequests } from './state/capture-actions';
 import { startViewStateSync } from './state/share';
 import { installShortcuts } from './state/shortcuts';
@@ -25,6 +25,7 @@ export function App() {
             <div className="shell" data-ui-hidden={uiHidden} data-inspector-open={inspectorOpen}>
                 <TopBar />
                 <ModeRail />
+                <MobileActions />
                 <div className="shell-stage" />
                 <Inspector />
                 <Footer />

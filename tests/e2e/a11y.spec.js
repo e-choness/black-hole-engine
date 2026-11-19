@@ -40,6 +40,16 @@ test.describe('on a phone', () => {
         const problems = trackPageProblems(page);
         await openSimulation(page);
         expect(await blockingViolations(page)).toEqual([]);
+        await expect(page.getByRole('group', { name: 'View actions' })).toBeVisible();
+
+        // The parameter sheet carries the mode switch, as phones have no rail.
+        await page.getByRole('button', { name: 'Parameters', exact: true }).click();
+        const sheet = page.getByRole('complementary', { name: 'Parameters' });
+        await sheet.getByRole('radio', { name: 'Dive' }).click();
+        await expect(page.getByRole('slider', { name: 'Dive progress' })).toBeVisible();
+        expect(await blockingViolations(page), 'parameter sheet').toEqual([]);
+        await sheet.getByRole('button', { name: 'Hide parameters' }).click();
+        await expect(sheet).toBeHidden();
 
         await page
             .getByRole('button', { name: 'Search parameters, scenarios and actions' })

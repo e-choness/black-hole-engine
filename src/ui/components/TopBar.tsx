@@ -260,7 +260,7 @@ function HelpButton() {
     return (
         <button
             type="button"
-            className="icon-btn"
+            className="icon-btn topbar-help"
             aria-label="Keyboard shortcuts and help"
             aria-keyshortcuts="?"
             title="Keyboard shortcuts and help"
@@ -303,5 +303,23 @@ export function TopBar() {
                 <HelpButton />
             </div>
         </header>
+    );
+}
+
+// Phones have no room for these in the top bar, so they float in a column over the view.
+export function MobileActions() {
+    return (
+        <div className="fabs" role="group" aria-label="View actions">
+            <CaptureButtons />
+            <button
+                type="button"
+                className="icon-btn"
+                aria-label="Copy view link"
+                onClick={copyViewLink}
+            >
+                <Link2 size={18} aria-hidden="true" />
+            </button>
+            <FullscreenButton />
+        </div>
     );
 }
