@@ -1,0 +1,248 @@
+/* Modal overlays: the command palette and the keyboard shortcut sheet. */
+.dialog-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    background: rgb(5 6 10 / 0.55);
+}
+
+.palette,
+.sheet {
+    position: fixed;
+    left: 50%;
+    z-index: 61;
+    width: min(640px, calc(100vw - 32px));
+    border-radius: var(--radius-lg);
+    transform: translateX(-50%);
+    background: var(--color-panel-solid);
+}
+
+.palette {
+    top: max(15vh, 72px);
+    display: flex;
+    flex-direction: column;
+    max-height: min(560px, calc(100dvh - 96px));
+    overflow: hidden;
+}
+
+.palette > [cmdk-root] {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.palette-search {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 14px;
+    border-bottom: 1px solid var(--color-hairline);
+    color: var(--color-text-3);
+}
+
+.palette-search input {
+    flex: 1;
+    min-width: 0;
+    height: 52px;
+    border: 0;
+    background: transparent;
+    color: var(--color-text);
+    font-size: 15px;
+    outline: none;
+}
+
+.palette-search input::placeholder {
+    color: var(--color-text-3);
+}
+
+/* The search row carries the focus indicator, so the field itself draws no ring. */
+.palette-search:focus-within {
+    box-shadow: inset 0 -2px 0 var(--color-doppler);
+}
+
+.palette-search input:focus-visible {
+    outline: none;
+    box-shadow: none;
+}
+
+.palette-list {
+    min-height: 0;
+    padding: 6px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+}
+
+.palette-group [cmdk-group-heading] {
+    padding: 10px 10px 6px;
+    color: var(--color-text-3);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.palette-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 44px;
+    padding: 0 12px;
+    border-radius: 10px;
+    color: #dce1ea;
+    font-size: 13.5px;
+    cursor: pointer;
+}
+
+.palette-item[data-selected='true'] {
+    background: rgb(255 255 255 / 0.07);
+}
+
+.palette-label {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.palette-context {
+    color: var(--color-text-3);
+}
+
+.palette-value {
+    color: var(--color-text-2);
+    font-size: 12px;
+}
+
+.palette-icon {
+    color: var(--color-accent);
+}
+
+.palette-enter {
+    visibility: hidden;
+    color: var(--color-text-3);
+}
+
+.palette-item[data-selected='true'] .palette-enter {
+    visibility: visible;
+}
+
+.palette-keys {
+    display: flex;
+    gap: 4px;
+}
+
+.palette-empty {
+    padding: 24px 12px;
+    color: var(--color-text-2);
+    text-align: center;
+}
+
+.palette-footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    padding: 10px 14px;
+    border-top: 1px solid var(--color-hairline);
+    color: var(--color-text-3);
+    font-size: 11.5px;
+}
+
+.palette-adjust {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 14px 0;
+}
+
+.palette-adjust .palette-footer {
+    margin: 4px -14px 0;
+}
+
+@media (pointer: coarse) {
+    .palette-footer {
+        display: none;
+    }
+
+    .palette-adjust {
+        padding-bottom: 14px;
+    }
+}
+
+.palette-adjust-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.palette-help {
+    margin: 0;
+    color: var(--color-text-2);
+    font-size: 12.5px;
+    line-height: 18px;
+}
+
+.sheet {
+    top: 50%;
+    max-height: calc(100dvh - 32px);
+    padding: 16px 20px 18px;
+    overflow-y: auto;
+    transform: translate(-50%, -50%);
+}
+
+.sheet-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.sheet-title {
+    margin: 0;
+    font: 600 17px var(--font-title);
+}
+
+.sheet-groups {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 8px 28px;
+}
+
+.sheet-group dl {
+    margin: 6px 0 0;
+}
+
+.shortcut-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 32px;
+    border-bottom: 1px solid var(--color-hairline);
+}
+
+.shortcut-row dt {
+    color: var(--color-text-2);
+    font-size: 13px;
+}
+
+.shortcut-row dd {
+    display: flex;
+    gap: 4px;
+    margin: 0;
+}
+
+.sheet-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 20px;
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid var(--color-hairline);
+    font-size: 13px;
+}
+
+.sheet-links a {
+    color: var(--color-doppler);
+}

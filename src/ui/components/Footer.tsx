@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
+import { useUi } from '../state/ui-store';
 import { Hud } from './Hud';
 import { TimeBar } from './TimeBar';
 
@@ -15,6 +16,7 @@ function readHintHidden(): boolean {
 
 function CameraHint() {
     const [hidden, setHidden] = useState(readHintHidden);
+    const openShortcuts = useUi((state) => state.setShortcutsOpen);
     if (hidden) return null;
     const touch = window.matchMedia('(pointer: coarse)').matches;
     const hide = () => {
@@ -32,6 +34,16 @@ function CameraHint() {
                     ? 'Drag to orbit · Pinch to zoom · Two-finger drag to pan'
                     : 'Drag to orbit · Right-drag to pan · Scroll to zoom'}
             </span>
+            {!touch && (
+                <button
+                    type="button"
+                    className="hint-shortcuts"
+                    onClick={() => openShortcuts(true)}
+                >
+                    <kbd className="kbd">?</kbd>
+                    shortcuts
+                </button>
+            )}
             <button
                 type="button"
                 className="icon-btn icon-btn--sm"

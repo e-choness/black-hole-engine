@@ -1,10 +1,9 @@
 /* Footer: observer readouts on the left, the camera hint and the time bar in the middle, centred
-   while the readouts leave room for it. The bottom padding clears the link bar until the help
-   sheet replaces it. */
+   while the readouts leave room for it. */
 .shell-footer {
     grid-area: 3 / 2 / 4 / 4;
     container: footer / inline-size;
-    padding: 0 16px 40px;
+    padding: 0 16px 16px;
     pointer-events: none;
 }
 
@@ -146,6 +145,20 @@
     border-radius: var(--radius-pill);
     color: var(--color-text-2);
     font-size: 12px;
+}
+
+.hint-shortcuts {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 28px;
+    padding: 0 6px;
+    border-radius: 8px;
+    color: var(--color-text-2);
+}
+
+.hint-shortcuts:hover {
+    background: rgb(255 255 255 / 0.06);
 }
 
 .timebar {
@@ -325,7 +338,7 @@
     .shell-footer,
     .shell[data-inspector-open='true'] .shell-footer {
         grid-area: 3 / 1 / 4 / 2;
-        padding: 0 8px 34px;
+        padding: 0 8px calc(8px + env(safe-area-inset-bottom));
     }
 
     .footer-layout,

@@ -137,8 +137,35 @@
     white-space: nowrap;
 }
 
-.topbar-spacer {
+.topbar-center {
+    display: flex;
     flex: 1;
+    justify-content: center;
+    min-width: 0;
+}
+
+.search-trigger {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: min(420px, 100%);
+    height: 40px;
+    padding: 0 8px 0 14px;
+    border-radius: 12px;
+    color: var(--color-text-3);
+    font-size: 13px;
+}
+
+.search-trigger:hover {
+    color: var(--color-text-2);
+}
+
+.search-trigger-text {
+    flex: 1;
+    overflow: hidden;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .quality-chip {
@@ -287,15 +314,29 @@
         gap: 4px;
     }
 
-    .scenario-btn-detail,
-    .topbar-divider,
-    .topbar-copy-link,
-    .quality-chip-cost,
-    .rail {
+    /* Scoped to the top bar so that these win over the base .icon-btn and .kbd display rules. */
+    .rail,
+    .topbar .scenario-btn-detail,
+    .topbar .topbar-divider,
+    .topbar .topbar-copy-link,
+    .topbar .quality-chip-cost,
+    .topbar .topbar-fullscreen,
+    .topbar .search-trigger-key {
         display: none;
     }
 
-    .quality-chip-name {
+    .topbar-center {
+        flex: none;
+    }
+
+    .search-trigger {
+        justify-content: center;
+        width: 40px;
+        padding: 0;
+    }
+
+    .quality-chip-name,
+    .topbar .search-trigger-text {
         position: absolute;
         width: 1px;
         height: 1px;

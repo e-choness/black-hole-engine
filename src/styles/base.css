@@ -19,24 +19,6 @@ body {
     color: #ffffff;
 }
 
-.link-bar {
-    position: absolute;
-    bottom: 10px;
-    width: 100%;
-    text-align: center;
-}
-
-.link-icon {
-    width: 1.3em;
-    height: 1.3em;
-    vertical-align: -0.3em;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 2;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-}
-
 #loader {
     margin-top: 20%;
 }
@@ -130,13 +112,6 @@ a:hover {
 }
 
 @media screen and (max-width: 960px) {
-    .link-bar {
-        bottom: 6px;
-        font-size: 11px;
-        line-height: 1.45;
-        padding: 0 8px;
-        box-sizing: border-box;
-    }
     /* Inputs below 16px make mobile browsers zoom in on focus. */
     .lil-gui {
         --input-font-size: 16px;
@@ -162,7 +137,6 @@ a:hover {
     /* ── Side open buttons — mobile redesign ── */
     .sp-open-btn {
         top: auto !important;
-        /* Clear the link-bar (≈40px) plus safe-area for iPhones */
         bottom: calc(env(safe-area-inset-bottom, 0px) + 52px) !important;
         height: 40px !important;
         min-height: unset !important;
@@ -197,9 +171,6 @@ a:hover {
     /* Undo has-timeline-panel shifts that are desktop-only */
     body.has-timeline-panel .sp-panel {
         bottom: 0;
-    }
-    body.has-timeline-panel .link-bar {
-        bottom: 6px;
     }
 }
 

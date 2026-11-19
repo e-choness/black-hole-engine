@@ -7,7 +7,7 @@ import { pwaOptions } from './config/pwa.js';
 import { securityHeaders, serializeContentSecurityPolicy } from './config/security-headers.js';
 import { sitePreviewPlugin } from './config/site-metadata.js';
 
-// The link bar in index.html points at docs/LEGAL.md, so every build ships it next to the page.
+// The help sheet links to docs/LEGAL.md, so every build ships it next to the page.
 function legalNotice() {
     return {
         name: 'black-hole:legal-notice',

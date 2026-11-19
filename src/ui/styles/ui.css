@@ -3,6 +3,7 @@
 @import './shell.css';
 @import './inspector.css';
 @import './footer.css';
+@import './overlays.css';
 
 /* Event Horizon design tokens. The panel is more opaque than the design's 0.78 and text-3 is
    lighter than #7D8596 so that secondary text keeps 4.5:1 contrast over the brightest disk. */

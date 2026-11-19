@@ -3,11 +3,13 @@ import { DropdownMenu, Popover, ToggleGroup } from 'radix-ui';
 import {
     Check,
     ChevronDown,
+    CircleHelp,
     Gauge,
     Link2,
     Maximize,
     Minimize,
     Orbit,
+    Search,
     SlidersHorizontal,
 } from 'lucide-react';
 import {
@@ -21,6 +23,8 @@ import {
 } from '../engine/engine';
 import { useEngineValue } from '../engine/hooks';
 import { useFrameSampler } from '../engine/telemetry';
+import { toggleFullscreen } from '../lib/fullscreen';
+import { MOD_KEY } from '../lib/keys';
 import { portalContainer } from '../lib/portal';
 import { formatSpin, SCENARIOS, scenarioLabel, SOLVER_LABELS } from '../lib/scenarios';
 import { copyViewLink } from '../state/share';
@@ -158,11 +162,6 @@ function QualityChip() {
     );
 }
 
-export function toggleFullscreen(): void {
-    if (document.fullscreenElement) void document.exitFullscreen();
-    else void document.documentElement.requestFullscreen?.().catch(() => {});
-}
-
 function FullscreenButton() {
     const [fullscreen, setFullscreen] = useState(() => document.fullscreenElement !== null);
     useEffect(() => {
@@ -173,7 +172,7 @@ function FullscreenButton() {
     return (
         <button
             type="button"
-            className="icon-btn"
+            className="icon-btn topbar-fullscreen"
             aria-label={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
             aria-keyshortcuts="F"
             onClick={toggleFullscreen}
@@ -201,6 +200,40 @@ function InspectorToggle() {
     );
 }
 
+function SearchTrigger() {
+    const setOpen = useUi((state) => state.setPaletteOpen);
+    return (
+        <button
+            type="button"
+            className="search-trigger glass"
+            aria-keyshortcuts="Control+K Meta+K"
+            onClick={() => setOpen(true)}
+        >
+            <Search size={16} aria-hidden="true" />
+            <span className="search-trigger-text">Search parameters, scenarios and actions</span>
+            <kbd className="kbd search-trigger-key" aria-hidden="true">
+                {MOD_KEY} K
+            </kbd>
+        </button>
+    );
+}
+
+function HelpButton() {
+    const setOpen = useUi((state) => state.setShortcutsOpen);
+    return (
+        <button
+            type="button"
+            className="icon-btn"
+            aria-label="Keyboard shortcuts and help"
+            aria-keyshortcuts="?"
+            title="Keyboard shortcuts and help"
+            onClick={() => setOpen(true)}
+        >
+            <CircleHelp size={18} aria-hidden="true" />
+        </button>
+    );
+}
+
 export function TopBar() {
     return (
         <header className="topbar">
@@ -212,7 +245,9 @@ export function TopBar() {
                 <span className="topbar-divider" aria-hidden="true" />
                 <ScenarioPicker />
             </div>
-            <span className="topbar-spacer" />
+            <div className="topbar-center">
+                <SearchTrigger />
+            </div>
             <div className="topbar-group glass">
                 <QualityChip />
                 <span className="topbar-divider" aria-hidden="true" />
@@ -227,6 +262,7 @@ export function TopBar() {
                     <Link2 size={18} aria-hidden="true" />
                 </button>
                 <FullscreenButton />
+                <HelpButton />
             </div>
         </header>
     );

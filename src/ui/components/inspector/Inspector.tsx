@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from 'react';
+import { useId, useMemo } from 'react';
 import { Tabs } from 'radix-ui';
 import { Crosshair, Link2, RotateCcw, Search, Timer, X } from 'lucide-react';
 import { toast } from 'sonner';
@@ -171,7 +171,7 @@ function FilterResults({ query }: { query: string }) {
     );
 }
 
-function resetAll(): void {
+export function resetAll(): void {
     const count = resetParams(PARAMS);
     toast(count ? `Reset ${count} parameter${count === 1 ? '' : 's'}` : 'Nothing to reset', {
         id: 'reset-all',
@@ -182,7 +182,8 @@ export function Inspector() {
     const open = useUi((state) => state.inspectorOpen);
     const tab = useUi((state) => state.inspectorTab);
     const setTab = useUi((state) => state.setInspectorTab);
-    const [query, setQuery] = useState('');
+    const query = useUi((state) => state.inspectorFilter);
+    const setQuery = useUi((state) => state.setInspectorFilter);
     const filtering = query.trim().length > 0;
     if (!open) return null;
     return (

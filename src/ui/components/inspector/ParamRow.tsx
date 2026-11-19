@@ -314,11 +314,15 @@ function SegmentedRow({ def }: { def: ChoiceDef }) {
     );
 }
 
-export function ParamRow({ def }: { def: ParamDef }) {
+// `anchored` gives the row the id that revealParam() looks for; a second copy of the row, as in the
+// command palette, goes without it.
+export function ParamRow({ def, anchored = true }: { def: ParamDef; anchored?: boolean }) {
     const visible = useEngineValue(() => paramVisible(def));
     if (!visible) return null;
-    if (def.control === 'slider') return <SliderRow def={def} />;
-    if (def.control === 'toggle') return <ToggleRow def={def} />;
-    if (def.control === 'segmented') return <SegmentedRow def={def} />;
-    return <SelectRow def={def} />;
+    let row;
+    if (def.control === 'slider') row = <SliderRow def={def} />;
+    else if (def.control === 'toggle') row = <ToggleRow def={def} />;
+    else if (def.control === 'segmented') row = <SegmentedRow def={def} />;
+    else row = <SelectRow def={def} />;
+    return <div id={anchored ? `param-${def.id}` : undefined}>{row}</div>;
 }
