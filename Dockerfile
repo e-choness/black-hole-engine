@@ -31,7 +31,7 @@ COPY --chown=node:node . .
 
 FROM source AS test
 LABEL com.black-hole.project=black-hole
-RUN npm run lint && npm test
+RUN npm run lint && npm run typecheck && npm test
 
 FROM source AS build
 LABEL com.black-hole.project=black-hole

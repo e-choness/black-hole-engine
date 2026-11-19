@@ -1,7 +1,6 @@
 // Role: Observer entity - tracks position, velocity, and orientation of the
 //       in-simulation camera/observer. Handles circular orbital motion and the
-//       simulation-time scaling used for orbit/hover modes. Also exports
-//       formatThousands.
+//       simulation-time scaling used for orbit/hover modes.
 
 import * as THREE from 'three';
 import { degToRad } from './shader.js';
@@ -10,12 +9,6 @@ var boundShader = null;
 
 export function bindObserverShader(shaderInstance) {
     boundShader = shaderInstance || null;
-}
-
-export function formatThousands(value) {
-    return Math.round(value)
-        .toString()
-        .replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 }
 
 // Close stationary views remain available, but circular observer motion is

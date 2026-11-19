@@ -5,7 +5,6 @@ export const DISK_TEMPERATURE_MIN = 1000.0;
 export const DISK_TEMPERATURE_MAX = 1.0e7;
 
 export let container = null;
-export let stats = null;
 export let camera = null;
 export let scene = null;
 export let renderer = null;
@@ -31,9 +30,6 @@ export let resetTemporalAAHistory = function () {};
 
 export function setContainer(value) {
     container = value;
-}
-export function setStats(value) {
-    stats = value;
 }
 export function setCamera(value) {
     camera = value;

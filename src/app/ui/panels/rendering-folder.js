@@ -27,7 +27,7 @@ export function setupRenderingFolder(options) {
     var onTaaEnabledChange = options.onTaaEnabledChange || function () {};
     var onTaaSettingChange = options.onTaaSettingChange || function () {};
 
-    var presetObj = { preset: 'Default' };
+    var presetObj = options.presetObj;
     var presetsFolder = gui.addFolder('Black Hole Presets');
     var blackHolePresetController = addControl(presetsFolder, presetObj, 'preset', {
         name: 'preset',

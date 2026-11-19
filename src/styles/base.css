@@ -46,16 +46,6 @@ body {
     color: gray;
 }
 
-#hint-text {
-    position: absolute;
-    /*right: 270px;*/
-    width: 100%;
-    top: 10px;
-    text-align: center;
-    font-weight: normal;
-    color: #cccccc;
-}
-
 a {
     color: white;
     text-decoration: none;
@@ -65,14 +55,10 @@ a:hover {
     color: #cccccc;
 }
 
-.initially-hidden {
-    visibility: hidden;
-}
-
-/* Colour bar of the Scientific tone mapper, below the hint line; it never takes pointer input. */
+/* Colour bar of the Scientific tone mapper, below the top bar; it never takes pointer input. */
 .scientific-legend {
     position: fixed;
-    top: 44px;
+    top: 80px;
     left: 50%;
     transform: translateX(-50%);
     z-index: 40;
@@ -144,12 +130,6 @@ a:hover {
 }
 
 @media screen and (max-width: 960px) {
-    #hint-text {
-        top: 6px;
-        padding: 0 8px;
-        font-size: 11px;
-        box-sizing: border-box;
-    }
     .link-bar {
         bottom: 6px;
         font-size: 11px;
@@ -214,9 +194,6 @@ a:hover {
     }
 
     /* ── Timeline: hidden on mobile ── */
-    #tl-open-btn {
-        display: none !important;
-    }
     .tl-panel {
         display: none !important;
     }

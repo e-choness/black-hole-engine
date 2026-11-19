@@ -14,7 +14,8 @@ const SECONDARY_BUTTON = 2;
 //     the left button is held;
 //   - one finger orbits; two fingers call panCallback with the movement of their midpoint and
 //     zoomCallback(distanceDelta), where distanceDelta > 0 means the fingers moved apart.
-// Mouse wheel zoom is left to the GUI, which owns the observer distance.
+// Mouse wheel zoom is left to installWheelZoom in ui/engine-actions.js, which owns the observer
+// distance.
 export class ObserverControls extends OrbitControls {
     panCallback = null;
     zoomCallback = null;

@@ -1,8 +1,7 @@
 import * as THREE from 'three';
-import Stats from 'three/addons/libs/stats.module.js';
 import { RAYTRACER_VERTEX_SHADER } from '../../../shaders/raytracer/index.js';
 import { Shader } from '../shader.js';
-import { formatThousands, clampObserverDistance, clampPlanetOrbitDistance } from '../observer.js';
+import { clampObserverDistance, clampPlanetOrbitDistance } from '../observer.js';
 import { initializeCamera, updateCamera } from '../../scene/camera-runtime.js';
 import { ObserverControls } from '../../scene/observer-controls.js';
 import { setupBloom } from '../../graphics/bloom.js';
@@ -10,6 +9,11 @@ import { setupOutputPass } from '../../graphics/output-pass.js';
 import { createRenderTarget } from '../../graphics/post-processing.js';
 import { setupTemporalAA } from './temporal-aa.js';
 import { setupGUI } from '../../ui/gui.js';
+import {
+    initEngineActions,
+    installWheelZoom,
+    notifyEngineChanged,
+} from '../../ui/engine-actions.js';
 import { applyQualityPresetValues } from '../../ui/quality-presets.js';
 import {
     beginQualityBenchmarkIfNeeded,
@@ -17,7 +21,6 @@ import {
     initialQualityPreset,
     clampResolutionScale,
 } from './renderer-quality.js';
-import { updateObserverDistanceBinding } from '../runtime/ui-bindings.js';
 import { diveState, hoverState } from '../scenarios/scenario-state.js';
 import { SHADER_MASS, iscoRadius } from '../physics/kerr.js';
 import {
@@ -50,7 +53,6 @@ import {
     lastTaaCameraMat,
     updateUniforms,
     setContainer,
-    setStats,
     setCamera,
     setScene,
     setRenderer,
@@ -67,26 +69,6 @@ import {
     setApplyRenderScaleFromSettings,
     setResetTemporalAAHistory,
 } from '../runtime/runtime-state.js';
-
-var effectLabels = {
-    spin: null,
-    temperature: null,
-};
-
-function updateEffectLabels() {
-    if (!shader || !effectLabels.spin || !effectLabels.temperature) return;
-
-    var spinPercent = shader.parameters.black_hole.spin * 100.0;
-    effectLabels.spin.textContent = 'a/M = ' + spinPercent.toFixed(1) + '%';
-    effectLabels.temperature.textContent =
-        'T = ' + formatThousands(diskPeakTemperature(shader.parameters)) + ' K';
-
-    if (shader.parameters.black_hole.spin_enabled) {
-        effectLabels.spin.classList.remove('is-disabled');
-    } else {
-        effectLabels.spin.classList.add('is-disabled');
-    }
-}
 
 // Two RGBA32F rows sampled with texelFetch: blackbody colour and luminance on a log-T grid, and
 // the colour of synchrotron power laws.
@@ -412,8 +394,6 @@ export function init(glslSource, textures) {
                 uniforms[entry[0]].value.set(v[1], v[2], v[3], v[0]);
             });
         }
-
-        updateEffectLabels();
     }
 
     setUpdateUniforms(updateUniformsImpl);
@@ -477,19 +457,6 @@ export function init(glslSource, textures) {
     setTaaPass(setupTemporalAA(renderer));
     setOutputPass(setupOutputPass());
 
-    var nextStats = new Stats();
-    nextStats.dom.style.position = 'fixed';
-    nextStats.dom.style.top = '0px';
-    nextStats.dom.style.left = '0px';
-    nextStats.dom.style.zIndex = '1000';
-    nextStats.dom.classList.add('hidden-phone');
-    container.appendChild(nextStats.dom);
-    setStats(nextStats);
-
-    effectLabels.spin = document.getElementById('spin-label');
-    effectLabels.temperature = document.getElementById('temperature-label');
-    updateEffectLabels();
-
     var nextCamera = new THREE.PerspectiveCamera(
         45,
         window.innerWidth / window.innerHeight,
@@ -517,7 +484,7 @@ export function init(glslSource, textures) {
         shader.parameters.observer.distance = newDist;
         updateCamera();
         shader.needsUpdate = true;
-        updateObserverDistanceBinding();
+        notifyEngineChanged();
     };
     controls.addEventListener('change', updateCamera);
     setCameraControls(controls);
@@ -526,6 +493,8 @@ export function init(glslSource, textures) {
     applyRenderScaleFromSettingsImpl();
     window.addEventListener('resize', onWindowResize, false);
 
+    initEngineActions();
+    installWheelZoom(renderer.domElement);
     setupGUI();
     beginQualityBenchmarkIfNeeded();
 }

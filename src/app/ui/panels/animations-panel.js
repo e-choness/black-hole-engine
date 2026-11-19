@@ -13,7 +13,6 @@ export function setupAnimationsPanel(options) {
         options.setAnimationTimelineCaptureCameraSmoothingEnabled;
     var updateAnimationTimelineCaptureUi = options.updateAnimationTimelineCaptureUi;
     var buildTimelinePanel = options.buildTimelinePanel;
-    var getTimelinePanelBinding = options.getTimelinePanelBinding;
 
     var ANIM_PANEL_WIDTH_STORAGE_KEY = 'black-hole.anim-panel.width';
     var ANIM_PANEL_DEFAULT_WIDTH = 420;
@@ -333,18 +332,4 @@ export function setupAnimationsPanel(options) {
     updateAnimationTimelineCaptureUi();
 
     buildTimelinePanel();
-
-    var tlOpenBtn = document.createElement('button');
-    tlOpenBtn.id = 'tl-open-btn';
-    tlOpenBtn.type = 'button';
-    tlOpenBtn.textContent = '\u25B2 TIMELINE';
-    tlOpenBtn.title = 'Open the full timeline / dopesheet panel';
-    document.body.appendChild(tlOpenBtn);
-
-    tlOpenBtn.addEventListener('click', function () {
-        var timelineBinding = getTimelinePanelBinding();
-        if (timelineBinding && typeof timelineBinding.toggle === 'function') {
-            timelineBinding.toggle();
-        }
-    });
 }

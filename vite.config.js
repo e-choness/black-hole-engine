@@ -1,4 +1,6 @@
 import { readFile } from 'node:fs/promises';
+import tailwindcss from '@tailwindcss/vite';
+import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import { pwaOptions } from './config/pwa.js';
@@ -42,19 +44,33 @@ function contentSecurityPolicyMeta() {
 
 export default defineConfig({
     base: './',
-    plugins: [contentSecurityPolicyMeta(), legalNotice(), sitePreviewPlugin(), VitePWA(pwaOptions)],
+    plugins: [
+        react(),
+        tailwindcss(),
+        contentSecurityPolicyMeta(),
+        legalNotice(),
+        sitePreviewPlugin(),
+        VitePWA(pwaOptions),
+    ],
     build: {
         target: 'es2022',
         sourcemap: true,
         modulePreload: { polyfill: false },
         // three.js is about 770 kB minified because WebGLRenderer pulls in the shader library of
         // every built-in material. It gets a chunk of its own, which also stays cached across app
-        // releases, and the size warning is raised to just above it.
+        // releases, and the size warning is raised to just above it. React gets one for the
+        // same caching reason.
         chunkSizeWarningLimit: 800,
         rolldownOptions: {
             output: {
                 codeSplitting: {
-                    groups: [{ name: 'three', test: /[\\/]node_modules[\\/]three[\\/]/ }],
+                    groups: [
+                        { name: 'three', test: /[\\/]node_modules[\\/]three[\\/]/ },
+                        {
+                            name: 'react',
+                            test: /[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/,
+                        },
+                    ],
                 },
             },
         },
@@ -75,7 +91,7 @@ export default defineConfig({
         headers: securityHeaders,
     },
     test: {
-        include: ['tests/unit/**/*.test.js'],
+        include: ['tests/unit/**/*.test.{js,ts}'],
         environment: 'node',
     },
 });

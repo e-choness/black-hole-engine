@@ -1,8 +1,7 @@
 // Role: lil-gui configuration — builds every control panel and folder, wires up
-//       all parameter bindings, manages conditional visibility for jet / torus /
-//       planet controls, and defines applyBlackHolePreset() to bulk-apply preset
-//       data from presets.js and quality-presets.js. Must be called after init()
-//       has created the scene.
+//       all parameter bindings and manages conditional visibility for jet / torus /
+//       planet controls. Presets, quality and observer operations live in
+//       engine-actions.js. Must be called after init() has created the scene.
 
 import GUI from 'lil-gui';
 import {
@@ -10,15 +9,11 @@ import {
     DISK_TEMPERATURE_MAX,
     shader,
     scene,
-    renderer,
-    cameraControls,
-    cameraPan,
     observer,
     updateUniforms,
     applyRenderScaleFromSettings,
     resetTemporalAAHistory,
     setDistanceController,
-    setRefreshAllControllersGlobal,
 } from '../core/runtime/runtime-state.js';
 import {
     OBSERVER_ORBIT_MIN,
@@ -27,17 +22,8 @@ import {
     PLANET_ORBIT_MIN,
     clampObserverDistance,
 } from '../core/observer.js';
-import {
-    DEFAULT_VIEW_INCLINATION,
-    setViewInclination,
-    updateCamera,
-} from '../scene/camera-runtime.js';
-import {
-    applyQualityPresetValues,
-    QUALITY_PRESET_LABELS,
-    KERR_MODE_LABELS,
-} from './quality-presets.js';
-import { BH_PRESETS } from './presets.js';
+import { updateCamera } from '../scene/camera-runtime.js';
+import { QUALITY_PRESET_LABELS, KERR_MODE_LABELS } from './quality-presets.js';
 import { diveState, hoverState } from '../core/scenarios/scenario-state.js';
 import { startDive, resetDive, seekDive } from '../core/scenarios/dive.js';
 import { startHover, resetHover, seekHover } from '../core/scenarios/hover.js';
@@ -47,8 +33,20 @@ import {
     updateAnimationTimelineCaptureUi,
 } from '../core/scenarios/animation-capture.js';
 import { buildTimelinePanel } from '../presentation/editor/timeline-panel.js';
-import { getTimelinePanelBinding } from '../core/runtime/ui-bindings.js';
 import { registerBlackHoleUiBinding } from '../core/runtime/runtime-registry.js';
+import {
+    applyBlackHolePreset,
+    applyKerrMode,
+    applyQualityPreset,
+    engineNotice,
+    getBlackHolePresetName,
+    markBlackHolePresetCustom,
+    markQualityPresetCustom,
+    notifyEngineChanged,
+    planetAvailable,
+    resetObserverCamera,
+    subscribeEngineChanges,
+} from './engine-actions.js';
 import { setupAnimationsPanel } from './panels/animations-panel.js';
 import { setupObserverOrbitWidget } from './widgets/observer-orbit-widget.js';
 import { setupControlsPanel } from './panels/controls-panel.js';
@@ -57,36 +55,9 @@ import { setupAccretionLookFolders } from './panels/accretion-look-folders.js';
 import { setupSimulationFolders } from './panels/simulation-folders.js';
 
 export function setupGUI() {
-    var hint = document.getElementById('hint-text');
-    var hintAnimation = null;
     var p = shader.parameters;
 
-    function hideHint() {
-        if (hintAnimation) hintAnimation.cancel();
-        hintAnimation = null;
-        hint.style.display = 'none';
-    }
-
-    // Fades the hint in over 120 ms, holds it for holdMs and fades it out over fadeOutMs.
-    function flashHint(text, holdMs, fadeOutMs) {
-        if (hintAnimation) hintAnimation.cancel();
-        hint.textContent = text;
-        hint.style.display = '';
-        var duration = 120 + holdMs + fadeOutMs;
-        hintAnimation = hint.animate(
-            [
-                { opacity: 0 },
-                { opacity: 1, offset: 120 / duration },
-                { opacity: 1, offset: (120 + holdMs) / duration },
-                { opacity: 0 },
-            ],
-            { duration: duration, fill: 'forwards' },
-        );
-        hintAnimation.onfinish = hideHint;
-    }
-
     function updateShader() {
-        hideHint();
         scene.updateShader();
     }
 
@@ -95,26 +66,9 @@ export function setupGUI() {
         shader.needsUpdate = true;
     }
 
-    function observerControlHelp(prefix) {
-        var lead = prefix ? prefix + ' ' : '';
-        return lead + 'Left drag: orbit, Right drag: pan, Left+Right drag: roll.';
-    }
-
     function showObserverControlHint(prefix) {
-        flashHint(observerControlHelp(prefix), 1400, 360);
-    }
-
-    function resetObserverCamera() {
-        if (cameraControls) {
-            cameraControls.reset();
-            cameraControls.target.set(0, 0, 0);
-        }
-        if (cameraPan) {
-            cameraPan.set(0, 0);
-        }
-        updateCamera();
-        shader.needsUpdate = true;
-        flashHint('Camera reset. ' + observerControlHelp(''), 900, 360);
+        var lead = prefix ? prefix + ' ' : '';
+        engineNotice(lead + 'Left drag: orbit, Right drag: pan, Left+Right drag: roll.');
     }
 
     var gui = new GUI({ autoPlace: false, closeFolders: true });
@@ -122,17 +76,21 @@ export function setupGUI() {
     setupControlsPanel(gui);
 
     var syncObserverWidgetControls = null;
+    var updateDependentVisibility = function () {};
 
     // lil-gui does not notice when code changes a bound property, so every controller is
     // redrawn after programmatic updates such as presets and timeline playback.
     function refreshAllControllers() {
+        document.querySelectorAll('.planet-controls').forEach(function (element) {
+            element.style.display = planetAvailable() ? '' : 'none';
+        });
+        updateDependentVisibility();
         gui.controllersRecursive().forEach(function (controller) {
             controller.updateDisplay();
         });
         if (syncObserverWidgetControls) syncObserverWidgetControls();
     }
-    setRefreshAllControllersGlobal(refreshAllControllers);
-    registerBlackHoleUiBinding('refreshControllers', refreshAllControllers);
+    subscribeEngineChanges(refreshAllControllers);
 
     function setGuiRowClass(controller, classNames) {
         controller.domElement.classList.add(...classNames.split(/\s+/));
@@ -142,147 +100,6 @@ export function setupGUI() {
         if (text) controller.domElement.title = text;
     }
 
-    var blackHolePresetController = null;
-    var qualityPresetController = null;
-    var blackHoleCustomState = null;
-    var qualityCustomState = null;
-
-    function deepClonePlain(value) {
-        return JSON.parse(JSON.stringify(value));
-    }
-
-    function captureQualityPresetState() {
-        return {
-            n_steps: p.n_steps,
-            sample_count: p.sample_count,
-            max_revolutions: p.max_revolutions,
-            rk4_integration: p.rk4_integration,
-            resolution_scale: p.resolution_scale,
-            taa_enabled: p.taa_enabled,
-            taa: deepClonePlain(p.taa),
-        };
-    }
-
-    function restoreQualityPresetState(state) {
-        if (!state) return;
-        p.n_steps = state.n_steps;
-        p.sample_count = state.sample_count;
-        p.max_revolutions = state.max_revolutions;
-        p.rk4_integration = state.rk4_integration;
-        p.resolution_scale = state.resolution_scale;
-        p.taa_enabled = state.taa_enabled;
-        Object.assign(p.taa, state.taa);
-    }
-
-    function captureBlackHolePresetState() {
-        return {
-            black_hole: deepClonePlain(p.black_hole),
-            accretion_disk: p.accretion_disk,
-            accretion_mode: p.accretion_mode,
-            disk_temperature: p.disk_temperature,
-            disk: deepClonePlain(p.disk),
-            torus: deepClonePlain(p.torus),
-            slim: deepClonePlain(p.slim),
-            jet: deepClonePlain(p.jet),
-            grmhd: deepClonePlain(p.grmhd),
-            beaming: p.beaming,
-            physical_beaming: p.physical_beaming,
-            doppler_shift: p.doppler_shift,
-            look: {
-                disk_gain: p.look.disk_gain,
-                glow: p.look.glow,
-                galaxy_gain: p.look.galaxy_gain,
-                tone_mapper: p.look.tone_mapper,
-                white_balance_enabled: p.look.white_balance_enabled,
-                white_balance_k: p.look.white_balance_k,
-            },
-            bloom: deepClonePlain(p.bloom),
-        };
-    }
-
-    function restoreBlackHolePresetState(state) {
-        if (!state) return;
-        p.black_hole.spin_enabled = state.black_hole.spin_enabled;
-        p.black_hole.spin = state.black_hole.spin;
-        p.black_hole.spin_strength = state.black_hole.spin_strength;
-        p.accretion_disk = state.accretion_disk;
-        p.accretion_mode = state.accretion_mode;
-        p.disk_temperature = state.disk_temperature;
-        if (state.disk) Object.assign(p.disk, state.disk);
-        p.torus.r0 = state.torus.r0;
-        p.torus.h_ratio = state.torus.h_ratio;
-        p.torus.radial_falloff = state.torus.radial_falloff;
-        p.torus.opacity = state.torus.opacity;
-        p.torus.outer_radius = state.torus.outer_radius;
-        p.slim.h_ratio = state.slim.h_ratio;
-        p.slim.opacity = state.slim.opacity;
-        p.slim.puff_factor = state.slim.puff_factor;
-        p.jet.enabled = state.jet.enabled;
-        p.jet.mode = state.jet.mode;
-        p.jet.half_angle = state.jet.half_angle;
-        p.jet.lorentz_factor = state.jet.lorentz_factor;
-        p.jet.brightness = state.jet.brightness;
-        p.jet.length = state.jet.length;
-        if (state.jet.spectral_index !== undefined) p.jet.spectral_index = state.jet.spectral_index;
-        p.jet.magnetization = state.jet.magnetization;
-        p.jet.knot_spacing = state.jet.knot_spacing;
-        p.jet.corona_brightness = state.jet.corona_brightness;
-        p.jet.base_width = state.jet.base_width;
-        p.jet.corona_extent = state.jet.corona_extent;
-        if (state.grmhd) {
-            p.grmhd.enabled = state.grmhd.enabled;
-            p.grmhd.r_high = state.grmhd.r_high;
-            p.grmhd.magnetic_beta = state.grmhd.magnetic_beta;
-            p.grmhd.mad_flux = state.grmhd.mad_flux;
-            p.grmhd.density_scale = state.grmhd.density_scale;
-            p.grmhd.turbulence_amp = state.grmhd.turbulence_amp;
-            p.grmhd.electron_kappa = state.grmhd.electron_kappa;
-            p.grmhd.magnetic_field_str = state.grmhd.magnetic_field_str;
-        }
-        p.beaming = state.beaming;
-        p.physical_beaming = state.physical_beaming;
-        p.doppler_shift = state.doppler_shift;
-        p.look.disk_gain = state.look.disk_gain;
-        p.look.glow = state.look.glow;
-        p.look.galaxy_gain = state.look.galaxy_gain;
-        p.look.tone_mapper = state.look.tone_mapper;
-        p.look.white_balance_enabled = state.look.white_balance_enabled;
-        p.look.white_balance_k = state.look.white_balance_k;
-        p.bloom.enabled = state.bloom.enabled;
-        p.bloom.strength = state.bloom.strength;
-        p.bloom.radius = state.bloom.radius;
-    }
-
-    function markBlackHolePresetCustom() {
-        blackHoleCustomState = captureBlackHolePresetState();
-        if (typeof presetObj !== 'undefined' && presetObj.preset !== 'Custom') {
-            presetObj.preset = 'Custom';
-            if (blackHolePresetController) blackHolePresetController.updateDisplay();
-        }
-    }
-
-    function markQualityPresetCustom() {
-        qualityCustomState = captureQualityPresetState();
-        if (p.quality !== 'custom') {
-            p.quality = 'custom';
-            if (qualityPresetController) qualityPresetController.updateDisplay();
-        }
-    }
-
-    function withBlackHolePresetTracking(handler) {
-        return function () {
-            markBlackHolePresetCustom();
-            if (handler) return handler.apply(this, arguments);
-        };
-    }
-
-    function withQualityPresetTracking(handler) {
-        return function () {
-            markQualityPresetCustom();
-            if (handler) return handler.apply(this, arguments);
-        };
-    }
-
     function addControl(folder, obj, key, cfg) {
         cfg = cfg || {};
         var c = cfg.options ? folder.add(obj, key, cfg.options) : folder.add(obj, key);
@@ -290,10 +107,13 @@ export function setupGUI() {
         if (cfg.max !== undefined) c.max(cfg.max);
         if (cfg.step !== undefined) c.step(cfg.step);
         if (cfg.name) c.name(cfg.name);
-        var onChange = cfg.onChange;
-        if (cfg.trackBlackHolePreset) onChange = withBlackHolePresetTracking(onChange);
-        if (cfg.trackQualityPreset) onChange = withQualityPresetTracking(onChange);
-        if (onChange) c.onChange(onChange);
+        var handler = cfg.onChange;
+        c.onChange(function () {
+            if (cfg.trackBlackHolePreset) markBlackHolePresetCustom();
+            if (cfg.trackQualityPreset) markQualityPresetCustom();
+            if (handler) handler.apply(this, arguments);
+            notifyEngineChanged();
+        });
         if (cfg.help) addHelpText(c, cfg.help);
         if (cfg.className) setGuiRowClass(c, cfg.className);
         return c;
@@ -309,127 +129,41 @@ export function setupGUI() {
         });
     }
 
-    function getOptionLabel(options, value) {
-        for (var label in options) {
-            if (Object.hasOwn(options, label) && options[label] === value) {
-                return label;
-            }
-        }
-        return String(value);
-    }
-
-    var updateDependentVisibility = function () {};
-
-    function applyKerrMode(mode) {
-        // Re-apply quality preset with new mode (preset values depend on kerr_mode)
-        applyQualityPresetInternal(p.quality);
-        flashHint('Solver mode: ' + getOptionLabel(KERR_MODE_LABELS, mode), 900, 350);
-    }
-
-    function setPlanetControlsVisible(visible) {
-        document.querySelectorAll('.planet-controls').forEach(function (element) {
-            element.style.display = visible ? '' : 'none';
-        });
-    }
-
-    function applyQualityPresetInternal(value, selectSolver) {
-        setPlanetControlsVisible(true);
-
-        if (value === 'custom') {
-            restoreQualityPresetState(qualityCustomState);
-        } else {
-            var preset = applyQualityPresetValues(p, value, { selectSolver: !!selectSolver });
-            if (!preset) return;
-
-            if (preset.hide_planet_controls) {
-                setPlanetControlsVisible(false);
-            }
-        }
-
-        if (typeof applyRenderScaleFromSettings === 'function') {
-            applyRenderScaleFromSettings();
-        }
-        if (typeof resetTemporalAAHistory === 'function') {
-            resetTemporalAAHistory();
-        }
-        updateDependentVisibility();
-        updateShader();
-        refreshAllControllers();
-    }
-
-    function applyQualityPreset(value) {
-        applyQualityPresetInternal(value, true);
-        if (value === 'custom') {
-            qualityCustomState = captureQualityPresetState();
-        }
-    }
-
-    // applyBlackHolePreset is assigned below, after visibility helpers are defined.
-    var presetObj = { preset: 'Default' };
-    var applyBlackHolePreset;
+    var presetObj = {
+        get preset() {
+            return getBlackHolePresetName();
+        },
+        set preset(name) {},
+    };
     var renderingFolder = setupRenderingFolder({
         gui: gui,
         parameters: p,
+        presetObj: presetObj,
         addControl: addControl,
         qualityPresetLabels: QUALITY_PRESET_LABELS,
         kerrModeLabels: KERR_MODE_LABELS,
-        applyBlackHolePreset: function (name) {
-            if (applyBlackHolePreset) applyBlackHolePreset(name);
-        },
+        applyBlackHolePreset: applyBlackHolePreset,
         applyQualityPreset: applyQualityPreset,
         applyKerrMode: applyKerrMode,
         updateShader: updateShader,
         onResolutionScaleChange: function () {
-            if (typeof applyRenderScaleFromSettings === 'function') {
-                applyRenderScaleFromSettings();
-            }
-            if (typeof resetTemporalAAHistory === 'function') {
-                resetTemporalAAHistory();
-            }
+            applyRenderScaleFromSettings();
+            resetTemporalAAHistory();
         },
         onTaaEnabledChange: function () {
-            if (typeof resetTemporalAAHistory === 'function') {
-                resetTemporalAAHistory();
-            }
-            updateDependentVisibility();
+            resetTemporalAAHistory();
             shader.needsUpdate = true;
         },
         onTaaSettingChange: function () {
-            if (typeof resetTemporalAAHistory === 'function') {
-                resetTemporalAAHistory();
-            }
+            resetTemporalAAHistory();
             shader.needsUpdate = true;
         },
     });
-    presetObj = renderingFolder.presetObj;
-    blackHolePresetController = renderingFolder.blackHolePresetController;
-    qualityPresetController = renderingFolder.qualityPresetController;
     var taaEnabledCtrl = renderingFolder.taaEnabledCtrl;
     var taaHistoryWeightCtrl = renderingFolder.taaHistoryWeightCtrl;
     var taaClipGammaCtrl = renderingFolder.taaClipGammaCtrl;
     var taaMotionRejectCtrl = renderingFolder.taaMotionRejectCtrl;
     var taaMaxDeltaCtrl = renderingFolder.taaMaxDeltaCtrl;
-
-    applyQualityPreset(p.quality);
-    blackHoleCustomState = captureBlackHolePresetState();
-    qualityCustomState = captureQualityPresetState();
-
-    // Custom scroll handler to control observer distance
-    // Placed here so we have access to refreshAllControllers and distanceController
-    renderer.domElement.addEventListener(
-        'wheel',
-        function (e) {
-            e.preventDefault();
-            var delta = e.deltaY > 0 ? 1.15 : 0.87; // zoom out / zoom in
-            var newDist = p.observer.distance * delta;
-            newDist = clampObserverDistance(newDist, p.observer.motion);
-            p.observer.distance = newDist;
-            updateCamera();
-            shader.needsUpdate = true;
-            refreshAllControllers();
-        },
-        { passive: false },
-    );
 
     var accretionLookFolders = setupAccretionLookFolders({
         gui: gui,
@@ -465,87 +199,6 @@ export function setupGUI() {
     var lookAberrationStrengthCtrl = accretionLookFolders.lookAberrationStrengthCtrl;
     var bloomStrengthCtrl = accretionLookFolders.bloomStrengthCtrl;
     var bloomRadiusCtrl = accretionLookFolders.bloomRadiusCtrl;
-
-    applyBlackHolePreset = function (name) {
-        if (name === 'Custom') {
-            restoreBlackHolePresetState(blackHoleCustomState);
-            updateDependentVisibility();
-            updateCamera();
-            updateShader();
-            refreshAllControllers();
-            blackHoleCustomState = captureBlackHolePresetState();
-            return;
-        }
-        var preset = BH_PRESETS[name];
-        if (!preset) return;
-
-        p.black_hole.spin_enabled = preset.spin_enabled;
-        p.black_hole.spin = preset.spin;
-        p.black_hole.spin_strength = preset.spin_strength;
-        p.accretion_disk = preset.accretion_disk;
-        p.accretion_mode = preset.accretion_mode;
-        p.disk_temperature = preset.disk_temperature;
-        if (preset.disk) Object.assign(p.disk, preset.disk);
-        p.torus.r0 = preset.torus.r0;
-        p.torus.h_ratio = preset.torus.h_ratio;
-        p.torus.radial_falloff = preset.torus.radial_falloff;
-        p.torus.opacity = preset.torus.opacity;
-        p.torus.outer_radius = preset.torus.outer_radius;
-        p.slim.h_ratio = preset.slim.h_ratio;
-        p.slim.opacity = preset.slim.opacity;
-        p.slim.puff_factor = preset.slim.puff_factor;
-        p.jet.enabled = preset.jet.enabled;
-        p.jet.mode = preset.jet.mode;
-        p.jet.half_angle = preset.jet.half_angle;
-        p.jet.lorentz_factor = preset.jet.lorentz_factor;
-        p.jet.brightness = preset.jet.brightness;
-        p.jet.length = preset.jet.length;
-        p.jet.spectral_index =
-            preset.jet.spectral_index !== undefined ? preset.jet.spectral_index : 0.7;
-        p.jet.magnetization = preset.jet.magnetization;
-        p.jet.knot_spacing = preset.jet.knot_spacing;
-        p.jet.corona_brightness = preset.jet.corona_brightness;
-        p.jet.base_width = preset.jet.base_width;
-        p.jet.corona_extent = preset.jet.corona_extent;
-        if (preset.grmhd) {
-            p.grmhd.enabled = preset.grmhd.enabled;
-            p.grmhd.r_high = preset.grmhd.r_high;
-            p.grmhd.magnetic_beta = preset.grmhd.magnetic_beta;
-            p.grmhd.mad_flux = preset.grmhd.mad_flux;
-            p.grmhd.density_scale = preset.grmhd.density_scale;
-            p.grmhd.turbulence_amp = preset.grmhd.turbulence_amp;
-            p.grmhd.electron_kappa = preset.grmhd.electron_kappa;
-            p.grmhd.magnetic_field_str = preset.grmhd.magnetic_field_str;
-        } else {
-            // Default GRMHD off when preset doesn't specify it
-            p.grmhd.enabled = false;
-        }
-        p.beaming = preset.beaming;
-        p.physical_beaming = preset.physical_beaming;
-        p.doppler_shift = preset.doppler_shift;
-        p.look.disk_gain = preset.disk_gain;
-        p.look.glow = preset.glow;
-        p.look.galaxy_gain = preset.galaxy_gain;
-        p.look.tone_mapper = preset.tone_mapper;
-        p.look.white_balance_enabled = preset.white_balance_k !== undefined;
-        if (preset.white_balance_k !== undefined) p.look.white_balance_k = preset.white_balance_k;
-
-        if (preset.bloom) {
-            p.bloom.enabled = preset.bloom.enabled;
-            p.bloom.strength = preset.bloom.strength;
-            p.bloom.radius = preset.bloom.radius;
-        }
-        setViewInclination(
-            preset.view_inclination !== undefined
-                ? preset.view_inclination
-                : DEFAULT_VIEW_INCLINATION,
-        );
-
-        updateDependentVisibility();
-        updateCamera();
-        updateShader();
-        refreshAllControllers();
-    };
 
     var simulationFolders = setupSimulationFolders({
         gui: gui,
@@ -633,7 +286,6 @@ export function setupGUI() {
             setAnimationTimelineCaptureCameraSmoothingEnabled,
         updateAnimationTimelineCaptureUi: updateAnimationTimelineCaptureUi,
         buildTimelinePanel: buildTimelinePanel,
-        getTimelinePanelBinding: getTimelinePanelBinding,
     });
 
     var observerOrbitWidget = setupObserverOrbitWidget({

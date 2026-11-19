@@ -6,7 +6,7 @@ import {
 import { SITE } from './site-metadata.js';
 
 // Installable app and offline support through vite-plugin-pwa (generateSW). The service worker
-// precaches the app shell (HTML, JS, CSS, the manifest and its icons), keeps textures in a
+// precaches the app shell (HTML, JS, CSS, fonts, the manifest and its icons), keeps textures in a
 // runtime cache and never caches video. src/features/pwa/register.js registers it.
 
 // Rendered from public/icons/black-hole.svg by scripts/render-pwa-icons.js. Maskable icons keep
@@ -57,7 +57,7 @@ export const pwaOptions = {
         ],
     },
     workbox: {
-        globPatterns: ['**/*.{js,css,html}'],
+        globPatterns: ['**/*.{js,css,html,woff2}'],
         globIgnores: ['**/node_modules/**/*', 'docs/**'],
         // Navigations are answered from the precache only for the page itself: every query
         // parameter (?quality=, ?e2e=) is ignored when matching, and index.html also answers the

@@ -3,7 +3,6 @@ import {
     renderer,
     camera,
     scene,
-    stats,
     shader,
     observer,
     bloomPass,
@@ -31,6 +30,7 @@ import { resizePasses, resizeRendererAndPasses, updateAxesGizmo } from './render
 import { whiteBalance } from '../physics/emission.js';
 import { registerBlackHoleRuntimeApi } from '../runtime/runtime-registry.js';
 import { isE2eMode, notifyFrameRendered } from '../runtime/test-hooks.js';
+import { recordRenderedFrame } from '../runtime/frame-stats.js';
 import { updateScientificLegend } from '../../ui/widgets/scientific-legend.js';
 
 var lastCameraMat = new THREE.Matrix4().identity();
@@ -182,10 +182,11 @@ function drawRendererFrame(forceRender) {
         frobeniusDistance(camera.matrixWorldInverse, lastCameraMat) > 1e-10
     ) {
         shader.needsUpdate = false;
+        var renderStart = performance.now();
         render();
+        recordRenderedFrame(performance.now() - renderStart);
         lastCameraMat = camera.matrixWorldInverse.clone();
     }
-    stats.update();
 }
 
 export function setRendererOfflineSteppingActive(active) {
@@ -206,7 +207,6 @@ export function animate() {
     requestAnimationFrame(animate);
 
     if (rendererOfflineSteppingActive) {
-        stats.update();
         return;
     }
 

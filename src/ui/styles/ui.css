@@ -1,0 +1,366 @@
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities);
+@import './shell.css';
+
+/* Event Horizon design tokens. The panel is more opaque than the design's 0.78 and text-3 is
+   lighter than #7D8596 so that secondary text keeps 4.5:1 contrast over the brightest disk. */
+@theme static {
+    --color-space: #05060a;
+    --color-panel: rgb(13 15 21 / 0.88);
+    --color-panel-solid: #0d0f15;
+    --color-raised: #14171e;
+    --color-hairline: rgb(255 255 255 / 0.08);
+    --color-text: #e9ecf2;
+    --color-text-2: #a3abba;
+    --color-text-3: #8991a2;
+    --color-accent: #ffb44d;
+    --color-on-accent: #1a1206;
+    --color-doppler: #7cc4ff;
+    --color-redshift: #ff9a7a;
+    --color-ok: #5bd6a0;
+    --color-danger: #ff6b6b;
+    --radius-xs: 6px;
+    --radius-sm: 9px;
+    --radius-md: 14px;
+    --radius-lg: 16px;
+    --radius-pill: 999px;
+    --font-ui: 'Inter Variable', 'Inter', system-ui, sans-serif;
+    --font-title: 'Space Grotesk Variable', 'Space Grotesk', var(--font-ui);
+    --font-num: 'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, monospace;
+    --spacing: 4px;
+}
+
+.bh-ui {
+    font-weight: 400;
+    font-family: var(--font-ui);
+    font-size: 13px;
+    line-height: 18px;
+    color: var(--color-text);
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: 'cv11', 'ss01';
+}
+
+.bh-ui *,
+.bh-ui *::before,
+.bh-ui *::after {
+    box-sizing: border-box;
+}
+
+.bh-ui :where(button, input, select, textarea) {
+    font: inherit;
+    color: inherit;
+    letter-spacing: inherit;
+}
+
+.bh-ui :where(button) {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+}
+
+.bh-ui :where(button:disabled) {
+    cursor: default;
+}
+
+.bh-ui :where(h1, h2, h3, p, ul, ol, dl, dd, figure) {
+    margin: 0;
+    padding: 0;
+}
+
+.bh-ui :where(ul, ol) {
+    list-style: none;
+}
+
+.bh-ui :where(a) {
+    color: var(--color-doppler);
+}
+
+/* Two-tone focus ring: the dark halo keeps the blue ring visible over the bright disk. */
+.bh-ui :focus-visible {
+    outline: 2px solid var(--color-doppler);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 2px var(--color-space);
+}
+
+.bh-ui :focus:not(:focus-visible) {
+    outline: none;
+}
+
+.num {
+    font-family: var(--font-num);
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+}
+
+.glass {
+    background: var(--color-panel);
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    border: 1px solid var(--color-hairline);
+    box-shadow: 0 12px 32px rgb(0 0 0 / 0.35);
+}
+
+.kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 5px;
+    border: 1px solid rgb(255 255 255 / 0.12);
+    border-radius: 5px;
+    background: rgb(255 255 255 / 0.05);
+    font-family: var(--font-num);
+    font-size: 11px;
+    color: var(--color-text-2);
+}
+
+.icon-btn {
+    display: inline-grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    color: #c9cfda;
+    transition:
+        background 120ms,
+        color 120ms;
+}
+
+.icon-btn:hover {
+    background: rgb(255 255 255 / 0.07);
+    color: var(--color-text);
+}
+
+.icon-btn[aria-pressed='true'],
+.icon-btn[data-state='open'] {
+    background: rgb(255 180 77 / 0.12);
+    color: var(--color-accent);
+}
+
+.icon-btn--sm {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 34px;
+    padding: 0 14px;
+    border-radius: var(--radius-sm);
+    font-size: 12.5px;
+    font-weight: 500;
+    white-space: nowrap;
+    transition:
+        background 120ms,
+        border-color 120ms;
+}
+
+.btn--primary {
+    background: var(--color-accent);
+    color: var(--color-on-accent);
+    font-weight: 600;
+}
+
+.btn--primary:hover {
+    background: #ffc169;
+}
+
+.btn--secondary {
+    border: 1px solid rgb(255 255 255 / 0.12);
+    background: rgb(255 255 255 / 0.05);
+}
+
+.btn--secondary:hover {
+    background: rgb(255 255 255 / 0.09);
+}
+
+.btn--ghost {
+    color: #c9cfda;
+}
+
+.btn--ghost:hover {
+    background: rgb(255 255 255 / 0.06);
+    color: var(--color-text);
+}
+
+.btn--danger {
+    border: 1px solid rgb(255 107 107 / 0.4);
+    background: rgb(255 107 107 / 0.08);
+    color: #ffb0b0;
+}
+
+.btn:disabled {
+    color: #6a7282;
+    background: rgb(255 255 255 / 0.03);
+    border-color: transparent;
+}
+
+.overline {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-text-3);
+}
+
+.popover {
+    z-index: 40;
+    min-width: 220px;
+    padding: 6px;
+    border-radius: 12px;
+    background: rgb(15 17 24 / 0.96);
+    border: 1px solid rgb(255 255 255 / 0.1);
+    box-shadow: 0 20px 50px rgb(0 0 0 / 0.55);
+    color: var(--color-text);
+}
+
+.tooltip {
+    z-index: 50;
+    max-width: 280px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: #1b1f28;
+    border: 1px solid rgb(255 255 255 / 0.12);
+    font-size: 12px;
+    line-height: 17px;
+    color: var(--color-text);
+    box-shadow: 0 12px 30px rgb(0 0 0 / 0.45);
+}
+
+.menu-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 36px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    text-align: left;
+    font-size: 13px;
+}
+
+.menu-item:hover,
+.menu-item[data-highlighted],
+.menu-item[data-state='on'] {
+    background: rgb(255 255 255 / 0.06);
+}
+
+.menu-item[aria-checked='true'],
+.menu-item[data-state='on'] {
+    color: var(--color-accent);
+}
+
+.toast {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 44px;
+    padding: 8px 8px 8px 14px;
+    border-radius: var(--radius-pill);
+    background: rgb(15 17 24 / 0.94);
+    border: 1px solid rgb(91 214 160 / 0.3);
+    color: var(--color-text);
+    font-family: var(--font-ui);
+    font-size: 13px;
+    box-shadow: 0 16px 40px rgb(0 0 0 / 0.45);
+}
+
+.toast[data-type='warning'],
+.toast[data-type='error'] {
+    border-color: rgb(255 154 122 / 0.35);
+}
+
+.toast [data-icon] {
+    color: var(--color-ok);
+}
+
+.toast[data-type='warning'] [data-icon],
+.toast[data-type='error'] [data-icon] {
+    color: var(--color-redshift);
+}
+
+.toast [data-description] {
+    color: var(--color-text-2);
+    font-size: 12px;
+}
+
+.toast [data-button] {
+    height: 30px;
+    padding: 0 12px;
+    border-radius: var(--radius-pill);
+    background: var(--color-accent);
+    color: var(--color-on-accent);
+    font-weight: 600;
+}
+
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+    .glass {
+        background: var(--color-panel-solid);
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .bh-ui *,
+    .bh-ui *::before,
+    .bh-ui *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+.segmented {
+    display: flex;
+    gap: 2px;
+    padding: 3px;
+    border-radius: 10px;
+    background: rgb(255 255 255 / 0.04);
+    border: 1px solid rgb(255 255 255 / 0.07);
+}
+
+.segmented-item {
+    flex: 1;
+    min-height: 30px;
+    padding: 0 8px;
+    border-radius: 7px;
+    font-size: 12px;
+    color: var(--color-text-2);
+    white-space: nowrap;
+}
+
+.segmented-item:hover {
+    color: var(--color-text);
+    background: rgb(255 255 255 / 0.05);
+}
+
+.segmented-item[data-state='on'] {
+    background: rgb(255 180 77 / 0.16);
+    color: var(--color-accent);
+    font-weight: 600;
+}
+
+.menu-label {
+    padding: 6px 10px;
+}

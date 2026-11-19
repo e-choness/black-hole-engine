@@ -1468,45 +1468,6 @@ body.tl-resizing * {
     box-shadow: 0 0 10px rgba(255, 128, 96, 0.35);
 }
 
-/* ── Open-timeline button (injected by gui.js) ── */
-#tl-open-btn {
-    position: fixed;
-    left: 50%;
-    bottom: 40px;
-    transform: translateX(-50%);
-    z-index: 130;
-    border: 1px solid #2e5080;
-    border-radius: 5px;
-    background: rgba(14, 24, 44, 0.92);
-    color: #80b4e8;
-    font-family: 'Lucida Grande', 'Segoe UI', sans-serif;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 1.5px;
-    padding: 6px 20px;
-    cursor: pointer;
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
-    transition:
-        background 0.14s,
-        border-color 0.14s,
-        color 0.14s,
-        bottom 0.22s ease,
-        opacity 0.22s ease;
-    text-transform: uppercase;
-}
-#tl-open-btn:hover {
-    background: rgba(24, 44, 78, 0.95);
-    border-color: #4a80c0;
-    color: #b8dcff;
-}
-body.has-timeline-panel #tl-open-btn {
-    opacity: 0;
-    pointer-events: none;
-    bottom: -40px;
-}
-
 /* ── Responsive ── */
 @media screen and (max-width: 900px) {
     .tl-tracks {

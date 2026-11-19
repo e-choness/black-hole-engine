@@ -1,6 +1,8 @@
 import js from '@eslint/js';
 import { defineConfig, globalIgnores } from 'eslint/config';
+import reactHooks from 'eslint-plugin-react-hooks';
 import globals from 'globals';
+import tseslint from 'typescript-eslint';
 
 export default defineConfig([
     globalIgnores(['dist/', 'coverage/', '.cache/', 'test-results/', 'playwright-report/']),
@@ -19,6 +21,20 @@ export default defineConfig([
         files: ['src/**/*.js'],
         languageOptions: {
             globals: globals.browser,
+        },
+    },
+    {
+        files: ['**/*.{ts,tsx}'],
+        extends: [tseslint.configs.recommended, reactHooks.configs.flat.recommended],
+        languageOptions: {
+            globals: globals.browser,
+        },
+        rules: {
+            'no-unused-vars': 'off',
+            '@typescript-eslint/no-unused-vars': [
+                'error',
+                { args: 'none', caughtErrors: 'none', varsIgnorePattern: '^_' },
+            ],
         },
     },
     {

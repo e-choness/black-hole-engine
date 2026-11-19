@@ -26,7 +26,7 @@ services:
 
   test:
     <<: *tooling
-    command: [sh, -c, npm run lint && npm test]
+    command: [sh, -c, npm run lint && npm run typecheck && npm test]
 
   build:
     <<: *tooling
