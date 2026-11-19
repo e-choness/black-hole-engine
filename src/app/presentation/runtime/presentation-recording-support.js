@@ -7,15 +7,19 @@ import {
     pickRecorderMimeType,
 } from './presentation-video-formats.js';
 
-export function choosePresentationMimeType(container) {
+export function choosePresentationMimeType(container, codec) {
     if (typeof MediaRecorder === 'undefined') return '';
     if (typeof MediaRecorder.isTypeSupported !== 'function') {
         return PRESENTATION_VIDEO_CONTAINERS[normalizePresentationVideoContainer(container)]
             .mimeType;
     }
-    return pickRecorderMimeType(container, function (mimeType) {
-        return MediaRecorder.isTypeSupported(mimeType);
-    });
+    return pickRecorderMimeType(
+        container,
+        function (mimeType) {
+            return MediaRecorder.isTypeSupported(mimeType);
+        },
+        codec,
+    );
 }
 
 // Wraps a file opened with the File System Access API. Mediabunny closes its target both when

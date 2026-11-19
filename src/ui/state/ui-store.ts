@@ -12,13 +12,22 @@ interface UiState {
     inspectorFilter: string;
     paletteOpen: boolean;
     shortcutsOpen: boolean;
+    captureOpen: boolean;
+    captureTab: CaptureTab;
     setUiHidden: (hidden: boolean) => void;
     setInspectorOpen: (open: boolean) => void;
     setInspectorTab: (tab: InspectorTab) => void;
     setInspectorFilter: (query: string) => void;
     setPaletteOpen: (open: boolean) => void;
     setShortcutsOpen: (open: boolean) => void;
+    setCaptureOpen: (open: boolean) => void;
+    setCaptureTab: (tab: CaptureTab) => void;
 }
+
+export type CaptureTab = 'screenshot' | 'video';
+
+// Only one overlay is open at a time.
+const OVERLAYS_CLOSED = { paletteOpen: false, shortcutsOpen: false, captureOpen: false };
 
 export const useUi = create<UiState>()((set) => ({
     uiHidden: false,
@@ -27,15 +36,19 @@ export const useUi = create<UiState>()((set) => ({
     inspectorFilter: '',
     paletteOpen: false,
     shortcutsOpen: false,
+    captureOpen: false,
+    captureTab: 'video',
     setUiHidden: (uiHidden) => set({ uiHidden }),
     setInspectorOpen: (inspectorOpen) => set({ inspectorOpen }),
     setInspectorTab: (inspectorTab) => set({ inspectorTab }),
     setInspectorFilter: (inspectorFilter) => set({ inspectorFilter }),
-    // Only one of the two overlays is open at a time.
     setPaletteOpen: (paletteOpen) =>
-        set(paletteOpen ? { paletteOpen, shortcutsOpen: false } : { paletteOpen }),
+        set(paletteOpen ? { ...OVERLAYS_CLOSED, paletteOpen } : { paletteOpen }),
     setShortcutsOpen: (shortcutsOpen) =>
-        set(shortcutsOpen ? { shortcutsOpen, paletteOpen: false } : { shortcutsOpen }),
+        set(shortcutsOpen ? { ...OVERLAYS_CLOSED, shortcutsOpen } : { shortcutsOpen }),
+    setCaptureOpen: (captureOpen) =>
+        set(captureOpen ? { ...OVERLAYS_CLOSED, captureOpen } : { captureOpen }),
+    setCaptureTab: (captureTab) => set({ captureTab }),
 }));
 
 // Opens the inspector on the tab of a parameter; focusParam() then moves the focus to its control
@@ -51,4 +64,8 @@ export function focusParam(id: string): void {
         row.scrollIntoView({ block: 'center' });
         focusControl(row);
     });
+}
+
+export function openCapture(tab: CaptureTab): void {
+    useUi.setState({ ...OVERLAYS_CLOSED, captureOpen: true, captureTab: tab });
 }

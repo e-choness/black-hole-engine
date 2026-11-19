@@ -1,5 +1,7 @@
 import { useEffect } from 'react';
 import { Tooltip } from 'radix-ui';
+import { CaptureDialog } from './components/capture/CaptureDialog';
+import { CaptureMonitor } from './components/capture/CaptureMonitor';
 import { CommandPalette } from './components/CommandPalette';
 import { Footer } from './components/Footer';
 import { Inspector } from './components/inspector/Inspector';
@@ -27,6 +29,8 @@ export function App() {
             </div>
             <CommandPalette />
             <ShortcutSheet />
+            <CaptureDialog />
+            <CaptureMonitor />
             <Notices />
         </Tooltip.Provider>
     );

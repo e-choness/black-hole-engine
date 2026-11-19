@@ -1,0 +1,245 @@
+/* Capture dialog and the progress panel of a running capture. */
+.capture {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    z-index: 61;
+    display: flex;
+    flex-direction: column;
+    width: min(600px, calc(100vw - 32px));
+    max-height: calc(100dvh - 32px);
+    padding: 16px 20px 18px;
+    overflow-y: auto;
+    border-radius: var(--radius-lg);
+    background: var(--color-panel-solid);
+    transform: translate(-50%, -50%);
+}
+
+.capture-tabs {
+    display: flex;
+    gap: 4px;
+    margin: 0 -20px;
+    padding: 0 20px;
+    border-bottom: 1px solid var(--color-hairline);
+}
+
+.capture-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding-top: 18px;
+}
+
+.capture-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px 18px;
+}
+
+.capture-field {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+}
+
+.capture-field--wide {
+    grid-column: 1 / -1;
+}
+
+.capture-label {
+    color: var(--color-text-2);
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.capture-select {
+    width: 100%;
+    max-width: none;
+    height: 38px;
+}
+
+.capture-hint {
+    margin: 0;
+    color: var(--color-text-3);
+    font-size: 11.5px;
+    line-height: 16px;
+}
+
+.capture-hint--field {
+    align-self: end;
+    padding-bottom: 4px;
+}
+
+.capture-check {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 32px;
+    font-size: 13px;
+}
+
+.capture-check label {
+    cursor: pointer;
+}
+
+.checkbox {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: 1px solid rgb(255 255 255 / 0.25);
+    border-radius: 5px;
+    background: rgb(255 255 255 / 0.04);
+    color: #1a1206;
+    cursor: pointer;
+}
+
+.checkbox[data-state='checked'] {
+    border-color: var(--color-accent);
+    background: var(--color-accent);
+}
+
+.capture-estimate {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 0;
+    padding: 12px 14px;
+    border: 1px solid rgb(124 196 255 / 0.2);
+    border-radius: 12px;
+    background: rgb(124 196 255 / 0.07);
+    color: #cfe6ff;
+    font-size: 13px;
+}
+
+.capture-estimate svg {
+    flex: none;
+    color: var(--color-doppler);
+}
+
+.capture-actions {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.record-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: var(--radius-pill);
+    background: #c2271b;
+}
+
+.btn--sm {
+    height: 30px;
+    padding: 0 10px;
+    font-size: 12px;
+}
+
+.capture-progress {
+    position: fixed;
+    right: max(16px, env(safe-area-inset-right));
+    bottom: max(16px, env(safe-area-inset-bottom));
+    z-index: 55;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: min(340px, calc(100vw - 32px));
+    padding: 14px;
+    border-radius: 14px;
+    background: var(--color-panel-solid);
+}
+
+.capture-progress-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.capture-progress-foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+}
+
+.capture-progress-actions {
+    display: flex;
+    gap: 8px;
+    margin-left: auto;
+}
+
+.capture-progress-title {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.capture-progress-label {
+    margin: -4px 0 0 16px;
+    overflow: hidden;
+    color: var(--color-text-2);
+    font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.capture-progress-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: var(--radius-pill);
+    background: #ff6b6b;
+    box-shadow: 0 0 0 4px rgb(255 107 107 / 0.18);
+}
+
+.capture-progress-dot[data-paused='true'] {
+    background: var(--color-text-3);
+    box-shadow: none;
+}
+
+.capture-progress-bar {
+    height: 6px;
+    overflow: hidden;
+    border-radius: var(--radius-pill);
+    background: rgb(255 255 255 / 0.08);
+}
+
+.capture-progress-bar span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--color-accent);
+}
+
+.capture-progress-foot {
+    color: var(--color-text-2);
+    font-size: 12px;
+}
+
+.capture-progress-detail {
+    flex: 1 1 auto;
+}
+
+@media (max-width: 560px) {
+    .capture-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+.record-glyph {
+    width: 12px;
+    height: 12px;
+    border: 2px solid currentColor;
+    border-radius: var(--radius-pill);
+    background: #e5484d;
+}
+
+.record-btn:not(:disabled):hover .record-glyph {
+    background: #ff6b6b;
+}

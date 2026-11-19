@@ -40,10 +40,7 @@ export function advanceTimelineDrivenDiveObserverTime(dt) {
         return;
     }
     var r = Math.max(diveState.currentR, diveFloor());
-    var effectiveSpeed = diveState.cinematic
-        ? diveState.speed * cinematicFactor(r)
-        : diveState.speed;
-    observer.time += dt * effectiveSpeed * shader.parameters.time_scale;
+    observer.time += dt * diveEffectiveSpeed(r) * shader.parameters.time_scale;
 }
 
 export function startDive(options) {
@@ -184,6 +181,38 @@ export function seekDive(targetR, options) {
     updateCamera();
 }
 
+// Playback speed of the dive at radius r, slowed near the photon sphere and the horizon in
+// cinematic mode.
+function diveEffectiveSpeed(r) {
+    return diveState.cinematic ? diveState.speed * cinematicFactor(r) : diveState.speed;
+}
+
+// Radius after a step of dt seconds from r: midpoint integration of dr/dtau = -fallRate(r), with
+// dtau scaled by the playback speed and the time scale.
+function diveRadiusStep(r, dt, floor, timeScale) {
+    var fallDt = dt * diveEffectiveSpeed(r) * timeScale;
+    var k1 = -fallRate(r) * fallDt;
+    var rMid = Math.max(r + k1 * 0.5, 0.01);
+    var k2 = -fallRate(rMid) * fallDt;
+    return Math.max(r + k2, floor);
+}
+
+// Frames a dive from startR lasts at `fps` steps per second, counted the way updateDive steps it:
+// the frame that reaches the floor is followed by the one that ends the dive. Infinity when it
+// would not end within maxFrames.
+export function diveFrameCount(startR, fps, maxFrames, timeScale) {
+    var floor = diveFloor();
+    var dt = 1.0 / fps;
+    var r = startR;
+    var frames = 0;
+    while (r > floor) {
+        if (frames >= maxFrames) return Infinity;
+        r = diveRadiusStep(r, dt, floor, timeScale);
+        frames += 1;
+    }
+    return frames + 1;
+}
+
 export function updateDive(dt) {
     if (!diveState.active || diveState.paused || diveState.reachedSingularity) return;
 
@@ -194,14 +223,8 @@ export function updateDive(dt) {
         return;
     }
 
-    var effectiveSpeed = diveState.cinematic
-        ? diveState.speed * cinematicFactor(r)
-        : diveState.speed;
-    var fallDt = dt * effectiveSpeed * shader.parameters.time_scale;
-    var k1 = -fallRate(r) * fallDt;
-    var rMid = Math.max(r + k1 * 0.5, 0.01);
-    var k2 = -fallRate(rMid) * fallDt;
-    var newR = Math.max(r + k2, floor);
+    var effectiveSpeed = diveEffectiveSpeed(r);
+    var newR = diveRadiusStep(r, dt, floor, shader.parameters.time_scale);
 
     diveState.currentR = newR;
     observer.position.copy(diveState.direction.clone().multiplyScalar(newR));
@@ -237,7 +260,7 @@ export function diveReadout() {
         spinning: spinning,
         rHorizon: rHorizon,
         phase: phase,
-        speed: diveState.cinematic ? diveState.speed * cinematicFactor(r) : diveState.speed,
+        speed: diveEffectiveSpeed(r),
         progress: Math.max(0, Math.min(1, 1.0 - r / Math.max(diveState.prevDistance, 1))),
         startR: Math.max(diveState.prevDistance, 1),
     };

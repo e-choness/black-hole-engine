@@ -1,5 +1,17 @@
 // Shared steps for the end-to-end tests.
 
+import AxeBuilder from '@axe-core/playwright';
+
+const BLOCKING = new Set(['serious', 'critical']);
+
+// Serious and critical axe violations in the interface, overlays included, as readable lines.
+export async function blockingViolations(page) {
+    const results = await new AxeBuilder({ page }).include('#ui-root').analyze();
+    return results.violations
+        .filter((violation) => BLOCKING.has(violation.impact))
+        .map((violation) => `${violation.id}: ${violation.nodes.map((n) => n.target).join(' | ')}`);
+}
+
 // Collects console errors and uncaught page errors; every test expects the list to stay empty.
 export function trackPageProblems(page) {
     const problems = [];

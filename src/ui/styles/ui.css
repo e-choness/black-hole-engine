@@ -4,6 +4,7 @@
 @import './inspector.css';
 @import './footer.css';
 @import './overlays.css';
+@import './capture.css';
 
 /* Event Horizon design tokens. The panel is more opaque than the design's 0.78 and text-3 is
    lighter than #7D8596 so that secondary text keeps 4.5:1 contrast over the brightest disk. */
@@ -229,7 +230,7 @@
 }
 
 .popover {
-    z-index: 40;
+    z-index: 70;
     min-width: 220px;
     padding: 6px;
     border-radius: 12px;
@@ -240,7 +241,7 @@
 }
 
 .tooltip {
-    z-index: 50;
+    z-index: 80;
     max-width: 280px;
     padding: 8px 10px;
     border-radius: 10px;

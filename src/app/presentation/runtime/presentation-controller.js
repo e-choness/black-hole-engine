@@ -70,7 +70,9 @@ import {
 } from './presentation-recording-support.js';
 import {
     DEFAULT_PRESENTATION_VIDEO_CONTAINER,
+    PRESENTATION_VIDEO_CODECS,
     PRESENTATION_VIDEO_CONTAINERS,
+    normalizePresentationVideoCodec,
     normalizePresentationVideoContainer,
 } from './presentation-video-formats.js';
 import {
@@ -144,9 +146,40 @@ var presentationCaptureState = {
     offlineJob: null,
     offlineUnavailableReason: '',
     rendererResizedForRecording: false,
+    // Recordings without a timeline end when until() returns true; expectedFrames, when known,
+    // drives their progress and time estimate.
+    until: null,
+    expectedFrames: 0,
+    startedAtMs: 0,
+    paused: false,
+    pausedAtMs: 0,
+    pausedTotalMs: 0,
+    cancelled: false,
+    // Outcome of the last recording, { id, status: 'saved' | 'failed' | 'cancelled', message }.
+    result: null,
+    resultCount: 0,
 };
 
 var presentationUiRefreshAccumulator = 0.0;
+
+// Open-ended recordings stop after this much video even if their end condition never comes.
+var OPEN_ENDED_RECORDING_MAX_SECONDS = 600;
+
+function reportRecordingResult(status, message) {
+    presentationCaptureState.resultCount += 1;
+    presentationCaptureState.result = {
+        id: presentationCaptureState.resultCount,
+        status: status,
+        message: message || '',
+    };
+}
+
+// Wall-clock milliseconds since `startMs` that the recording was not paused.
+function recordingElapsedMs(startMs) {
+    if (!startMs) return 0;
+    var now = presentationCaptureState.paused ? presentationCaptureState.pausedAtMs : Date.now();
+    return Math.max(0, now - startMs - presentationCaptureState.pausedTotalMs);
+}
 
 function clonePresentationData(value) {
     return JSON.parse(JSON.stringify(value));
@@ -630,10 +663,10 @@ export function getPresentationState() {
     }
     var offlineFramesDone = offlineJob ? offlineJob.frameCount || 0 : 0;
     var offlineFramesTotal = offlineJob ? offlineJob.totalFrames || 0 : 0;
-    var offlineElapsedSeconds = 0;
-    if (offlineJob && offlineJob.wallStartMs) {
-        offlineElapsedSeconds = Math.max(0.0, (Date.now() - offlineJob.wallStartMs) / 1000.0);
-    }
+    var offlineFramesExpected = offlineFramesTotal || presentationCaptureState.expectedFrames || 0;
+    var offlineElapsedSeconds = offlineJob
+        ? recordingElapsedMs(offlineJob.wallStartMs) / 1000.0
+        : 0;
     var offlineSinceLastFrameSeconds = 0;
     if (offlineJob && offlineJob.lastFrameWallMs) {
         offlineSinceLastFrameSeconds = Math.max(
@@ -643,15 +676,20 @@ export function getPresentationState() {
     }
     var offlineRenderFps =
         offlineElapsedSeconds > 0.0 ? offlineFramesDone / offlineElapsedSeconds : 0.0;
+    // An expected frame count is only an estimate, so its progress stops short of done.
     var offlineProgress =
-        offlineFramesTotal > 0
-            ? presentationClamp(offlineFramesDone / offlineFramesTotal, 0.0, 1.0)
+        offlineFramesExpected > 0
+            ? presentationClamp(
+                  offlineFramesDone / offlineFramesExpected,
+                  0.0,
+                  offlineFramesTotal > 0 ? 1.0 : 0.99,
+              )
             : 0.0;
     var offlineEtaSeconds = -1;
-    if (offlineFramesTotal > 0 && offlineRenderFps > 1e-6) {
+    if (offlineFramesExpected > 0 && offlineRenderFps > 1e-6) {
         offlineEtaSeconds = Math.max(
             0.0,
-            (offlineFramesTotal - offlineFramesDone) / offlineRenderFps,
+            (offlineFramesExpected - offlineFramesDone) / offlineRenderFps,
         );
     }
     var offlinePhase = offlineJob && offlineJob.phase ? offlineJob.phase : 'idle';
@@ -682,6 +720,9 @@ export function getPresentationState() {
         time: presentationState.time,
         duration: presentationState.duration,
         recording: !!presentationCaptureState.active,
+        recording_paused: !!presentationCaptureState.paused,
+        recording_elapsed_s: recordingElapsedMs(presentationCaptureState.startedAtMs) / 1000.0,
+        recording_result: presentationCaptureState.result,
         recording_mode: presentationCaptureState.mode || 'realtime',
         recording_mode_preferred: presentationCaptureState.preferredMode || 'offline',
         recording_video_container: presentationCaptureState.videoContainer,
@@ -695,7 +736,7 @@ export function getPresentationState() {
         recording_background_throttle_reason: backgroundThrottleReason,
         recording_offline_phase: offlinePhase,
         recording_offline_frames_done: offlineFramesDone,
-        recording_offline_frames_total: offlineFramesTotal,
+        recording_offline_frames_total: offlineFramesExpected,
         recording_offline_progress: offlineProgress,
         recording_offline_finalizing_progress: offlineFinalizingProgress,
         recording_offline_elapsed_s: offlineElapsedSeconds,
@@ -997,6 +1038,13 @@ function cleanupPresentationRecordingState() {
     clearPresentationCaptureBuffers();
     presentationCaptureState.backgroundThrottleDetected = false;
     presentationCaptureState.offlineJob = null;
+    presentationCaptureState.until = null;
+    presentationCaptureState.expectedFrames = 0;
+    presentationCaptureState.startedAtMs = 0;
+    presentationCaptureState.paused = false;
+    presentationCaptureState.pausedAtMs = 0;
+    presentationCaptureState.pausedTotalMs = 0;
+    presentationCaptureState.cancelled = false;
 
     restorePresentationQualitySnapshot(presentationCaptureState.restoreQualitySnapshot);
     presentationCaptureState.restoreQualitySnapshot = null;
@@ -1037,7 +1085,14 @@ function finalizeOfflinePresentationRecording() {
     function finishCleanup() {
         if (!offlineJob.failed) {
             offlineJob.phase = 'done';
-            refreshPresentationUiBindings();
+            reportRecordingResult('saved');
+        } else if (presentationCaptureState.cancelled) {
+            reportRecordingResult('cancelled');
+        } else {
+            reportRecordingResult(
+                'failed',
+                offlineJob.failureMessage || 'The video could not be finished.',
+            );
         }
         cleanupPresentationRecordingState();
         refreshPresentationUiBindings();
@@ -1077,6 +1132,7 @@ function finalizeOfflinePresentationRecording() {
         offlineJob.finalizeWatchdog = 0;
         if (error) {
             console.warn('Offline recording finalize failed:', error);
+            offlineJob.failureMessage = error.message || '';
             discardOutput();
             return;
         }
@@ -1094,6 +1150,7 @@ function finalizeOfflinePresentationRecording() {
                 }
             } catch (downloadErr) {
                 console.warn('Offline recording download failed:', downloadErr);
+                offlineJob.failureMessage = 'The video could not be downloaded.';
                 offlineJob.failed = true;
                 offlineJob.phase = 'failed';
             }
@@ -1129,12 +1186,19 @@ function runOfflinePresentationRecordingLoop() {
     function abort(message, err) {
         if (err === undefined) console.warn(message);
         else console.warn(message, err);
+        offlineJob.failureMessage = message.replace(/^Offline recording aborted: /, '');
         offlineJob.failed = true;
         finalizeOfflinePresentationRecording();
     }
 
     function reachedEnd() {
         if (offlineJob.totalFrames > 0) return offlineJob.frameCount >= offlineJob.totalFrames;
+        if (presentationCaptureState.until) {
+            return (
+                !!presentationCaptureState.until() ||
+                offlineJob.frameCount >= OPEN_ENDED_RECORDING_MAX_SECONDS * fps
+            );
+        }
         if (!presentationCaptureState.autoStopOnPresentationEnd) return false;
         var state = getPresentationState();
         return !!state.loaded && !state.playing;
@@ -1180,6 +1244,17 @@ function runOfflinePresentationRecordingLoop() {
                     finalizeOfflinePresentationRecording();
                     return;
                 }
+                // A paused job parks here until resumePresentationRecording() or a stop wakes it.
+                if (
+                    presentationCaptureState.paused &&
+                    !offlineJob.stopRequested &&
+                    !offlineJob.failed
+                ) {
+                    offlineJob.resume = function () {
+                        setTimeout(encodeNextFrame, 0);
+                    };
+                    return;
+                }
                 // Yield between frames so the page stays responsive and the GPU is not driven
                 // in long synchronous bursts, which can trigger a driver reset on long renders.
                 setTimeout(encodeNextFrame, 0);
@@ -1207,7 +1282,6 @@ export function capturePresentationScreenshot(options) {
     var qualityPreset = normalizePresentationRecordingQualityPreset(
         options.qualityPreset === undefined ? 'cinematic' : options.qualityPreset,
     );
-    if (qualityPreset === 'current') qualityPreset = 'cinematic';
 
     var resolutionPreset = normalizePresentationRecordingResolutionPreset(
         options.recordingResolution === undefined
@@ -1236,7 +1310,7 @@ export function capturePresentationScreenshot(options) {
         return fail('Offline screenshot capture failed: renderer quality state is unavailable.');
     }
 
-    if (!applyPresentationRecordingQualityPreset(qualityPreset)) {
+    if (qualityPreset !== 'current' && !applyPresentationRecordingQualityPreset(qualityPreset)) {
         return fail('Offline screenshot capture failed: unable to apply Offline quality preset.');
     }
 
@@ -1267,7 +1341,22 @@ export function capturePresentationScreenshot(options) {
             return fail('Offline screenshot capture failed: capture canvas is unavailable.');
         }
 
-        // Force a fresh frame render at cinematic quality before copying to PNG.
+        // A fixed resolution is rendered at that size rather than scaled from the window.
+        if (resolvedResolution.preset !== 'current') {
+            var screenshotRuntimeApi = getPresentationRendererRuntimeApi();
+            if (
+                screenshotRuntimeApi &&
+                typeof screenshotRuntimeApi.resizeForOfflineRecording === 'function'
+            ) {
+                screenshotRuntimeApi.resizeForOfflineRecording(
+                    resolvedResolution.width,
+                    resolvedResolution.height,
+                );
+                presentationCaptureState.rendererResizedForRecording = true;
+            }
+        }
+
+        // Render a fresh frame at the chosen quality before copying it to PNG.
         if (!stepPresentationRendererOfflineFrame(1.0 / 60.0)) {
             return fail('Offline screenshot capture failed: renderer frame API is unavailable.');
         }
@@ -1314,6 +1403,7 @@ export function capturePresentationScreenshot(options) {
         console.warn('Offline screenshot capture failed:', err);
         return fail('Offline screenshot capture failed.');
     } finally {
+        restorePresentationRendererSize();
         clearPresentationCaptureBuffers();
         presentationCaptureState.qualityPreset = previousCaptureQualityPreset;
         presentationCaptureState.resolutionPreset = previousCaptureResolutionPreset;
@@ -1321,11 +1411,19 @@ export function capturePresentationScreenshot(options) {
     }
 }
 
+function wakeOfflineJob(job) {
+    if (!job || !job.resume) return;
+    var resume = job.resume;
+    job.resume = null;
+    resume();
+}
+
 export function stopPresentationRecording() {
     if (!presentationCaptureState.active) return false;
 
     if (presentationCaptureState.mode === 'offline' && presentationCaptureState.offlineJob) {
         presentationCaptureState.offlineJob.stopRequested = true;
+        wakeOfflineJob(presentationCaptureState.offlineJob);
         return true;
     }
 
@@ -1340,6 +1438,56 @@ export function stopPresentationRecording() {
         cleanupPresentationRecordingState();
     }
     return true;
+}
+
+export function isPresentationRecording() {
+    return !!presentationCaptureState.active;
+}
+
+export function getPresentationRecordingResult() {
+    return presentationCaptureState.result;
+}
+
+// Pauses rendering or recording; the paused time counts neither towards the elapsed time nor the
+// time estimate.
+export function pausePresentationRecording() {
+    if (!presentationCaptureState.active || presentationCaptureState.paused) return false;
+    presentationCaptureState.paused = true;
+    presentationCaptureState.pausedAtMs = Date.now();
+    var recorder = presentationCaptureState.recorder;
+    if (recorder && recorder.state === 'recording') recorder.pause();
+    refreshPresentationUiBindings();
+    return true;
+}
+
+export function resumePresentationRecording() {
+    if (!presentationCaptureState.active || !presentationCaptureState.paused) return false;
+    var pausedMs = Date.now() - presentationCaptureState.pausedAtMs;
+    presentationCaptureState.pausedTotalMs += pausedMs;
+    presentationCaptureState.paused = false;
+    var job = presentationCaptureState.offlineJob;
+    if (job) {
+        if (job.lastFrameWallMs) job.lastFrameWallMs += pausedMs;
+        wakeOfflineJob(job);
+    }
+    var recorder = presentationCaptureState.recorder;
+    if (recorder && recorder.state === 'paused') recorder.resume();
+    refreshPresentationUiBindings();
+    return true;
+}
+
+// Stops the recording and throws away what it captured.
+export function cancelPresentationRecording() {
+    if (!presentationCaptureState.active) return false;
+    presentationCaptureState.cancelled = true;
+    var job = presentationCaptureState.offlineJob;
+    if (job) {
+        job.failed = true;
+        wakeOfflineJob(job);
+        return true;
+    }
+    presentationCaptureState.chunks = [];
+    return stopPresentationRecording();
 }
 
 // Resolves to true once recording has started. options.writableFileStream, when given, is
@@ -1397,7 +1545,10 @@ async function beginPresentationRecording(options) {
             ? presentationCaptureState.videoContainer
             : options.videoContainer,
     );
+    var videoCodec = normalizePresentationVideoCodec(options.videoCodec);
+    if (videoCodec) videoContainer = PRESENTATION_VIDEO_CODECS[videoCodec].container;
     presentationCaptureState.videoContainer = videoContainer;
+    var until = typeof options.until === 'function' ? options.until : null;
 
     var recordingMode = requestedMode;
     presentationCaptureState.offlineUnavailableReason = '';
@@ -1410,7 +1561,7 @@ async function beginPresentationRecording(options) {
             refreshPresentationUiBindings();
             return false;
         }
-        if (!presentationState.timeline) {
+        if (!presentationState.timeline && !until) {
             presentationCaptureState.offlineUnavailableReason =
                 'Offline recording requires a loaded presentation timeline.';
             console.warn(
@@ -1505,6 +1656,7 @@ async function beginPresentationRecording(options) {
         try {
             encoderModule = await import('./offline-video-encoder.js');
             codec = await encoderModule.selectOfflineVideoCodec(videoContainer, {
+                codecs: videoCodec ? [videoCodec] : undefined,
                 width: width,
                 height: height,
                 bitrate: bitsPerSecond,
@@ -1516,7 +1668,7 @@ async function beginPresentationRecording(options) {
         if (!codec) {
             presentationCaptureState.offlineUnavailableReason =
                 'This browser cannot encode ' +
-                containerSpec.label +
+                (videoCodec ? PRESENTATION_VIDEO_CODECS[videoCodec].label : containerSpec.label) +
                 ' video at ' +
                 width +
                 '\xd7' +
@@ -1606,7 +1758,7 @@ async function beginPresentationRecording(options) {
             presentationCaptureState.compositeRaf = requestAnimationFrame(compositeTick);
         };
 
-        mimeType = choosePresentationMimeType(videoContainer);
+        mimeType = choosePresentationMimeType(videoContainer, videoCodec);
         var recorderConfig = {};
         if (mimeType) recorderConfig.mimeType = mimeType;
         recorderConfig.videoBitsPerSecond = Math.round(bitrate * 1000000.0);
@@ -1650,10 +1802,18 @@ async function beginPresentationRecording(options) {
     presentationCaptureState.includeAnnotationsInRecording = includeAnnotationsInRecording;
     presentationCaptureState.backgroundThrottleDetected = false;
     presentationCaptureState.offlineJob = offlineJob;
+    presentationCaptureState.until = until;
+    presentationCaptureState.expectedFrames = until
+        ? Math.max(0, Math.round(parseFloat(options.expectedFrames) || 0))
+        : 0;
+    presentationCaptureState.startedAtMs = Date.now();
+    presentationCaptureState.paused = false;
+    presentationCaptureState.pausedTotalMs = 0;
+    presentationCaptureState.cancelled = false;
 
     if (recordingMode === 'offline') {
         setPresentationRendererOfflineStepping(true);
-        if (typeof playPresentation === 'function') {
+        if (!until) {
             var playState = getPresentationState();
             if (playState.loaded && !playState.playing) {
                 playPresentation(false);
@@ -1663,7 +1823,7 @@ async function beginPresentationRecording(options) {
             var startTimelineTime = presentationState.time;
             var totalDuration = Math.max(presentationState.duration, 0.0);
             var totalTimelineSeconds;
-            if (presentationCaptureState.autoStopOnPresentationEnd) {
+            if (presentationCaptureState.autoStopOnPresentationEnd && !until) {
                 if (presentationState.loop) {
                     totalTimelineSeconds = totalDuration;
                 } else {
@@ -1698,13 +1858,18 @@ async function beginPresentationRecording(options) {
 
     recorder.onstop = function () {
         var finalMime = presentationCaptureState.mimeType || 'video/webm';
-        if (presentationCaptureState.chunks.length > 0) {
+        if (presentationCaptureState.cancelled) {
+            reportRecordingResult('cancelled');
+        } else if (presentationCaptureState.chunks.length > 0) {
             var blob = new Blob(presentationCaptureState.chunks, { type: finalMime });
             downloadPresentationRecordingBlob(
                 blob,
                 finalMime,
                 presentationCaptureState.filenamePrefix,
             );
+            reportRecordingResult('saved');
+        } else {
+            reportRecordingResult('failed', 'No video data was recorded.');
         }
         cleanupPresentationRecordingState();
         refreshPresentationUiBindings();
@@ -1760,6 +1925,9 @@ if (typeof window !== 'undefined') {
         clearParamHud: clearParamHud,
         startRecording: startPresentationRecording,
         stopRecording: stopPresentationRecording,
+        pauseRecording: pausePresentationRecording,
+        resumeRecording: resumePresentationRecording,
+        cancelRecording: cancelPresentationRecording,
         captureScreenshot: capturePresentationScreenshot,
     };
 }

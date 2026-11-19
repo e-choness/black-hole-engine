@@ -19,9 +19,11 @@ import { portalContainer } from '../lib/portal';
 import { SCENARIOS } from '../lib/scenarios';
 import { readParam, resetParam, searchParams, setParam, tabLabel } from '../params/params';
 import { PARAMS_BY_ID, type ParamDef } from '../params/registry';
+import { captureActive, readCaptureStatus } from '../engine/capture';
+import { saveScreenshot, toggleRecording } from '../state/capture-actions';
 import { copyViewLink } from '../state/share';
 import { toggleInterface } from '../state/shortcuts';
-import { focusParam, revealParam, useUi } from '../state/ui-store';
+import { focusParam, openCapture, revealParam, useUi } from '../state/ui-store';
 import { resetAll } from './inspector/Inspector';
 import { formatParamValue, ParamRow } from './inspector/ParamRow';
 
@@ -44,6 +46,20 @@ function param(id: string): ParamDef {
 function spinTo(value: number): void {
     setParam(param('black_hole.spin_enabled'), true);
     setParam(param('black_hole.spin'), value);
+}
+
+// An offline render ends from its progress panel only, so it has no palette action.
+function recordingActions(): Action[] {
+    if (captureActive() && !readCaptureStatus().live) return [];
+    return [
+        {
+            id: 'record',
+            label: captureActive() ? 'Stop the recording' : 'Record a video',
+            keys: ['R'],
+            keywords: 'capture video render export mp4 webm movie',
+            run: toggleRecording,
+        },
+    ];
 }
 
 function actions(): Action[] {
@@ -84,6 +100,20 @@ function actions(): Action[] {
             run: toggleInterface,
         },
         { id: 'fullscreen', label: 'Fullscreen', keys: ['F'], run: toggleFullscreen },
+        {
+            id: 'screenshot',
+            label: 'Save a screenshot',
+            keys: ['P'],
+            keywords: 'capture image png picture',
+            run: () => saveScreenshot(),
+        },
+        {
+            id: 'capture-settings',
+            label: 'Screenshot settings',
+            keywords: 'capture resolution 4k png',
+            run: () => openCapture('screenshot'),
+        },
+        ...recordingActions(),
         {
             id: 'shortcuts',
             label: 'Keyboard shortcuts and help',

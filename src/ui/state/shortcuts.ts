@@ -2,6 +2,7 @@ import { toast } from 'sonner';
 import { enterMode, presentationBusy, timelinePanel, type ObserverMode } from '../engine/engine';
 import { togglePlayback } from '../engine/playback';
 import { toggleFullscreen } from '../lib/fullscreen';
+import { saveScreenshot, toggleRecording } from './capture-actions';
 import { useUi } from './ui-store';
 
 export interface Shortcut {
@@ -18,6 +19,8 @@ export const SHORTCUT_GROUPS: { title: string; shortcuts: Shortcut[] }[] = [
             { keys: ['?'], label: 'Keyboard shortcuts' },
             { keys: ['H'], label: 'Hide or show the interface' },
             { keys: ['F'], label: 'Fullscreen' },
+            { keys: ['P'], label: 'Save a screenshot' },
+            { keys: ['R'], label: 'Record a video, or stop a live recording' },
         ],
     },
     {
@@ -104,6 +107,10 @@ function handleKeyDown(event: KeyboardEvent): void {
         toggleFullscreen();
     } else if (key === 't') {
         timelinePanel()?.toggle();
+    } else if (key === 'p') {
+        saveScreenshot();
+    } else if (key === 'r') {
+        toggleRecording();
     } else {
         handled = false;
     }

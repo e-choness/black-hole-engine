@@ -17,11 +17,11 @@ import {
     normalizePresentationVideoContainer,
 } from './presentation-video-formats.js';
 
-// Resolves to the first codec of the container that WebCodecs can encode with these settings,
-// or null when there is none.
+// Resolves to the first codec of `settings.codecs`, or else of the container, that WebCodecs can
+// encode with these settings, or null when there is none.
 export function selectOfflineVideoCodec(container, settings) {
     const spec = PRESENTATION_VIDEO_CONTAINERS[normalizePresentationVideoContainer(container)];
-    return getFirstEncodableVideoCodec(spec.codecs, {
+    return getFirstEncodableVideoCodec(settings.codecs || spec.codecs, {
         width: settings.width,
         height: settings.height,
         quality: new Quality({ bitrate: settings.bitrate }),

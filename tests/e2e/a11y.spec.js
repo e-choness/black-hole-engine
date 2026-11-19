@@ -1,15 +1,5 @@
-import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
-import { openSimulation, trackPageProblems } from './support.js';
-
-const BLOCKING = new Set(['serious', 'critical']);
-
-async function blockingViolations(page) {
-    const results = await new AxeBuilder({ page }).include('#ui-root').analyze();
-    return results.violations
-        .filter((violation) => BLOCKING.has(violation.impact))
-        .map((violation) => `${violation.id}: ${violation.nodes.map((n) => n.target).join(' | ')}`);
-}
+import { blockingViolations, openSimulation, trackPageProblems } from './support.js';
 
 test('the interface has no serious or critical accessibility violations', async ({ page }) => {
     const problems = trackPageProblems(page);
@@ -33,6 +23,13 @@ test('the interface has no serious or critical accessibility violations', async 
     await page.keyboard.press('Shift+Slash');
     await expect(page.getByRole('dialog', { name: 'Keyboard shortcuts' })).toBeVisible();
     expect(await blockingViolations(page), 'shortcuts').toEqual([]);
+    await page.keyboard.press('Escape');
+
+    await page.keyboard.press('r');
+    await expect(page.getByRole('dialog', { name: 'Capture' })).toBeVisible();
+    expect(await blockingViolations(page), 'capture video').toEqual([]);
+    await page.getByRole('tab', { name: 'Screenshot' }).click();
+    expect(await blockingViolations(page), 'capture screenshot').toEqual([]);
     expect(problems).toEqual([]);
 });
 

@@ -321,6 +321,7 @@
     .topbar .topbar-copy-link,
     .topbar .quality-chip-cost,
     .topbar .topbar-fullscreen,
+    .topbar .topbar-capture,
     .topbar .search-trigger-key {
         display: none;
     }

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { DropdownMenu, Popover, ToggleGroup } from 'radix-ui';
 import {
+    Camera,
     Check,
     ChevronDown,
     CircleHelp,
@@ -11,6 +12,7 @@ import {
     Orbit,
     Search,
     SlidersHorizontal,
+    Square,
 } from 'lucide-react';
 import {
     activeBlackHolePreset,
@@ -27,8 +29,10 @@ import { toggleFullscreen } from '../lib/fullscreen';
 import { MOD_KEY } from '../lib/keys';
 import { portalContainer } from '../lib/portal';
 import { formatSpin, SCENARIOS, scenarioLabel, SOLVER_LABELS } from '../lib/scenarios';
+import { captureActive, readCaptureStatus } from '../engine/capture';
+import { toggleRecording } from '../state/capture-actions';
 import { copyViewLink } from '../state/share';
-import { useUi } from '../state/ui-store';
+import { openCapture, useUi } from '../state/ui-store';
 
 function ScenarioPicker() {
     const active = useEngineValue(activeBlackHolePreset);
@@ -218,6 +222,39 @@ function SearchTrigger() {
     );
 }
 
+function CaptureButtons() {
+    const recording = useEngineValue(captureActive);
+    const live = useEngineValue(() => captureActive() && readCaptureStatus().live);
+    return (
+        <>
+            <button
+                type="button"
+                className="icon-btn topbar-capture"
+                aria-label="Screenshot"
+                title="Screenshot (P saves one at once)"
+                onClick={() => openCapture('screenshot')}
+            >
+                <Camera size={18} aria-hidden="true" />
+            </button>
+            <button
+                type="button"
+                className="icon-btn topbar-capture record-btn"
+                aria-label={live ? 'Stop recording' : 'Record video'}
+                aria-keyshortcuts="R"
+                title={live ? 'Stop recording (R)' : 'Record video (R)'}
+                disabled={recording && !live}
+                onClick={toggleRecording}
+            >
+                {live ? (
+                    <Square size={16} aria-hidden="true" />
+                ) : (
+                    <span className="record-glyph" aria-hidden="true" />
+                )}
+            </button>
+        </>
+    );
+}
+
 function HelpButton() {
     const setOpen = useUi((state) => state.setShortcutsOpen);
     return (
@@ -251,6 +288,7 @@ export function TopBar() {
             <div className="topbar-group glass">
                 <QualityChip />
                 <span className="topbar-divider" aria-hidden="true" />
+                <CaptureButtons />
                 <InspectorToggle />
                 <button
                     type="button"
