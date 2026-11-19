@@ -1,0 +1,10 @@
+.ipynb_checkpoints
+assets/img/milkyway.png
+*.pyc
+*.ipynb
+### these files should not be pushed
+.claude/
+CLAUDE.md
+docs/
+### local caches & tool state (never committed; all caches live here, not on C:)
+.cache/
