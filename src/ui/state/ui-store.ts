@@ -14,6 +14,7 @@ interface UiState {
     shortcutsOpen: boolean;
     captureOpen: boolean;
     captureTab: CaptureTab;
+    physicsOpen: boolean;
     setUiHidden: (hidden: boolean) => void;
     setInspectorOpen: (open: boolean) => void;
     setInspectorTab: (tab: InspectorTab) => void;
@@ -22,12 +23,18 @@ interface UiState {
     setShortcutsOpen: (open: boolean) => void;
     setCaptureOpen: (open: boolean) => void;
     setCaptureTab: (tab: CaptureTab) => void;
+    setPhysicsOpen: (open: boolean) => void;
 }
 
 export type CaptureTab = 'screenshot' | 'video';
 
 // Only one overlay is open at a time.
-const OVERLAYS_CLOSED = { paletteOpen: false, shortcutsOpen: false, captureOpen: false };
+const OVERLAYS_CLOSED = {
+    paletteOpen: false,
+    shortcutsOpen: false,
+    captureOpen: false,
+    physicsOpen: false,
+};
 
 export const useUi = create<UiState>()((set) => ({
     uiHidden: false,
@@ -38,6 +45,7 @@ export const useUi = create<UiState>()((set) => ({
     shortcutsOpen: false,
     captureOpen: false,
     captureTab: 'video',
+    physicsOpen: false,
     setUiHidden: (uiHidden) => set({ uiHidden }),
     setInspectorOpen: (inspectorOpen) => set({ inspectorOpen }),
     setInspectorTab: (inspectorTab) => set({ inspectorTab }),
@@ -49,6 +57,8 @@ export const useUi = create<UiState>()((set) => ({
     setCaptureOpen: (captureOpen) =>
         set(captureOpen ? { ...OVERLAYS_CLOSED, captureOpen } : { captureOpen }),
     setCaptureTab: (captureTab) => set({ captureTab }),
+    setPhysicsOpen: (physicsOpen) =>
+        set(physicsOpen ? { ...OVERLAYS_CLOSED, physicsOpen } : { physicsOpen }),
 }));
 
 // Opens the inspector on the tab of a parameter; focusParam() then moves the focus to its control

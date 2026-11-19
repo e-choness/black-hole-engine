@@ -7,6 +7,7 @@ import { Footer } from './components/Footer';
 import { Inspector } from './components/inspector/Inspector';
 import { ModeRail } from './components/ModeRail';
 import { Notices } from './components/Notices';
+import { PhysicsDialog } from './components/physics/PhysicsDialog';
 import { ShortcutSheet } from './components/ShortcutSheet';
 import { MobileActions, TopBar } from './components/TopBar';
 import { installCaptureRequests } from './state/capture-actions';
@@ -34,6 +35,7 @@ export function App() {
             <ShortcutSheet />
             <CaptureDialog />
             <CaptureMonitor />
+            <PhysicsDialog />
             <Notices />
         </Tooltip.Provider>
     );

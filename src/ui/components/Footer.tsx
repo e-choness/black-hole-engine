@@ -1,39 +1,50 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
+import { currentMode, type ObserverMode } from '../engine/engine';
+import { useEngineValue } from '../engine/hooks';
 import { useUi } from '../state/ui-store';
 import { Hud } from './Hud';
 import { TimeBar } from './TimeBar';
 
-const HINT_KEY = 'black-hole.hint.camera';
+const HINTS_KEY = 'black-hole.hints';
 
-function readHintHidden(): boolean {
+function readHintsHidden(): boolean {
     try {
-        return localStorage.getItem(HINT_KEY) === 'hidden';
+        return localStorage.getItem(HINTS_KEY) === 'hidden';
     } catch {
         return false;
     }
 }
 
-function CameraHint() {
-    const [hidden, setHidden] = useState(readHintHidden);
+// What the observer does in each mode and how to look around, for a first visit.
+function hintText(mode: ObserverMode, touch: boolean): string {
+    if (mode === 'hover') {
+        return 'Rockets hold you up as you are lowered toward the horizon · Drag to look around';
+    }
+    if (mode === 'dive')
+        return 'You fall freely from rest, through the horizon · Drag to look around';
+    return touch
+        ? 'Drag to orbit · Pinch to zoom · Two-finger drag to pan'
+        : 'Drag to orbit · Right-drag to pan · Scroll to zoom';
+}
+
+function Hints() {
+    const [hidden, setHidden] = useState(readHintsHidden);
+    const mode = useEngineValue(currentMode);
     const openShortcuts = useUi((state) => state.setShortcutsOpen);
     if (hidden) return null;
     const touch = window.matchMedia('(pointer: coarse)').matches;
     const hide = () => {
         setHidden(true);
         try {
-            localStorage.setItem(HINT_KEY, 'hidden');
+            localStorage.setItem(HINTS_KEY, 'hidden');
         } catch {
-            // The hint stays hidden for this visit only.
+            // The hints stay hidden for this visit only.
         }
     };
     return (
         <div className="hint glass">
-            <span>
-                {touch
-                    ? 'Drag to orbit · Pinch to zoom · Two-finger drag to pan'
-                    : 'Drag to orbit · Right-drag to pan · Scroll to zoom'}
-            </span>
+            <span>{hintText(mode, touch)}</span>
             {!touch && (
                 <button
                     type="button"
@@ -47,7 +58,7 @@ function CameraHint() {
             <button
                 type="button"
                 className="icon-btn icon-btn--sm"
-                aria-label="Hide hint"
+                aria-label="Hide hints"
                 onClick={hide}
             >
                 <X size={14} aria-hidden="true" />
@@ -62,7 +73,7 @@ export function Footer() {
             <div className="footer-layout">
                 <Hud />
                 <div className="footer-center">
-                    <CameraHint />
+                    <Hints />
                     <TimeBar />
                 </div>
             </div>

@@ -1,0 +1,212 @@
+/* Physics notes: the rendered Markdown and, on wide screens, its contents beside it. */
+.physics {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    z-index: 61;
+    display: flex;
+    flex-direction: column;
+    width: min(1040px, calc(100vw - 32px));
+    height: min(900px, calc(100dvh - 32px));
+    overflow: hidden;
+    border: 1px solid var(--color-hairline);
+    border-radius: var(--radius-lg);
+    background: var(--color-panel-solid);
+    box-shadow: 0 12px 32px rgb(0 0 0 / 0.35);
+    transform: translate(-50%, -50%);
+}
+
+.physics-head {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px 12px 24px;
+    border-bottom: 1px solid var(--color-hairline);
+}
+
+.physics-loading {
+    padding: 20px 24px;
+    color: var(--color-text-2);
+}
+
+.physics-layout {
+    display: grid;
+    flex: 1;
+    grid-template-columns: 220px minmax(0, 1fr);
+    min-height: 0;
+}
+
+.physics-toc {
+    padding: 14px 10px;
+    overflow-y: auto;
+    border-right: 1px solid var(--color-hairline);
+    scrollbar-width: thin;
+}
+
+.physics-toc ol {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.physics-toc button {
+    width: 100%;
+    min-height: 32px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    color: var(--color-text-2);
+    text-align: left;
+}
+
+.physics-toc button:hover {
+    background: rgb(255 255 255 / 0.06);
+    color: var(--color-text);
+}
+
+.physics-doc {
+    padding: 4px 32px 48px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    color: #c9cfda;
+    font-size: 14px;
+    line-height: 1.65;
+    scrollbar-width: thin;
+    scrollbar-color: rgb(255 255 255 / 0.16) transparent;
+}
+
+.physics-doc > * {
+    max-width: 46rem;
+}
+
+.physics-doc h3,
+.physics-doc h4,
+.physics-doc h5 {
+    color: var(--color-text);
+    scroll-margin-top: 12px;
+}
+
+.physics-doc h3 {
+    margin: 32px 0 10px;
+    font: 600 19px/1.3 var(--font-title);
+}
+
+.physics-doc h4 {
+    margin: 24px 0 8px;
+    font: 600 15.5px/1.35 var(--font-title);
+}
+
+.physics-doc h5 {
+    margin: 20px 0 6px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.physics-doc p,
+.physics-doc ul,
+.physics-doc ol {
+    margin: 0 0 12px;
+}
+
+.physics-doc ul,
+.physics-doc ol {
+    padding-left: 22px;
+}
+
+.physics-doc ul {
+    list-style: disc;
+}
+
+.physics-doc ol {
+    list-style: decimal;
+}
+
+.physics-doc li + li {
+    margin-top: 4px;
+}
+
+.physics-doc strong {
+    color: var(--color-text);
+    font-weight: 600;
+}
+
+.physics-doc code {
+    padding: 1px 5px;
+    border-radius: 5px;
+    background: rgb(255 255 255 / 0.06);
+    color: #e6eaf2;
+    font-family: var(--font-num);
+    font-size: 0.86em;
+}
+
+/* Equations are indented blocks of plain text: monospaced, on a panel of their own, and wrapped
+   rather than scrolled where the column is narrower than a line. */
+.physics-doc pre {
+    margin: 0 0 14px;
+    padding: 12px 16px;
+    border: 1px solid var(--color-hairline);
+    border-radius: 10px;
+    background: rgb(255 255 255 / 0.03);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.physics-doc pre code {
+    padding: 0;
+    background: none;
+    color: #f2f4f8;
+    font-size: 12px;
+    line-height: 1.75;
+}
+
+.physics-doc table {
+    width: 100%;
+    margin: 0 0 16px;
+    border-collapse: collapse;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.physics-doc th,
+.physics-doc td {
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--color-hairline);
+    text-align: left;
+    vertical-align: top;
+    overflow-wrap: anywhere;
+}
+
+.physics-doc th {
+    color: var(--color-text);
+    font-weight: 600;
+}
+
+@media (max-width: 900px) {
+    .physics-layout {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .physics-toc {
+        display: none;
+    }
+
+    .physics-doc {
+        padding: 4px 20px 32px;
+    }
+}
+
+/* Phones read the notes full screen. */
+@media (max-width: 760px) {
+    .physics {
+        width: 100vw;
+        height: 100dvh;
+        padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+            env(safe-area-inset-left);
+        border: 0;
+        border-radius: 0;
+    }
+
+    .physics-head {
+        padding-left: 20px;
+    }
+}

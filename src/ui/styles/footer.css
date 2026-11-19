@@ -327,10 +327,6 @@
     .timebar {
         padding: 6px 8px;
     }
-
-    .hint {
-        display: none;
-    }
 }
 
 /* Phones get a compact time bar in one row: play, the speed, both clocks and the clock rate. It
@@ -406,5 +402,12 @@
 
     .clock-rate {
         font-size: 12px;
+    }
+
+    .hint {
+        align-self: center;
+        max-width: 100%;
+        border-radius: var(--radius-md);
+        text-wrap: balance;
     }
 }

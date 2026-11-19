@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ToggleGroup } from 'radix-ui';
-import { ArrowDownToLine, ChartGantt, Crosshair, Orbit, Video } from 'lucide-react';
+import { ArrowDownToLine, ChartGantt, Crosshair, Info, Orbit, Video } from 'lucide-react';
 import { currentMode, enterMode, timelinePanel, type ObserverMode } from '../engine/engine';
 import { useEngineValue } from '../engine/hooks';
 import { useFrameSampler } from '../engine/telemetry';
@@ -30,6 +30,7 @@ export function ModeRail() {
     const mode = useEngineValue(currentMode);
     const timelineOpen = useTimelineOpen();
     const setCaptureOpen = useUi((state) => state.setCaptureOpen);
+    const setPhysicsOpen = useUi((state) => state.setPhysicsOpen);
     return (
         <nav className="rail glass" aria-label="Modes">
             <ToggleGroup.Root
@@ -72,6 +73,16 @@ export function ModeRail() {
             >
                 <Video size={20} aria-hidden="true" />
                 Capture
+            </button>
+            <span className="rail-sep" aria-hidden="true" />
+            <button
+                type="button"
+                className="rail-btn"
+                aria-haspopup="dialog"
+                onClick={() => setPhysicsOpen(true)}
+            >
+                <Info size={20} aria-hidden="true" />
+                Physics
             </button>
         </nav>
     );

@@ -45,6 +45,7 @@
     "cmdk": "^1.1.1",
     "lil-gui": "^0.21.0",
     "lucide-react": "^1.76.0",
+    "marked": "^18.2.1",
     "mediabunny": "^1.66.1",
     "mustache": "^4.2.0",
     "radix-ui": "^1.8.1",

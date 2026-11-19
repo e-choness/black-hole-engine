@@ -30,6 +30,14 @@ test('the interface has no serious or critical accessibility violations', async 
     expect(await blockingViolations(page), 'capture video').toEqual([]);
     await page.getByRole('tab', { name: 'Screenshot' }).click();
     expect(await blockingViolations(page), 'capture screenshot').toEqual([]);
+    await page.keyboard.press('Escape');
+
+    await page
+        .getByRole('navigation', { name: 'Modes' })
+        .getByRole('button', { name: 'Physics' })
+        .click();
+    await expect(page.getByRole('heading', { name: 'Solvers', exact: true })).toBeVisible();
+    expect(await blockingViolations(page), 'physics').toEqual([]);
     expect(problems).toEqual([]);
 });
 
@@ -56,6 +64,12 @@ test.describe('on a phone', () => {
             .click();
         await page.keyboard.type('spin');
         expect(await blockingViolations(page), 'palette').toEqual([]);
+
+        await page.keyboard.press('Control+A');
+        await page.keyboard.type('physics');
+        await page.getByRole('option', { name: 'Physics notes' }).click();
+        await expect(page.getByRole('heading', { name: 'Solvers', exact: true })).toBeVisible();
+        expect(await blockingViolations(page), 'physics').toEqual([]);
         expect(problems).toEqual([]);
     });
 });

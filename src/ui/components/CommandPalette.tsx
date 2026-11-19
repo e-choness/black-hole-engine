@@ -122,6 +122,12 @@ function actions(): Action[] {
             run: () => ui.setShortcutsOpen(true),
         },
         {
+            id: 'physics',
+            label: 'Physics notes',
+            keywords: 'equations theory documentation relativity kerr geodesics',
+            run: () => ui.setPhysicsOpen(true),
+        },
+        {
             id: 'thorne',
             label: 'Set spin to the Thorne limit (0.998)',
             keywords: 'kerr maximal',
