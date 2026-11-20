@@ -1,55 +1,119 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<svg id="Layer_1" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 449.91 247.55">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <title>Black Hole Simulation</title>
   <defs>
-    <style>
-      .cls-1 {
-        fill: url(#Black_Hole_Gradient);
-      }
-
-      .cls-1, .cls-2 {
-        fill-rule: evenodd;
-      }
-
-      .cls-3 {
-        fill: #231f20;
-        stroke: #231f20;
-      }
-
-      .cls-3, .cls-4 {
-        stroke-miterlimit: 10;
-      }
-
-      .cls-2 {
-        fill: url(#Black_Hole_Gradient-2);
-      }
-
-      .cls-4 {
-        fill: none;
-        stroke: url(#linear-gradient);
-        stroke-width: 2px;
-      }
-    </style>
-    <linearGradient id="Black_Hole_Gradient" data-name="Black Hole Gradient" x1="102.29" y1="186.72" x2="338.48" y2="186.72" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#fff33b"/>
-      <stop offset=".04" stop-color="#fee62d"/>
-      <stop offset=".12" stop-color="#fdd51b"/>
-      <stop offset=".2" stop-color="#fdca0f"/>
-      <stop offset=".28" stop-color="#fdc70c"/>
-      <stop offset=".5" stop-color="#f3903f"/>
-      <stop offset="1" stop-color="#662504"/>
+    <!-- Everything outside the central circle of 80 % diameter is the plain theme colour, so a
+         launcher's mask of any shape can crop it. -->
+    <radialGradient id="space" gradientUnits="userSpaceOnUse" cx="256" cy="256" r="204">
+      <stop offset="0" stop-color="#18223d"/>
+      <stop offset="0.55" stop-color="#0a0e19"/>
+      <stop offset="1" stop-color="#05060a"/>
+    </radialGradient>
+    <!-- Doppler beaming: the approaching left side is brighter and bluer than the receding right. -->
+    <linearGradient id="doppler" x1="56" y1="0" x2="456" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fffaf0"/>
+      <stop offset="0.2" stop-color="#ffe6b5"/>
+      <stop offset="0.48" stop-color="#ffb44d"/>
+      <stop offset="0.76" stop-color="#e5682a"/>
+      <stop offset="1" stop-color="#8a2e0c"/>
     </linearGradient>
-    <linearGradient id="linear-gradient" x1="142.21" y1="131.03" x2="298.47" y2="131.03" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#fff33b"/>
-      <stop offset=".04" stop-color="#fee62d"/>
-      <stop offset=".12" stop-color="#fdd51b"/>
-      <stop offset=".2" stop-color="#fdca0f"/>
-      <stop offset=".28" stop-color="#fdc70c"/>
-      <stop offset="1" stop-color="#f3903f"/>
+    <linearGradient id="ring" x1="178" y1="0" x2="334" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.5" stop-color="#ffe9c4"/>
+      <stop offset="1" stop-color="#ffb44d"/>
     </linearGradient>
-    <linearGradient id="Black_Hole_Gradient-2" data-name="Black Hole Gradient" x1="0" y1="82.05" x2="449.91" y2="82.05" xlink:href="#Black_Hole_Gradient"/>
+    <!-- The disk is brightest at its inner edge and fades out towards the outer edge. -->
+    <radialGradient id="disk-fade" gradientUnits="userSpaceOnUse" cx="256" cy="256" r="200"
+      gradientTransform="translate(0 196.1) scale(1 0.234)">
+      <stop offset="0.49" stop-color="#fff"/>
+      <stop offset="0.78" stop-color="#d8d8d8"/>
+      <stop offset="1" stop-color="#262626"/>
+    </radialGradient>
+    <radialGradient id="arch-fade" gradientUnits="userSpaceOnUse" cx="256" cy="256" r="122">
+      <stop offset="0.8" stop-color="#fff"/>
+      <stop offset="1" stop-color="#666"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#ffb44d" stop-opacity="0.55"/>
+      <stop offset="0.6" stop-color="#ff9a4d" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#ff9a4d" stop-opacity="0"/>
+    </radialGradient>
+    <mask id="disk-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
+      <rect width="512" height="512" fill="url(#disk-fade)"/>
+    </mask>
+    <mask id="arch-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
+      <rect width="512" height="512" fill="url(#arch-fade)"/>
+    </mask>
+    <clipPath id="safe"><circle cx="256" cy="256" r="203"/></clipPath>
+    <clipPath id="far"><rect width="512" height="256"/></clipPath>
+    <clipPath id="near"><rect y="256" width="512" height="256"/></clipPath>
+    <filter id="blur" x="-30%" y="-60%" width="160%" height="220%">
+      <feGaussianBlur stdDeviation="9"/>
+    </filter>
+    <!-- The disk seen at about 77 degrees: outer edge 200 x 46, inner edge 98 x 23. -->
+    <path id="annulus" fill-rule="evenodd"
+      d="M56 256a200 46 0 1 0 400 0a200 46 0 1 0 -400 0Z M158 256a98 23 0 1 1 196 0a98 23 0 1 1 -196 0Z"/>
+    <!-- Flow streaks between the edges. -->
+    <g id="streaks" fill="none" stroke-width="1.6">
+      <ellipse cx="256" cy="256" rx="118" ry="27.6" stroke="#fff" opacity="0.55"/>
+      <ellipse cx="256" cy="256" rx="136" ry="31.8" stroke="#fff3dc" opacity="0.35"/>
+      <ellipse cx="256" cy="256" rx="152" ry="35.6" stroke="#7a2a0c" opacity="0.35"/>
+      <ellipse cx="256" cy="256" rx="168" ry="39.3" stroke="#fff3dc" opacity="0.22"/>
+      <ellipse cx="256" cy="256" rx="184" ry="43" stroke="#7a2a0c" opacity="0.3"/>
+    </g>
+    <!-- The far side of the disk, lensed over the top of the hole. -->
+    <path id="arch" d="M138 270V256a118 122 0 0 1 236 0V270H343V256a87 91 0 0 0 -174 0V270Z"/>
+    <!-- Its fainter second image under the hole. -->
+    <path id="underarc" d="M171 256a85 88 0 0 0 170 0h-5a80 83 0 0 1 -160 0Z"/>
   </defs>
-  <path class="cls-1" d="M110.39,126.67c-8.4,3.62-8.87,18.87-7.52,27.55,2.02,12.96,5.17,22.84,13.94,35.73,4.48,6.59,9.49,12.78,15.02,18.6,64.3,69.11,172.71,43.17,204.62-52.62,3.19-9.09,2.79-14.36-2.44-20.73-3.18-4.4-8.35-7.26-14.14-4.3-14.58,8.04-15.61,20.83-24.7,35.43-21.76,39.01-64.98,56.91-103.22,40.98-4.48-1.8-8.74-3.92-12.8-6.39-4.33-2.63-17.1-10.87-29.21-28.46-14.07-20.43-10.47-29.08-24.11-39.84-3.29-2.6-8.53-8.93-15.43-5.96Z"/>
-  <ellipse class="cls-3" cx="220.34" cy="131.03" rx="77.13" ry="77.38"/>
-  <ellipse class="cls-4" cx="220.34" cy="131.03" rx="77.13" ry="77.38"/>
-  <path class="cls-2" d="M.16,118.86c-3.2,20.09,42.95,28.88,57.6,32.38,39.66,7.86,80.01,9.81,120.07,12.1,9.27.49,18.34.68,27.87.72,22.05-.12,44.49.46,65.78-.83,18.62-.86,39.08-1.44,57.78-3.49,21.64-1.96,43.09-4.16,64.57-8.87,14.71-3.21,29.75-6.94,43.19-13.86,21.79-12.1,13.42-27.65-6.31-35.64-19.6-8.74-43.63-9.68-62.86-19.51-17.15-8.05-29.05-22.86-41.97-36.52C302.94,20.69,273.78,2.87,239.57.62c-35.33-2.75-66.33,3.29-94.69,25.53-12.16,9.2-21.73,20.24-31.93,31.34-10.15,11.34-22.1,21.24-36.41,26.95C57.49,93.1,5.8,96.48.19,118.72l-.03.14ZM120.77,116.8c2.32-9.4,10.76-14.97,17.63-22.12,2.68-2.61,5.28-5.28,7.89-7.96,8.5-8.68,16.08-16.97,25.89-23.88,17.36-12.5,39.59-16.38,60.67-13.66,29.09,3.72,45.23,20.64,64.55,40.61,6.58,7.6,22.45,18.55,22.25,28.66-2.23,13.05-28.72,14.24-39.56,15.84-12.85,1.3-23.07,2.39-35.93,2.77-25.38.68-53.14.54-78.58-2.29-11.03-1.51-46.16-2.96-44.83-17.85l.02-.13Z"/>
+
+  <rect width="512" height="512" rx="112" fill="url(#space)"/>
+  <g fill="#d6e8ff">
+    <circle cx="150" cy="118" r="2.6" opacity="0.85"/>
+    <circle cx="372" cy="108" r="2" opacity="0.6"/>
+    <circle cx="420" cy="190" r="1.6" opacity="0.5"/>
+    <circle cx="96" cy="330" r="1.8" opacity="0.55"/>
+    <circle cx="330" cy="420" r="2.4" opacity="0.7"/>
+    <circle cx="200" cy="438" r="1.4" opacity="0.45"/>
+    <circle cx="256" cy="74" r="1.4" opacity="0.45"/>
+    <circle cx="412" cy="360" r="1.2" opacity="0.4"/>
+    <circle cx="118" cy="176" r="1.1" opacity="0.4"/>
+  </g>
+
+  <g clip-path="url(#safe)">
+  <g transform="translate(256 256) scale(0.93) translate(-256 -256)">
+  <!-- Glow of the disk and the arch; the shadow covers its middle. -->
+  <ellipse cx="256" cy="250" rx="214" ry="84" fill="url(#glow)"/>
+  <g filter="url(#blur)" opacity="0.7">
+    <use href="#annulus" fill="url(#doppler)" mask="url(#disk-mask)"/>
+    <use href="#arch" fill="url(#doppler)"/>
+  </g>
+
+  <!-- Lensed starlight, behind the disk. -->
+  <circle cx="256" cy="256" r="100" fill="none" stroke="#7cc4ff" stroke-width="2" opacity="0.45"/>
+
+  <!-- Far half of the disk, behind the hole. -->
+  <g clip-path="url(#far)" mask="url(#disk-mask)" opacity="0.92">
+    <use href="#annulus" fill="url(#doppler)"/>
+    <use href="#streaks"/>
+  </g>
+
+  <g mask="url(#arch-mask)">
+    <use href="#arch" fill="url(#doppler)"/>
+    <path fill="none" stroke="#fff" stroke-width="1.6" opacity="0.35" d="M152 256a104 108 0 0 1 208 0"/>
+  </g>
+  <use href="#underarc" fill="url(#doppler)" opacity="0.6"/>
+
+  <!-- The shadow and the photon ring at its edge. -->
+  <circle cx="256" cy="256" r="74" fill="#000"/>
+  <circle cx="256" cy="256" r="76.5" fill="none" stroke="url(#ring)" stroke-width="4"/>
+
+  <!-- Near half of the disk, in front of the hole, with its white-hot inner edge. -->
+  <g clip-path="url(#near)" mask="url(#disk-mask)">
+    <use href="#annulus" fill="url(#doppler)"/>
+    <use href="#streaks"/>
+    <ellipse cx="256" cy="256" rx="99" ry="23.5" fill="none" stroke="#fff" stroke-width="3"
+      opacity="0.85"/>
+  </g>
+  </g>
+  </g>
 </svg>
