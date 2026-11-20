@@ -1,5 +1,6 @@
 import { Dialog } from 'radix-ui';
 import { X } from 'lucide-react';
+import { SITE } from '../../../config/site-metadata.js';
 import { timelineAvailable } from '../engine/engine';
 import { MOD_KEY } from '../lib/keys';
 import { portalContainer } from '../lib/portal';
@@ -7,8 +8,8 @@ import { SHORTCUT_GROUPS, type ShortcutGroup } from '../state/shortcuts';
 import { useUi } from '../state/ui-store';
 
 const LINKS = [
-    { href: 'https://github.com/Adriwin06/black-hole#readme', label: 'About this simulation' },
-    { href: 'https://github.com/Adriwin06/black-hole', label: 'Source code' },
+    { href: `${SITE.repository}#readme`, label: 'About this simulation' },
+    { href: SITE.repository, label: 'Source code' },
     { href: 'docs/LEGAL.md', label: 'Legal notices and licenses' },
 ];
 

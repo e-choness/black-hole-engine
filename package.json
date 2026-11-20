@@ -3,6 +3,7 @@
   "private": true,
   "license": "PolyForm-Noncommercial-1.0.0",
   "description": "Real-time WebGL ray tracer of a black hole with gravitational lensing, accretion flows, relativistic jets and a presentation timeline.",
+  "repository": "github:e-choness/black-hole-engine",
   "type": "module",
   "engines": {
     "node": ">=26"

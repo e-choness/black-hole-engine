@@ -92,6 +92,10 @@ test('keyboard shortcuts drive playback, modes, the interface and the help sheet
         'href',
         'docs/LEGAL.md',
     );
+    await expect(sheet.getByRole('link', { name: 'Source code' })).toHaveAttribute(
+        'href',
+        'https://github.com/e-choness/black-hole-engine',
+    );
     await page.keyboard.press('Escape');
     await expect(sheet).toBeHidden();
     expect(problems).toEqual([]);

@@ -5,6 +5,7 @@
 export const SITE = Object.freeze({
     name: 'Black Hole Simulation',
     shortName: 'Black Hole',
+    repository: 'https://github.com/e-choness/black-hole-engine',
     description:
         'A browser-based black hole visualization with Schwarzschild lensing based on the exact Binet equation, approximate spin effects, accretion-flow models, presentation presets, and recording tools.',
     // Canvas colour of the interface design, used for the browser chrome and the splash screen
