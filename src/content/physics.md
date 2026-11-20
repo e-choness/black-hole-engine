@@ -466,52 +466,66 @@ out that line of sight runs inside the jet, so the preset views it from 12 degre
 
 ## Performance
 
-Measured in headless Chromium with SwiftShader (a CPU rasterizer, so only ratios carry over to
-GPUs) at 800 x 450 with the default scene (`a/M = 0.9`, thin disk), milliseconds per frame:
+Measured in headless Chromium with SwiftShader, a CPU rasterizer, on three's WebGL 2 backend at
+800 x 450 with the default scene (`a/M = 0.9`, thin disk with arcs). Only ratios carry over to
+GPUs; SwiftShader's WebGPU path is up to three times slower again and says as little about them.
+Each time is the median over at least 10 s of frames that each wait for the GPU to finish, in
+milliseconds per frame:
 
 | Preset    | Kerr-inspired | Full Kerr | Ratio |
 | --------- | ------------- | --------- | ----- |
-| mobile    | 116           | 195       | 1.68  |
-| optimal   | 421           | 381       | 0.90  |
-| medium    | 800           | 1000      | 1.25  |
-| high      | 2000          | 1818      | 0.91  |
-| ultra     | 2222          | 2000      | 0.90  |
-| cinematic | 2500          | 2222      | 0.89  |
+| mobile    | 165           | 147       | 0.89  |
+| optimal   | 921           | 419       | 0.46  |
+| medium    | 4729          | 1808      | 0.38  |
+| high      | 5329          | 2442      | 0.46  |
+| ultra     | 10398         | 3978      | 0.38  |
+| cinematic | 22933         | 8103      | 0.35  |
 
-Full Kerr takes fewer, larger steps than the Binet solver's fixed angular grid, which offsets
-the six Hamiltonian evaluations per step at the higher presets; it is the default there. The
-ratio holds across sample counts: at 400 x 225 with the high tiers, 1, 4 and 12 samples per
-pixel cost 313, 833 and 1250 ms with the Kerr-inspired mode and 268, 789 and 1154 ms with Full
-Kerr. Shader compilation does not grow either: the time from a shader change to the first frame,
-minus that of a uniform-only change, at 160 x 90 was about 20 ms, 430 ms and 1.2 s for Full Kerr
-at mobile, high and cinematic against 20 ms, 510 ms and 1.5 s for the Kerr-inspired mode.
+Full Kerr takes fewer, larger steps than the Binet solver's fixed angular grid, which more than
+offsets its six Hamiltonian evaluations per step at every preset here; high, ultra and cinematic
+use it by default for spinning holes. The ratio holds across sample counts: at 400 x 225 with the
+high tiers, 1, 4 and 12 samples per pixel cost 353, 1410 and 4135 ms with the Kerr-inspired mode
+and 172, 618 and 1855 ms with Full Kerr.
+
+Shader compilation is where Full Kerr costs more. SwiftShader builds a pipeline at its first
+draw, and the time from a shader change to the end of the first frame drawn with it, minus that
+of a uniform-only change, at 160 x 90 was 6.9, 7.9 and 7.8 s for Full Kerr at mobile, high and
+cinematic against 0.46, 0.97 and 0.87 s for the Kerr-inspired mode. Most of it is the six
+derivative evaluations of a Dormand-Prince step, unrolled into the shader: as a loop over the
+stages the pipeline builds in under a second, but frames take 1.6 to 2.7 times as long, so the
+step stays unrolled. Compile times on GPU drivers are unmeasured.
+
+The disk arcs add about 60 % to a frame in SwiftShader, which filters their 3-D noise texture in
+software: with the plasma pattern instead, mobile, optimal and medium take 101, 552 and 2881 ms
+with the Kerr-inspired mode and 90.5, 269 and 1157 ms with Full Kerr. The GLSL renderer that
+preceded the TSL one, measured the same way with that pattern, took 108, 527 and 2549 ms and 182,
+426 and 1802 ms, so the port matches it within 13 % with the Binet solver and takes 36 to 50 %
+less time with Full Kerr.
 
 ### Scene presets
 
 Each scene preset with its own emitters and solver settings at 800 x 450, with still
-accumulation tracing every frame, timed as the mean interval between frame completions over 8 s
-(mobile) and 30 s (medium) in one session. Absolute SwiftShader times move with the host load,
-so compare within a column:
+accumulation tracing every frame, timed as above over 10 s (mobile) and 30 s (medium) in one
+session. Absolute SwiftShader times drift by 10 to 15 % with the host load over a run, so compare
+within a column:
 
 | Scene preset              | mobile (ms) | medium (ms) |
 | ------------------------- | ----------- | ----------- |
-| Schwarzschild             | 82          | 2492        |
-| Default                   | 89          | 2757        |
-| Cygnus X-1                | 95          | 3167        |
-| Sgr A\*                   | 119         | 3955        |
-| Gargantua-style cinematic | 147         | 4001        |
-| TON 618                   | 169         | 4674        |
-| GRS 1915+105              | 196         | 7394        |
-| M87\*                     | 255         | 7192        |
-| 3C 273                    | 349         | 8258        |
+| Schwarzschild             | 152         | 4187        |
+| Default                   | 182         | 4760        |
+| Cygnus X-1                | 187         | 5053        |
+| Sgr A\*                   | 153         | 3986        |
+| Gargantua-style cinematic | 176         | 4934        |
+| TON 618                   | 174         | 4810        |
+| GRS 1915+105              | 211         | 5669        |
+| M87\*                     | 270         | 6419        |
+| 3C 273                    | 285         | 7248        |
 
-The ray-marched volumes set the cost: the thick torus (Sgr A\*) and the slim disk (TON 618) add
-35 to 90 % to the opaque thin disk, the translucent Gargantua-style disk lets rays continue
-through it, and the scenes with jets take two to four times as long as the thin-disk ones.
-Measured back to back, the Default scene took 124 and 3581 ms per frame at the commit before the
-emission and imaging work and 89 and 2757 ms after it, so the new pipeline as a whole costs less
-than the one it replaced. Anisotropic filtering of the sky is about a tenth of the medium time in
-SwiftShader (2494 ms without it); GPUs filter in hardware.
+The thin-disk scenes carry the cost of the arcs, so the thick torus without a jet (Sgr A\*) is as
+cheap as the Schwarzschild disk and the slim disk (TON 618) lands among the thin-disk scenes.
+Jets add 18 to 76 %: M87\* takes 1.6 to 1.8 times as long as Sgr A\*, and GRS 1915+105 and 3C 273
+take 1.2 to 1.6 times as long as TON 618. Anisotropic filtering of the sky costs about 2 % of the
+medium time in SwiftShader (4769 ms without it, 4869 with); GPUs filter in hardware.
 
 ## Known limitations
 
