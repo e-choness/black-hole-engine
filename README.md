@@ -191,4 +191,4 @@ has started), `stopRecording()`, `state()` and `getPathValue(path)`.
 
 ## License
 
-Licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE.md).
+Licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE).

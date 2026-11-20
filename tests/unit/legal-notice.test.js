@@ -56,7 +56,7 @@ writePackage('rolldown', { name: 'rolldown', version: '1.0.0', license: 'MIT' },
 writePackage('vite-plugin-pwa', { name: 'vite-plugin-pwa', version: '2.0.0', license: 'MIT' });
 writePackage('extra', { name: 'extra', version: '1.0.0', license: 'MIT' }, { LICENSE: 'E' });
 writePackage('unlicensed', { name: 'unlicensed', version: '1.0.0' });
-writeFileSync(path.join(root, 'LICENSE.md'), '# Project terms\n\n```text\nMIT upstream\n```\n');
+writeFileSync(path.join(root, 'LICENSE'), '# Project terms\n\n```text\nMIT upstream\n```\n');
 
 const modules = (...moduleIds) => ({ 'index.js': { type: 'chunk', moduleIds } });
 const inRoot = (...segments) => path.join(root, ...segments);
@@ -187,7 +187,7 @@ function emittedNotice(bundle) {
     return files[0].source;
 }
 
-test('a build assembles the notice from LICENSE.md and the bundled packages', () => {
+test('a build assembles the notice from LICENSE and the bundled packages', () => {
     const notice = emittedNotice(BUNDLE);
     assert.match(notice, /````text\n# Project terms\n\n```text\nMIT upstream\n```\n````/);
     for (const heading of ['alpha 1.0.0 (MIT)', 'extra 1.0.0 (MIT)', 'font 5.0.0 (OFL-1.1)']) {

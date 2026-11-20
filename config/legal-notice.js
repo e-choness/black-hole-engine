@@ -162,7 +162,7 @@ export function composeLegalNotice({ license, packages }) {
 
 // The help sheet links to docs/LEGAL.md, so every build ships one next to the page. A checkout
 // that has the curated notice (docs/ is not tracked) ships it as it is; any other build assembles
-// one from LICENSE.md and the license files of the bundled packages. Every build attributes each
+// one from LICENSE and the license files of the bundled packages. Every build attributes each
 // bundled module, so a module of unknown origin fails local builds as well.
 export function legalNoticePlugin({ root = ROOT, extraPackages = [] } = {}) {
     return {
@@ -174,7 +174,7 @@ export function legalNoticePlugin({ root = ROOT, extraPackages = [] } = {}) {
             const source = existsSync(curated)
                 ? readFileSync(curated, 'utf8')
                 : composeLegalNotice({
-                      license: readFileSync(path.join(root, 'LICENSE.md'), 'utf8'),
+                      license: readFileSync(path.join(root, 'LICENSE'), 'utf8'),
                       packages,
                   });
             this.emitFile({ type: 'asset', fileName: 'docs/LEGAL.md', source });
