@@ -15,8 +15,8 @@ function createEmissionLutTexture() {
     return texture;
 }
 
-// Initial values of the ray tracer's uniforms, by name. Both the GLSL material ({ value }
-// entries) and the TSL graph (uniform nodes) are built from this list; renderer.js updates them.
+// Initial values of the ray tracer's uniforms, by name, from which createRaytracerUniforms()
+// builds the uniform nodes that renderer.js updates.
 export function raytracerUniformValues() {
     return {
         time: 0,

@@ -7,9 +7,9 @@ import {
 } from '../../src/app/core/physics/kerr.js';
 import { bardeenShadowExtent } from '../support/kerr-reference.js';
 
-// Float64 mirror of the Full Kerr integrator in src/shaders/raytracer/physics/geodesics.glsl and
-// the trace loop in output/trace/setup.glsl, so the equations, the tableau and the termination
-// rules can be checked against closed forms. Positions are (x, y, z, t), r_s = 1.
+// Float64 mirror of the Full Kerr integrator in src/shaders/tsl/raytracer/geodesics.js and the
+// trace loop in trace.js, so the equations, the tableau and the termination rules can be checked
+// against closed forms. Positions are (x, y, z, t), r_s = 1.
 
 function rhs(x, p, pt, a) {
     const r = ksRadius(x[0], x[1], x[2], a);

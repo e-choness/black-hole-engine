@@ -1,5 +1,4 @@
-// Uniform nodes of the TSL ray tracer, keyed like the GLSL uniforms; each node's .value is what
-// renderer.js updates.
+// Uniform nodes of the ray tracer, keyed by name; renderer.js updates each node's .value.
 
 import { texture, uniform } from 'three/tsl';
 import { cubeGradientUniform } from '../nodes/cube-gradient.js';

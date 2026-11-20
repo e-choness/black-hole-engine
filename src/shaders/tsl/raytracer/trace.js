@@ -1,6 +1,6 @@
 // The ray march: integrates a backward photon through the curved spacetime and composites the
-// accretion flow, jets, planet and sky along it with Beer-Lambert transmittance. Mustache
-// sections of the GLSL become JavaScript conditionals on the variant flags F.
+// accretion flow, jets, planet and sky along it with Beer-Lambert transmittance. The variant
+// flags F select at build time which parts the shader contains.
 
 import {
     Break,

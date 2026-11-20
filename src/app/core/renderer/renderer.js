@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import { MeshBasicNodeMaterial } from 'three/webgpu';
 import { positionGeometry, vec4 } from 'three/tsl';
-import { RAYTRACER_VERTEX_SHADER } from '../../../shaders/raytracer/index.js';
 import {
     createRaytracerNode,
     createRaytracerUniforms,
@@ -161,25 +160,16 @@ function recoverRenderer(attempt) {
     );
 }
 
-export function init(glslSource, viewport) {
-    setShader(new Shader(glslSource));
+export function init(viewport) {
+    setShader(new Shader());
 
     applyQualityPresetValues(shader.parameters, initialQualityPreset(), { selectSolver: true });
 
     setViewportHost(viewport);
     setScene(new THREE.Scene());
 
-    // WebGPURenderer (the node renderer) draws the TSL ray tracer, WebGLRenderer the GLSL one.
-    var nodeRenderer = !!viewport.gl.isWebGPURenderer;
     var geometry = new THREE.PlaneGeometry(2, 2);
-    var uniformValues = raytracerUniformValues();
-    var uniforms = nodeRenderer
-        ? createRaytracerUniforms(uniformValues)
-        : Object.fromEntries(
-              Object.entries(uniformValues).map(function (entry) {
-                  return [entry[0], { value: entry[1] }];
-              }),
-          );
+    var uniforms = createRaytracerUniforms(raytracerUniformValues());
     setShaderUniforms(uniforms);
 
     // Disk temperature scale, Page-Thorne coefficients of the spin and the exposure that puts the
@@ -355,23 +345,15 @@ export function init(glslSource, viewport) {
 
     setUpdateUniforms(updateUniformsImpl);
 
-    var material;
-    if (nodeRenderer) {
-        material = new MeshBasicNodeMaterial();
-        material.vertexNode = vec4(positionGeometry.xy, 0.0, 1.0);
-        material.depthTest = false;
-        material.depthWrite = false;
-    } else {
-        material = new THREE.ShaderMaterial({
-            glslVersion: THREE.GLSL3,
-            uniforms: uniforms,
-            vertexShader: RAYTRACER_VERTEX_SHADER,
-        });
-    }
+    var material = new MeshBasicNodeMaterial();
+    material.vertexNode = vec4(positionGeometry.xy, 0.0, 1.0);
+    material.depthTest = false;
+    material.depthWrite = false;
 
+    // The variant flags decide which parts of the ray tracer the shader contains, so a change of
+    // variant builds a new fragment node.
     scene.updateShader = function () {
-        if (nodeRenderer) material.fragmentNode = createRaytracerNode(shader.variant(), uniforms);
-        else material.fragmentShader = shader.compile();
+        material.fragmentNode = createRaytracerNode(shader.variant(), uniforms);
         material.needsUpdate = true;
         shader.needsUpdate = true;
         resetTemporalAAHistoryImpl();
@@ -389,39 +371,13 @@ export function init(glslSource, viewport) {
     nextRenderer.domElement.id = 'bh-canvas';
     nextRenderer.domElement.style.touchAction = 'none';
     setRenderer(nextRenderer);
-    var maxAnisotropy = nodeRenderer
-        ? renderer.getMaxAnisotropy()
-        : renderer.capabilities.getMaxAnisotropy();
-    initSky(renderer, uniforms, Math.min(16, maxAnisotropy));
+    initSky(renderer, uniforms, Math.min(16, renderer.getMaxAnisotropy()));
+    watchDeviceLoss(renderer);
 
-    if (nodeRenderer) {
-        watchDeviceLoss(renderer);
-    } else {
-        renderer.domElement.addEventListener(
-            'webglcontextlost',
-            function (e) {
-                e.preventDefault();
-                setRendererContextLost(true);
-                console.warn('WebGL context lost - GPU driver may have reset (TDR).');
-            },
-            false,
-        );
-        renderer.domElement.addEventListener(
-            'webglcontextrestored',
-            function () {
-                setRendererContextLost(false);
-                console.info('WebGL context restored.');
-                if (shader) shader.needsUpdate = true;
-                resetTemporalAAHistoryImpl();
-            },
-            false,
-        );
-    }
-
-    setHdrTarget(createRenderTarget(renderer, 1, 1));
-    setBloomPass(setupBloom(renderer));
-    setTaaPass(setupTemporalAA(renderer));
-    setOutputPass(setupOutputPass(renderer));
+    setHdrTarget(createRenderTarget(1, 1));
+    setBloomPass(setupBloom());
+    setTaaPass(setupTemporalAA());
+    setOutputPass(setupOutputPass());
 
     var size = viewport.size();
     var nextCamera = new THREE.PerspectiveCamera(45, size.width / size.height, 1, 80000);

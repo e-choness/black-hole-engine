@@ -1,9 +1,7 @@
-// Role: Shader configuration and compilation. Holds all compile-time parameters
-//       that control the Mustache-templated GLSL (quality, modes, enabled features)
-//       and exposes compile() to render the template into a ready-to-use fragment
-//       shader string. Also defines the degToRad helper.
+// Role: Shader configuration. Holds the parameters of the simulation and the look, and derives
+//       from them the variant flags (quality, modes, enabled features) that decide which parts
+//       the ray tracer's shader contains. Also defines the degToRad helper.
 
-import Mustache from 'mustache';
 import { diveState, hoverState } from './scenarios/scenario-state.js';
 import { GALAXY_DEFAULTS } from '../../features/galaxy/model.js';
 
@@ -11,7 +9,7 @@ export function degToRad(a) {
     return (Math.PI * a) / 180.0;
 }
 
-export function Shader(mustacheTemplate) {
+export function Shader() {
     this.parameters = {
         n_steps: 100,
         sample_count: 1,
@@ -190,9 +188,5 @@ export function Shader(mustacheTemplate) {
                 that.parameters.jet_enabled);
         that.parameters.planet_enabled = that.parameters.planetEnabled();
         return that.parameters;
-    };
-
-    this.compile = function () {
-        return Mustache.render(mustacheTemplate, that.variant());
     };
 }

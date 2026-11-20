@@ -3,8 +3,8 @@
 // are re-rendered only when the sky changes: every face after a parameter, budget or context
 // change, and while the galaxy turns only the faces its bounding sphere touches, once some
 // particle would have moved by a third of a texel. `revision` counts the renders, so frame
-// accumulation can tell when the sky behind a still view changed. With three's WebGPURenderer the
-// particles use the node materials of galaxy-nodes.js in place of the GLSL of galaxy-shaders.js.
+// accumulation can tell when the sky behind a still view changed. The particles are instanced
+// quads drawn with the node materials of galaxy-nodes.js.
 
 import * as THREE from 'three';
 import { CubeRenderTarget, QuadMesh, RenderTarget } from 'three/webgpu';
@@ -32,16 +32,6 @@ import {
     seedSalt,
     skySignature,
 } from '../../features/galaxy/model.js';
-import {
-    BACKGROUND_FRAGMENT,
-    BACKGROUND_VERTEX,
-    CLOUD_FRAGMENT,
-    CLOUD_VERTEX,
-    PROBE_FRAGMENT,
-    PROBE_VERTEX,
-    STAR_FRAGMENT,
-    STAR_VERTEX,
-} from './galaxy-shaders.js';
 
 const ALL_FACES = 0b111111;
 const NEAR = 0.01;
@@ -162,47 +152,15 @@ const PACKED_FORMAT = {
 };
 const HALF_FORMAT = { name: 'RGBA16F', type: THREE.HalfFloatType, format: THREE.RGBAFormat };
 
-// HDR cube storage: packed R11G11B10F (4 bytes per texel) where it is renderable, else RGBA16F,
-// else 8-bit. WebGPU renders to RGBA16F everywhere and to the packed format with an optional
-// feature; three's WebGL 2 backend enables float colour buffers where they exist.
+// HDR cube storage: packed R11G11B10F (4 bytes per texel) where it is renderable, else RGBA16F.
+// WebGPU renders to RGBA16F everywhere and to the packed format with an optional feature; three's
+// WebGL 2 backend renders to both where EXT_color_buffer_float exists.
 function cubeTargetFormat(renderer) {
-    if (renderer.isWebGPURenderer) {
-        const backend = renderer.backend;
-        const packed = backend.isWebGPUBackend
-            ? renderer.hasFeature('rg11b10ufloat-renderable')
-            : backend.extensions.has('EXT_color_buffer_float');
-        return packed ? PACKED_FORMAT : HALF_FORMAT;
-    }
-    if (renderer.extensions.has('EXT_color_buffer_float')) return PACKED_FORMAT;
-    if (renderer.extensions.has('EXT_color_buffer_half_float')) return HALF_FORMAT;
-    return { name: 'RGBA8', type: THREE.UnsignedByteType, format: THREE.RGBAFormat };
-}
-
-const UINT_UNIFORMS = new Set([
-    'u_arm_salt',
-    'u_bulge_salt',
-    'u_cloud_salt',
-    'u_sky_salt',
-    'u_arm_stars',
-]);
-
-// The same uniforms as TSL nodes, which keep their value so applyParams() serves both.
-function toUniformNodes(uniforms) {
-    return Object.fromEntries(
-        Object.entries(uniforms).map(([name, { value }]) => [
-            name,
-            value && value.isTexture
-                ? texture(value)
-                : uniform(value, UINT_UNIFORMS.has(name) ? 'uint' : undefined),
-        ]),
-    );
-}
-
-function instancedPoint() {
-    const geometry = new THREE.InstancedBufferGeometry();
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0], 3));
-    geometry.instanceCount = 0;
-    return geometry;
+    const backend = renderer.backend;
+    const packed = backend.isWebGPUBackend
+        ? renderer.hasFeature('rg11b10ufloat-renderable')
+        : backend.extensions.has('EXT_color_buffer_float');
+    return packed ? PACKED_FORMAT : HALF_FORMAT;
 }
 
 function instancedQuad() {
@@ -211,26 +169,9 @@ function instancedQuad() {
     return geometry;
 }
 
-function additiveMaterial(uniforms, vertexShader, fragmentShader) {
-    return new THREE.ShaderMaterial({
-        glslVersion: THREE.GLSL3,
-        uniforms,
-        vertexShader,
-        fragmentShader,
-        blending: THREE.CustomBlending,
-        blendEquation: THREE.AddEquation,
-        blendSrc: THREE.OneFactor,
-        blendDst: THREE.OneFactor,
-        depthTest: false,
-        depthWrite: false,
-        side: THREE.DoubleSide,
-    });
-}
-
 export class GalaxySky {
     constructor(renderer, { anisotropy = 1 } = {}) {
         this.renderer = renderer;
-        this.nodes = !!renderer.isWebGPURenderer;
         this.anisotropy = anisotropy;
         this.format = cubeTargetFormat(renderer);
         this.budget = DEFAULT_BUDGET;
@@ -244,65 +185,47 @@ export class GalaxySky {
         this.palette = createTemperaturePalette();
         this.cloudNoise = createCloudNoise();
 
-        const shared = {
-            u_face: { value: 0 },
-            u_arm_count: { value: 2 },
-            u_tightness: { value: 0 },
-            u_arm_width: { value: 1 },
-            u_randomness: { value: 0 },
-            u_thickness: { value: 1 },
-            u_corotation: { value: 0 },
-            u_phase: { value: 0 },
-            u_phase_angle: { value: 0 },
-            u_phase_cycles: { value: 0 },
-            u_lifetime_angle: { value: 1 },
-            u_density_wave: { value: 1 },
-            u_envelope_norm: { value: 1 / ENVELOPE_MEAN },
-        };
+        // Uniform nodes; applyParams() and setPhase() write their values.
         this.uniforms = {
-            ...shared,
-            u_arm_salt: { value: 0 },
-            u_bulge_salt: { value: 0 },
-            u_cloud_salt: { value: 0 },
-            u_sky_salt: { value: 0 },
-            u_arm_stars: { value: 0 },
-            u_star_size: { value: 0.06 },
-            u_star_flux: { value: 0 },
-            u_young_color: { value: new THREE.Color() },
-            u_old_color: { value: new THREE.Color() },
-            u_bulge_color: { value: new THREE.Color() },
-            u_cloud_size: { value: 1 },
-            u_cloud_flux: { value: 0 },
-            u_nebulae: { value: 0 },
-            u_cloud_tint: { value: new THREE.Color() },
-            u_nebula_color: { value: new THREE.Color() },
-            u_sky_count_scale: { value: 1 },
-            u_sky_flux: { value: 0 },
-            u_palette: { value: this.palette },
-            u_cloud_noise: { value: this.cloudNoise },
+            u_face: uniform(0),
+            u_arm_count: uniform(2),
+            u_tightness: uniform(0),
+            u_arm_width: uniform(1),
+            u_randomness: uniform(0),
+            u_thickness: uniform(1),
+            u_corotation: uniform(0),
+            u_phase: uniform(0),
+            u_phase_angle: uniform(0),
+            u_phase_cycles: uniform(0),
+            u_lifetime_angle: uniform(1),
+            u_density_wave: uniform(1),
+            u_envelope_norm: uniform(1 / ENVELOPE_MEAN),
+            u_arm_salt: uniform(0, 'uint'),
+            u_bulge_salt: uniform(0, 'uint'),
+            u_cloud_salt: uniform(0, 'uint'),
+            u_sky_salt: uniform(0, 'uint'),
+            u_arm_stars: uniform(0, 'uint'),
+            u_star_size: uniform(0.06),
+            u_star_flux: uniform(0),
+            u_young_color: uniform(new THREE.Color()),
+            u_old_color: uniform(new THREE.Color()),
+            u_bulge_color: uniform(new THREE.Color()),
+            u_cloud_size: uniform(1),
+            u_cloud_flux: uniform(0),
+            u_nebulae: uniform(0),
+            u_cloud_tint: uniform(new THREE.Color()),
+            u_nebula_color: uniform(new THREE.Color()),
+            u_sky_count_scale: uniform(1),
+            u_sky_flux: uniform(0),
+            u_palette: texture(this.palette),
+            u_cloud_noise: texture(this.cloudNoise),
         };
 
         this.scene = new THREE.Scene();
-        if (this.nodes) {
-            this.uniforms = toUniformNodes(this.uniforms);
-            const materials = createGalaxyNodeMaterials(this.uniforms);
-            this.background = new THREE.Mesh(instancedQuad(), materials.background);
-            this.clouds = new THREE.Mesh(instancedQuad(), materials.clouds);
-            this.stars = new THREE.Mesh(instancedQuad(), materials.stars);
-        } else {
-            this.background = new THREE.Points(
-                instancedPoint(),
-                additiveMaterial(this.uniforms, BACKGROUND_VERTEX, BACKGROUND_FRAGMENT),
-            );
-            this.clouds = new THREE.Mesh(
-                instancedQuad(),
-                additiveMaterial(this.uniforms, CLOUD_VERTEX, CLOUD_FRAGMENT),
-            );
-            this.stars = new THREE.Points(
-                instancedPoint(),
-                additiveMaterial(this.uniforms, STAR_VERTEX, STAR_FRAGMENT),
-            );
-        }
+        const materials = createGalaxyNodeMaterials(this.uniforms);
+        this.background = new THREE.Mesh(instancedQuad(), materials.background);
+        this.clouds = new THREE.Mesh(instancedQuad(), materials.clouds);
+        this.stars = new THREE.Mesh(instancedQuad(), materials.stars);
         // The galaxy's placement in the hole frame is the model matrix of its particles.
         for (const object of [this.background, this.clouds, this.stars]) {
             object.frustumCulled = false;
@@ -312,17 +235,13 @@ export class GalaxySky {
 
         this.cubeCamera = new THREE.CubeCamera(NEAR, FAR, this.ensureTarget(this.budget.face));
         this.syncCameras();
-
-        this.onContextRestored = () => {
-            this.signature = '';
-        };
-        renderer.domElement.addEventListener('webglcontextrestored', this.onContextRestored);
     }
 
     get texture() {
         return this.target.texture;
     }
 
+    // A renderer that replaces a lost one starts without the cube, so every face is drawn again.
     setRenderer(renderer) {
         this.renderer = renderer;
         this.signature = '';
@@ -340,8 +259,7 @@ export class GalaxySky {
     ensureTarget(face) {
         if (this.target && this.target.width === face) return this.target;
         const previous = this.target;
-        const CubeTarget = this.nodes ? CubeRenderTarget : THREE.WebGLCubeRenderTarget;
-        this.target = new CubeTarget(face, {
+        this.target = new CubeRenderTarget(face, {
             type: this.format.type,
             format: this.format.format,
             generateMipmaps: true,
@@ -491,54 +409,8 @@ export class GalaxySky {
     }
 
     // Reads back an equirectangular thumbnail of the cube (longitude across, latitude up, in the
-    // hole frame) for tests and diagnostics: linear RGB rows from the south pole up.
-    probe(width = 64, height = 32) {
-        if (this.nodes) return this.probeNodes(width, height);
-        const renderer = this.renderer;
-        const float = renderer.extensions.has('EXT_color_buffer_float');
-        const target = new THREE.WebGLRenderTarget(width, height, {
-            type: float ? THREE.FloatType : THREE.HalfFloatType,
-            depthBuffer: false,
-        });
-        const material = new THREE.ShaderMaterial({
-            glslVersion: THREE.GLSL3,
-            uniforms: {
-                u_cube: { value: this.target.texture },
-                // Mip level whose texels match a probe pixel, so stars are averaged, not point-sampled.
-                u_lod: { value: Math.max(0, Math.log2((Math.PI * this.budget.face) / width)) },
-            },
-            vertexShader: PROBE_VERTEX,
-            fragmentShader: PROBE_FRAGMENT,
-            depthTest: false,
-            depthWrite: false,
-        });
-        const quad = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), material);
-        quad.frustumCulled = false;
-        const scene = new THREE.Scene();
-        scene.add(quad);
-        const previousTarget = renderer.getRenderTarget();
-        renderer.setRenderTarget(target);
-        renderer.render(scene, new THREE.Camera());
-        const raw = float
-            ? new Float32Array(width * height * 4)
-            : new Uint16Array(width * height * 4);
-        renderer.readRenderTargetPixels(target, 0, 0, width, height, raw);
-        renderer.setRenderTarget(previousTarget);
-        target.dispose();
-        material.dispose();
-        quad.geometry.dispose();
-        const rgb = new Float32Array(width * height * 3);
-        for (let i = 0; i < width * height; i++) {
-            for (let c = 0; c < 3; c++) {
-                const v = raw[i * 4 + c];
-                rgb[i * 3 + c] = float ? v : THREE.DataUtils.fromHalfFloat(v);
-            }
-        }
-        return { width, height, rgb };
-    }
-
-    // probe() for WebGPURenderer, whose readback is asynchronous: resolves to the same result.
-    async probeNodes(width, height) {
+    // hole frame) for tests and diagnostics. Resolves to linear RGB rows from the south pole up.
+    async probe(width = 64, height = 32) {
         const renderer = this.renderer;
         const target = new RenderTarget(width, height, {
             type: THREE.FloatType,
@@ -569,10 +441,6 @@ export class GalaxySky {
     }
 
     dispose() {
-        this.renderer.domElement.removeEventListener(
-            'webglcontextrestored',
-            this.onContextRestored,
-        );
         for (const object of [this.background, this.clouds, this.stars]) {
             object.geometry.dispose();
             object.material.dispose();

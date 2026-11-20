@@ -2,8 +2,8 @@
 // galaxy.js of dgreenheck/webgpu-galaxy (spiral arms drawn per particle from a hash, a flat
 // rotation curve, stars coloured by their distance from the arm ridge), but every particle is
 // evaluated in closed form from its index and the galaxy phase instead of being integrated frame
-// by frame. The GLSL in src/app/sky/galaxy-shaders.js mirrors the functions here, which the unit
-// tests use as the reference.
+// by frame. The node materials in src/app/sky/galaxy-nodes.js mirror the functions here, which
+// the unit tests use as the reference.
 //
 // Lengths are in webgpu-galaxy units (a disk of radius 13), so its parameter values carry over.
 // Only angles reach the image: the sky is rendered from the hole, which sits `distance` galaxy
@@ -157,7 +157,7 @@ export function clampGalaxyParams(params = {}) {
 // --- Hash ------------------------------------------------------------------------------------
 
 // lowbias32 integer hash (C. Wellons, "Hash function prospector", 2018). Integer arithmetic is
-// exact in GLSL ES 3.0 and in JS through Math.imul, so both sides draw identical particles.
+// exact in the shaders and in JS through Math.imul, so both sides draw identical particles.
 export function hashU32(value) {
     let x = value >>> 0;
     x ^= x >>> 16;
@@ -242,7 +242,7 @@ export const ENVELOPE_MEAN = (() => {
     return sum / (3 * n);
 })();
 
-// --- Particles (reference implementations of the GLSL) --------------------------------------
+// --- Particles (reference implementations of the shaders) -----------------------------------
 
 // Number of disk (arm) stars for a total star budget; the rest form the bulge.
 export function armStarCount(total, bulge) {

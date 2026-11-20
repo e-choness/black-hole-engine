@@ -1,8 +1,9 @@
 # Black Hole Simulation
 
 A real-time black hole renderer that runs in the browser. Every pixel traces a light ray through
-curved spacetime on the GPU with WebGL 2, so the lensed sky, the accretion flow and relativistic
-jets are recomputed live as you move the camera or change the physics. A timeline editor turns any
+curved spacetime on the GPU, with WebGPU on desktop and WebGL 2 on phones and tablets, so the
+lensed sky, the accretion flow and relativistic jets are recomputed live as you move the camera or
+change the physics. A timeline editor turns any
 setup into a scripted presentation that can be recorded to video.
 
 ## Features
@@ -34,7 +35,10 @@ setup into a scripted presentation that can be recorded to video.
   MediaRecorder. Where the File System Access API is available, offline renders stream straight
   into the chosen file instead of being held in memory.
 
-The simulation needs a browser with WebGL 2 and explains in the page when it is missing. Offline
+The simulation needs a browser with WebGPU or WebGL 2 and explains in the page when both are
+missing. The shaders are written once in three.js TSL, which compiles them to WGSL for WebGPU and
+to GLSL for WebGL 2. Desktop browsers use WebGPU; phones, tablets, Firefox and browsers without
+WebGPU use WebGL 2, and `?backend=webgl` or `?backend=webgpu` overrides the choice. Offline
 recording also needs WebCodecs.
 
 ## Quick start
@@ -48,17 +52,18 @@ docker compose up dev
 
 Then open <http://localhost:5173>. Source changes reload in the browser.
 
-| Command                                                 | What it does                                                  |
-| ------------------------------------------------------- | ------------------------------------------------------------- |
-| `docker compose up dev`                                 | Vite dev server with hot module reload                        |
-| `docker compose run --rm test`                          | ESLint, Prettier check and Vitest unit tests                  |
-| `docker compose run --rm build`                         | Production build into `dist/`                                 |
-| `docker compose up --build preview`                     | Production nginx image on <http://localhost:8080>             |
-| `docker compose run --rm e2e`                           | Playwright e2e tests in headless Chromium with software WebGL |
-| `docker compose run --rm test npm run format`           | Format with Prettier and apply ESLint fixes                   |
-| `docker compose run --rm test npm run check:deprecated` | Fail if the lockfile installs a deprecated package version    |
-| `docker compose run --rm test npm install <pkg>`        | Add a dependency (updates `package.json` and the lockfile)    |
-| `docker compose down --remove-orphans`                  | Stop and remove the project's containers                      |
+| Command                                                 | What it does                                                 |
+| ------------------------------------------------------- | ------------------------------------------------------------ |
+| `docker compose up dev`                                 | Vite dev server with hot module reload                       |
+| `docker compose run --rm test`                          | ESLint, Prettier check and Vitest unit tests                 |
+| `docker compose run --rm build`                         | Production build into `dist/`                                |
+| `docker compose up --build preview`                     | Production nginx image on <http://localhost:8080>            |
+| `docker compose run --rm e2e`                           | Playwright e2e tests in headless Chromium on software WebGPU |
+| `docker compose run --rm -e VITE_BACKEND=webgl e2e`     | The e2e tests on the WebGL 2 backend                         |
+| `docker compose run --rm test npm run format`           | Format with Prettier and apply ESLint fixes                  |
+| `docker compose run --rm test npm run check:deprecated` | Fail if the lockfile installs a deprecated package version   |
+| `docker compose run --rm test npm install <pkg>`        | Add a dependency (updates `package.json` and the lockfile)   |
+| `docker compose down --remove-orphans`                  | Stop and remove the project's containers                     |
 
 Settings can be exported or put in a `.env` file next to `compose.yaml`:
 
@@ -114,9 +119,9 @@ docker build --target runtime --tag black-hole:local .
 docker run --rm -p 8080:8080 --read-only --tmpfs /tmp --cap-drop ALL black-hole:local
 ```
 
-The security headers, including a CSP that allows WebGL2, WebCodecs, Web Audio worklets and
-service workers, are defined once in `config/security-headers.js` and applied to the Vite preview
-server, the build-time `<meta>` tag and the nginx configuration.
+The security headers, including a CSP that allows WebGPU, WebGL 2, WebCodecs, Web Audio worklets
+and service workers, are defined once in `config/security-headers.js` and applied to the Vite
+preview server, the build-time `<meta>` tag and the nginx configuration.
 
 ## Project structure
 
@@ -124,7 +129,7 @@ server, the build-time `<meta>` tag and the nginx configuration.
 index.html               page shell and Vite entry
 src/app/main.js          application entry point
 src/app/core/            renderer, render loop, runtime state, observer physics, scenarios
-src/app/graphics/        bloom and the shared full-screen pass helpers
+src/app/graphics/        bloom, output pass and the shared full-screen pass helpers
 src/app/presentation/    timeline editor, presentation runtime and recording, bundled presets
 src/app/scene/           camera runtime and the mouse and touch observer controls
 src/app/sky/             procedural galaxy drawn into the sky cube map
@@ -133,11 +138,11 @@ src/ui/                  React interface: top bar, mode rail, inspector, time ba
 src/ui/viewport/         React Three Fiber canvas that creates the renderer and runs the frame loop
 src/features/            galaxy model, units, clocks, sonification, view links and the offline app
 src/content/             physics notes shown in the app
-src/shaders/raytracer/   GLSL ES 3.00 ray tracer; index.js sets the order the shards are joined in
+src/shaders/tsl/         ray tracer as three.js TSL nodes, built per variant of the scene
 src/styles/              stylesheets of the page and the timeline editor
 public/                  files served as-is: icons and the link-preview image
 tests/unit/              Vitest unit tests
-tests/e2e/               Playwright tests: rendering, controls, recording, missing WebGL 2
+tests/e2e/               Playwright tests: rendering, controls, recording, GPU loss and support
 config/                  build settings: security headers, PWA, link previews, legal notice
 docker/                  container entrypoint and nginx configuration
 scripts/                 build helpers
@@ -163,7 +168,9 @@ Two URL parameters make the app scriptable:
 | `accumulatedFrames` | Frames in the running mean of a static view                                     |
 | `viewport`          | `{ canvas, passes }`: drawing-buffer and scene-target size as `[width, height]` |
 | `sky`               | Galaxy sky status: cube face size, particle counts, colour format, revision     |
-| `probeSky`          | `probeSky(width, height)` reads the sky cube back as equirectangular RGB        |
+| `contextLost`       | `true` from the loss of the GPU device or context until rendering resumes       |
+| `probeSky`          | `probeSky(width, height)` resolves to the sky cube as equirectangular RGB       |
+| `loseGpuDevice`     | `loseGpuDevice()` takes the WebGPU device away; `false` on WebGL 2              |
 
 ```js
 await page.goto('/?quality=mobile&e2e=1');
@@ -171,7 +178,7 @@ await page.evaluate(() => window.__BH__.ready);
 await page.waitForFunction(() => window.__BH__.frameCount >= 24);
 ```
 
-The WebGL canvas has the id `bh-canvas`.
+The canvas has the id `bh-canvas`.
 
 `window.blackHolePresentation` is the presentation API the e2e tests drive, for example
 `loadPreset(name)`, `startRecording(options)` (a promise that resolves to `true` once recording

@@ -285,7 +285,7 @@ holds a share of the stars. Field stars lie uniformly on the sphere with Euclide
 colours from 2600 to 25 000 K.
 
 No particle is stored or integrated: each is a function of its index (the integer hash lowbias32,
-identical in JavaScript and GLSL) and of the pattern phase `Phi = Omega_p t`, where `t` is the
+identical in JavaScript and in the shaders) and of the pattern phase `Phi = Omega_p t`, where `t` is the
 observer's coordinate time. The galaxy therefore turns faster while the observer's clock runs slow
 near the hole, stops with the clock, and seeks and offline renders are deterministic. In winding
 mode every star keeps its orbit, `theta = theta_0 - Omega(r) t`, as in webgpu-galaxy, and

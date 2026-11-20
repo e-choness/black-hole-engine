@@ -1,19 +1,14 @@
 import { memo, useLayoutEffect, useState } from 'react';
 import {
-    Canvas as NodeCanvas,
-    type DefaultRendererProps,
-    type WebGPURootState,
-} from '@react-three/fiber';
-import {
     Canvas,
     useFrame,
     useStore,
-    type DefaultGLProps,
-    type RootState,
-} from '@react-three/fiber/legacy';
-import { LinearSRGBColorSpace, NoToneMapping, WebGLRenderer } from 'three';
+    type DefaultRendererProps,
+    type WebGPURootState,
+} from '@react-three/fiber';
+import { LinearSRGBColorSpace, NoToneMapping } from 'three';
 import { WebGPURenderer } from 'three/webgpu';
-import { preferredBackend, useNodeRenderer } from '../../app/core/renderer/backend.js';
+import { preferredBackend } from '../../app/core/renderer/backend.js';
 import {
     baseDevicePixelRatio,
     onEngineCanvasResize,
@@ -21,20 +16,10 @@ import {
     startEngine,
 } from '../engine/engine';
 
-// The GLSL ray tracer draws with WebGLRenderer from the legacy entry. Every pass draws a
-// full-screen quad, so a multisampled canvas would only cost memory. On the web, React Three Fiber
-// passes the canvas element it renders.
-function createRenderer({ canvas }: DefaultGLProps) {
-    return new WebGLRenderer({
-        canvas: canvas as HTMLCanvasElement,
-        antialias: false,
-        powerPreference: 'high-performance',
-    });
-}
-
-// The node (TSL) ray tracer draws with WebGPURenderer from the default entry, on WebGPU or on its
-// WebGL 2 backend (backend.js); React Three Fiber awaits its initialisation.
-function newNodeRenderer(canvas: HTMLCanvasElement) {
+// The ray tracer draws with WebGPURenderer, on WebGPU or on its WebGL 2 backend (backend.js).
+// Every pass draws a full-screen quad, so a multisampled canvas would only cost memory. React
+// Three Fiber passes the canvas element it renders and awaits the renderer's initialisation.
+function newRenderer(canvas: HTMLCanvasElement) {
     return new WebGPURenderer({
         canvas,
         antialias: false,
@@ -43,24 +28,24 @@ function newNodeRenderer(canvas: HTMLCanvasElement) {
     });
 }
 
-function createNodeRenderer({ canvas }: DefaultRendererProps) {
-    return newNodeRenderer(canvas as HTMLCanvasElement);
+// React Three Fiber gives a new renderer ACES tone mapping and sRGB output; the output pass
+// tone-maps and encodes itself, so the renderer draws it straight to the canvas.
+function configureOutput(renderer: WebGPURenderer) {
+    renderer.toneMapping = NoToneMapping;
+    renderer.outputColorSpace = LinearSRGBColorSpace;
 }
 
-// React Three Fiber gives the renderer ACES tone mapping and sRGB output; the output pass tone-maps
-// and encodes itself, so WebGPURenderer draws it straight to the canvas.
-function configureRenderer(renderer: WebGLRenderer | WebGPURenderer) {
-    renderer.toneMapping = NoToneMapping;
-    if (useNodeRenderer) renderer.outputColorSpace = LinearSRGBColorSpace;
+function createRenderer({ canvas }: DefaultRendererProps) {
+    return newRenderer(canvas as HTMLCanvasElement);
 }
 
 // A renderer whose GPU device or WebGL context was lost never draws again. Its replacement takes
 // the same canvas and size, and becomes the root's renderer, which React Three Fiber resizes and
 // disposes; the engine has already disposed the lost one.
-async function replaceNodeRenderer(state: WebGPURootState) {
+async function replaceRenderer(state: WebGPURootState) {
     const { renderer: lost, size, viewport } = state.get();
-    const next = newNodeRenderer(lost.domElement);
-    configureRenderer(next);
+    const next = newRenderer(lost.domElement);
+    configureOutput(next);
     next.setPixelRatio(viewport.dpr);
     next.setSize(size.width, size.height, false);
     await next.init();
@@ -105,8 +90,8 @@ interface ViewportProps {
 // The canvas fills the window underneath the interface; its pixel ratio carries the render scale.
 export const Viewport = memo(function Viewport({ onReady }: ViewportProps) {
     const [dpr, setDpr] = useState(baseDevicePixelRatio);
-    const start = (state: RootState | WebGPURootState) => {
-        configureRenderer(state.renderer);
+    const start = (state: WebGPURootState) => {
+        configureOutput(state.renderer);
         startEngine({
             gl: state.renderer,
             size: () => state.get().size,
@@ -117,28 +102,15 @@ export const Viewport = memo(function Viewport({ onReady }: ViewportProps) {
                 renderer.setPixelRatio(viewport.dpr);
                 renderer.setSize(size.width, size.height);
             },
-            replaceRenderer: useNodeRenderer
-                ? () => replaceNodeRenderer(state as WebGPURootState)
-                : undefined,
+            replaceRenderer: () => replaceRenderer(state),
         });
         onReady();
     };
     return (
         <div className="viewport">
-            {useNodeRenderer ? (
-                <NodeCanvas
-                    renderer={createNodeRenderer}
-                    dpr={dpr}
-                    events={noEvents}
-                    onCreated={start}
-                >
-                    <EngineFrame />
-                </NodeCanvas>
-            ) : (
-                <Canvas gl={createRenderer} dpr={dpr} events={noEvents} onCreated={start}>
-                    <EngineFrame />
-                </Canvas>
-            )}
+            <Canvas renderer={createRenderer} dpr={dpr} events={noEvents} onCreated={start}>
+                <EngineFrame />
+            </Canvas>
         </div>
     );
 });

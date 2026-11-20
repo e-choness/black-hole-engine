@@ -42,17 +42,17 @@ const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const norm = (a) => Math.hypot(a[0], a[1], a[2]);
 
 describe('hash', () => {
-    test('the GLSL hash uses the same constants and shifts as hashU32', () => {
-        const glsl = fs.readFileSync('src/app/sky/galaxy-shaders.js', 'utf8');
+    test('the shader hash uses the same constants and shifts as hashU32', () => {
+        const nodes = fs.readFileSync('src/app/sky/galaxy-nodes.js', 'utf8');
         for (const fragment of [
-            'x ^= x >> 16u;',
-            'x *= 0x7feb352du;',
-            'x ^= x >> 15u;',
-            'x *= 0x846ca68bu;',
-            'hash_u32(index * 16u + stream + salt) >> 8u',
-            '(1.0 / 16777216.0)',
+            'h.assign(h.bitXor(h.shiftRight(uint(16))));',
+            'h.assign(h.mul(uint(0x7feb352d)));',
+            'h.assign(h.bitXor(h.shiftRight(uint(15))));',
+            'h.assign(h.mul(uint(0x846ca68b)));',
+            'hashU32(index.mul(uint(16)).add(uint(stream)).add(salt))',
+            'float(h.shiftRight(uint(8))).mul(1.0 / 16777216.0)',
         ]) {
-            assert.ok(glsl.includes(fragment), `galaxy-shaders.js lacks "${fragment}"`);
+            assert.ok(nodes.includes(fragment), `galaxy-nodes.js lacks "${fragment}"`);
         }
     });
 

@@ -1,7 +1,10 @@
-// Node-material (TSL) version of galaxy-shaders.js for three's WebGPURenderer. WebGPU has no point
-// sprites, so every particle is an instanced quad that the vertex stage spreads in clip space to the
-// sprite size in face pixels. As in the GLSL, each instance draws its parameters from an integer hash
-// of its instance index.
+// Node materials of the galaxy sky (src/features/galaxy/model.js holds the reference
+// implementation of every placement and motion function). Particles carry no vertex data: each
+// instance draws its parameters from an integer hash of its instance index, so structural changes
+// are uniform updates. WebGPU has no point sprites, so every particle is an instanced quad that the
+// vertex stage spreads in clip space to the sprite size. The scene is rendered from the hole into
+// the six faces of a cube map; sizes are in pixels of a face, whose 90 degree field of view gives a
+// focal length of face / 2 pixels.
 
 import { MeshBasicNodeMaterial } from 'three/webgpu';
 import {
@@ -47,12 +50,17 @@ import {
     ROTATION_SOFTENING,
 } from '../../features/galaxy/model.js';
 
-// galaxy-shaders.js documents these constants.
 const TAU = 6.283185307179586;
+// Sprites stay between these sizes and their brightness is rescaled to the light they carry, so
+// sub-pixel stars do not flicker in and out of the texel grid and nearby ones stay points.
 const MIN_POINT = 2.0;
 const MAX_POINT = 4.0;
+// Angular diameter (rad) above which a particle's light grows more slowly than its solid angle:
+// each particle is a star cloud, and from inside the galaxy the nearest ones would otherwise
+// outshine the rest of the sky.
 const SOFT_ANGLE = 0.012;
 const BULGE_FLATTENING = 0.6;
+// Angular diameter of a background star sprite (rad).
 const STAR_ANGLE = 0.004;
 
 // lowbias32 (C. Wellons 2018); identical to hashU32() in model.js.
@@ -83,7 +91,9 @@ function youngEnvelope(u, age) {
     return smoothstep(0.0, 0.06, age).mul(fade).mul(fade).mul(u.u_envelope_norm);
 }
 
-// (angle, age) of an arm particle at the current pattern phase.
+// Angle of an arm particle at the current pattern phase and its age as a fraction of the
+// lifetime. Density-wave particles are born on the rigidly rotating arm and drift at their own
+// angular speed; winding particles keep their angular speed from t = 0.
 function armMotion(u, theta0, r, phaseOffset) {
     const kappa = relativeSpeed(u, r).toConst();
     const age = fract(u.u_phase_cycles.add(phaseOffset)).toConst();
@@ -95,7 +105,8 @@ function armMotion(u, theta0, r, phaseOffset) {
     return select(u.u_density_wave.greaterThan(0.5), wave, winding).toConst();
 }
 
-// (sprite size in pixels, brightness factor) for an angular diameter in radians.
+// Sprite size in pixels for an angular diameter in radians, and the brightness factor that gives
+// the resized sprite the light of the particle: its solid angle, softened above SOFT_ANGLE.
 function sprite(u, angle) {
     const size = angle.mul(0.5).mul(u.u_face).toConst();
     const point = clamp(size, MIN_POINT, MAX_POINT).toConst();
@@ -275,7 +286,8 @@ function cloudMaterial(u) {
         offset.assign(vec2(hashUnit(id, 10, salt), hashUnit(id, 11, salt)));
         return select(nearFade.mul(envelope).lessThanEqual(0.0), vec4(2.0, 2.0, 2.0, 1.0), clip);
     })();
-    // Soft wisp: a radial falloff cut by tileable fractal noise at an offset that differs per cloud.
+    // Soft wisp in place of webgpu-galaxy's cloud.png: a radial falloff cut by tileable fractal
+    // noise (GalaxySky's cloud noise texture) at an offset that differs per cloud.
     const fragment = Fn(() => {
         const q = uv().mul(2.0).sub(1.0).toConst();
         const r2 = dot(q, q).toConst();

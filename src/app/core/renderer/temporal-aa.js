@@ -7,11 +7,30 @@
 // pixel integral (progressive accumulation).
 
 import * as THREE from 'three';
-import { createNodeResolveMaterial } from '../../graphics/node-passes.js';
 import {
-    createPassMaterial,
+    Fn,
+    If,
+    Loop,
+    abs,
+    dot,
+    float,
+    int,
+    max,
+    mix,
+    select,
+    sqrt,
+    texture,
+    uniform,
+    uv,
+    vec2,
+    vec3,
+    vec4,
+} from 'three/tsl';
+import {
+    EMPTY_TEXTURE,
     createPassQuad,
     createRenderTarget,
+    passMaterial,
     renderPass,
 } from '../../graphics/post-processing.js';
 
@@ -32,88 +51,82 @@ function halton(index, base) {
 // Statistics and blending run in YCoCg on c / (1 + Y), the tonemapped weighting that keeps single
 // HDR fireflies from dominating the neighbourhood moments and the resolve. The history is clipped
 // towards the neighbourhood mean mu into the box mu +- gamma sigma.
-const RESOLVE_FRAGMENT_SHADER = /* glsl */ `
-uniform sampler2D tCurrent;
-uniform sampler2D tHistory;
-uniform vec2 texel;
-uniform float historyWeight;
-uniform float clipGamma;
-uniform bool accumulate;
-in vec2 vUv;
-out vec4 fragColor;
-
-vec3 compress(vec3 rgb) {
-    vec3 c = vec3(
-        dot(rgb, vec3(0.25, 0.5, 0.25)),
-        dot(rgb, vec3(0.5, 0.0, -0.5)),
-        dot(rgb, vec3(-0.25, 0.5, -0.25))
-    );
-    return c / (1.0 + c.x);
+function createResolveMaterial() {
+    const u = {
+        tCurrent: texture(EMPTY_TEXTURE),
+        tHistory: texture(EMPTY_TEXTURE),
+        texel: uniform(new THREE.Vector2()),
+        historyWeight: uniform(0.0),
+        clipGamma: uniform(1.25),
+        accumulate: uniform(0),
+    };
+    const compress = (rgb) => {
+        const c = vec3(
+            dot(rgb, vec3(0.25, 0.5, 0.25)),
+            dot(rgb, vec3(0.5, 0.0, -0.5)),
+            dot(rgb, vec3(-0.25, 0.5, -0.25)),
+        ).toConst();
+        return c.div(c.x.add(1.0));
+    };
+    const expand = (compressed) => {
+        const c = compressed.div(max(float(1.0).sub(compressed.x), 1e-4)).toConst();
+        return vec3(c.x.add(c.y).sub(c.z), c.x.add(c.z), c.x.sub(c.y).sub(c.z));
+    };
+    // Running mean of a static view.
+    const accumulateNode = (p) =>
+        mix(u.tCurrent.sample(p).rgb, u.tHistory.sample(p).rgb, u.historyWeight);
+    // TAA blend of the rectified history into the new frame.
+    const resolveNode = (p) => {
+        const m1 = vec3(0.0).toVar();
+        const m2 = vec3(0.0).toVar();
+        const current = vec3(0.0).toVar();
+        Loop({ start: int(-1), end: int(1), condition: '<=' }, ({ i: y }) => {
+            Loop({ start: int(-1), end: int(1), condition: '<=' }, ({ i: x }) => {
+                const offset = vec2(float(x), float(y)).mul(u.texel);
+                const s = compress(u.tCurrent.sample(p.add(offset)).rgb).toConst();
+                If(x.equal(0).and(y.equal(0)), () => {
+                    current.assign(s);
+                });
+                m1.addAssign(s);
+                m2.addAssign(s.mul(s));
+            });
+        });
+        const mu = m1.div(9.0).toConst();
+        const sigma = sqrt(max(m2.div(9.0).sub(mu.mul(mu)), vec3(0.0)));
+        const history = compress(u.tHistory.sample(p).rgb).toConst();
+        const v = history.sub(mu).toConst();
+        const units = abs(v)
+            .div(max(sigma.mul(u.clipGamma), vec3(1e-6)))
+            .toConst();
+        const m = max(units.x, max(units.y, units.z)).toConst();
+        const clipped = select(m.greaterThan(1.0), mu.add(v.div(m)), history);
+        return max(expand(mix(current, clipped, u.historyWeight)), vec3(0.0));
+    };
+    const node = Fn(() => {
+        const p = uv();
+        const result = vec3(0.0).toVar();
+        If(u.accumulate.greaterThan(0.5), () => {
+            result.assign(accumulateNode(p));
+        }).Else(() => {
+            result.assign(resolveNode(p));
+        });
+        return vec4(result, 1.0);
+    })();
+    return Object.assign(passMaterial(node), { uniforms: u });
 }
-
-vec3 expand(vec3 c) {
-    c /= max(1.0 - c.x, 1e-4);
-    return vec3(c.x + c.y - c.z, c.x + c.z, c.x - c.y - c.z);
-}
-
-vec3 clip_towards_mean(vec3 mu, vec3 extent, vec3 history) {
-    vec3 v = history - mu;
-    vec3 units = abs(v) / max(extent, vec3(1e-6));
-    float m = max(units.x, max(units.y, units.z));
-    return m > 1.0 ? mu + v / m : history;
-}
-
-void main() {
-    if (accumulate) {
-        fragColor = vec4(mix(texture(tCurrent, vUv).rgb, texture(tHistory, vUv).rgb, historyWeight), 1.0);
-        return;
-    }
-    vec3 m1 = vec3(0.0);
-    vec3 m2 = vec3(0.0);
-    vec3 current = vec3(0.0);
-    for (int y = -1; y <= 1; y++) {
-        for (int x = -1; x <= 1; x++) {
-            vec3 s = compress(texture(tCurrent, vUv + vec2(float(x), float(y)) * texel).rgb);
-            if (x == 0 && y == 0) current = s;
-            m1 += s;
-            m2 += s * s;
-        }
-    }
-    vec3 mu = m1 / 9.0;
-    vec3 sigma = sqrt(max(m2 / 9.0 - mu * mu, vec3(0.0)));
-    vec3 history = clip_towards_mean(mu, clipGamma * sigma, compress(texture(tHistory, vUv).rgb));
-    fragColor = vec4(max(expand(mix(current, history, historyWeight)), vec3(0.0)), 1.0);
-}
-`;
 
 function clampSetting(value, fallback, min, max) {
     var v = value !== undefined ? value : fallback;
     return Math.max(min, Math.min(max, v));
 }
 
-function createResolveMaterial() {
-    return createPassMaterial(
-        {
-            tCurrent: { value: null },
-            tHistory: { value: null },
-            texel: { value: new THREE.Vector2() },
-            historyWeight: { value: 0.0 },
-            clipGamma: { value: 1.25 },
-            accumulate: { value: false },
-        },
-        RESOLVE_FRAGMENT_SHADER,
-    );
-}
-
-export function setupTemporalAA(renderer) {
-    var resolveMat = renderer.isWebGPURenderer
-        ? createNodeResolveMaterial()
-        : createResolveMaterial();
+export function setupTemporalAA() {
+    var resolveMat = createResolveMaterial();
 
     var pass = {
-        quad: createPassQuad(renderer),
-        historyRT: createRenderTarget(renderer, 1, 1),
-        outputRT: createRenderTarget(renderer, 1, 1),
+        quad: createPassQuad(),
+        historyRT: createRenderTarget(1, 1),
+        outputRT: createRenderTarget(1, 1),
         historyValid: false,
         frameIndex: 0,
         accumulatedFrames: 0,
@@ -128,8 +141,8 @@ export function setupTemporalAA(renderer) {
         resize: function (w, h) {
             this.historyRT.dispose();
             this.outputRT.dispose();
-            this.historyRT = createRenderTarget(renderer, w, h);
-            this.outputRT = createRenderTarget(renderer, w, h);
+            this.historyRT = createRenderTarget(w, h);
+            this.outputRT = createRenderTarget(w, h);
             this.reset();
         },
 

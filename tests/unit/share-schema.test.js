@@ -28,7 +28,7 @@ const codec = viewStateCodec;
 const reasons = (result) => result.issues.map((issue) => [issue.reason, issue.key]);
 
 // The app's start-up state, resolved like path-bindings.js resolves presentation paths.
-const shader = new Shader('');
+const shader = new Shader();
 const ROOTS = [
     ['cameraPan.', { x: 0, y: 0 }],
     ['observerState.', new Observer()],

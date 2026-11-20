@@ -1,7 +1,9 @@
-// WebGL 2 is required by the renderer (three.js dropped WebGL 1), so the page checks for it
-// before loading any assets and explains the problem in place of the loading message.
+// The renderer draws with WebGPU or, where that is missing, with WebGL 2 (three.js dropped WebGL 1),
+// so the page checks for either before mounting the app and explains the problem in place of the
+// loading message.
 
-export function isWebGL2Available() {
+export function isGpuRenderingAvailable(nav = navigator) {
+    if ('gpu' in nav) return true;
     try {
         const gl = document.createElement('canvas').getContext('webgl2');
         if (!gl) return false;
@@ -12,7 +14,7 @@ export function isWebGL2Available() {
     }
 }
 
-export function showWebGL2Unavailable() {
+export function showGpuRenderingUnavailable() {
     const loader = document.getElementById('loader');
     if (!loader) return;
 
@@ -24,11 +26,11 @@ export function showWebGL2Unavailable() {
     link.rel = 'noopener';
     link.textContent = 'Check WebGL 2 support';
     detail.append(
-        'This simulation needs WebGL 2. Use a current version of Chrome, Edge, Firefox or ' +
-            'Safari and make sure hardware acceleration is enabled. ',
+        'This simulation needs WebGPU or WebGL 2. Use a current version of Chrome, Edge, Firefox ' +
+            'or Safari and make sure hardware acceleration is enabled. ',
         link,
     );
 
-    loader.replaceChildren('WebGL 2 is not available in this browser.', detail);
+    loader.replaceChildren('Neither WebGPU nor WebGL 2 is available in this browser.', detail);
     loader.setAttribute('role', 'alert');
 }

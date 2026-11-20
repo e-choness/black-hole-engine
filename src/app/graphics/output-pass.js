@@ -3,8 +3,29 @@
 // exact sRGB OETF and adds TPDF dither just before the 8-bit canvas quantises it.
 
 import * as THREE from 'three';
-import { createNodeOutputMaterial } from './node-passes.js';
-import { createPassQuad } from './post-processing.js';
+import {
+    Fn,
+    If,
+    acesFilmicToneMapping,
+    agxToneMapping,
+    clamp,
+    dot,
+    float,
+    log2,
+    max,
+    mix,
+    neutralToneMapping,
+    screenCoordinate,
+    sRGBTransferOETF,
+    texture,
+    uint,
+    uniform,
+    uv,
+    uvec3,
+    vec3,
+    vec4,
+} from 'three/tsl';
+import { EMPTY_TEXTURE, LUMA, createPassQuad, passMaterial, tent } from './post-processing.js';
 import { ANCHOR_LUMINANCE } from '../core/physics/emission.js';
 
 export const TONE_MAPPERS = { agx: 0, neutral: 1, aces: 2, scientific: 3 };
@@ -46,139 +67,85 @@ export function scientificLuminanceRange(log2Exposure) {
     return { log2Min: log2Max - SCIENTIFIC_RANGE_STOPS, log2Max };
 }
 
-const INFERNO_GLSL = INFERNO_COEFFICIENTS.map(
-    (c, i) => `    const vec3 c${i} = vec3(${c.join(', ')});`,
-).join('\n');
-
-const VERTEX_SHADER = /* glsl */ `
-precision highp float;
-in vec3 position;
-in vec2 uv;
-out vec2 vUv;
-
-void main() {
-    vUv = uv;
-    gl_Position = vec4(position, 1.0);
-}
-`;
-
-const FRAGMENT_SHADER = /* glsl */ `
-precision highp float;
-precision highp int;
-
-uniform sampler2D tScene;
-uniform sampler2D tBloom;
-uniform vec2 bloomTexel;
-uniform float bloomStrength;
-uniform mat3 whiteBalance;
-uniform int toneMapper;
-uniform float scientificLog2Max;
-uniform float scientificStops;
-uniform int frameIndex;
-in vec2 vUv;
-out vec4 fragColor;
-
-#include <tonemapping_pars_fragment>
-#include <colorspace_pars_fragment>
-
-// 3x3 tent filter over the half-resolution bloom level.
-vec3 bloom_tent(vec2 uv) {
-    vec4 d = bloomTexel.xyxy * vec4(1.0, 1.0, -1.0, 0.0);
-    vec3 s = texture(tBloom, uv - d.xy).rgb;
-    s += texture(tBloom, uv - d.wy).rgb * 2.0;
-    s += texture(tBloom, uv - d.zy).rgb;
-    s += texture(tBloom, uv + d.zw).rgb * 2.0;
-    s += texture(tBloom, uv).rgb * 4.0;
-    s += texture(tBloom, uv + d.xw).rgb * 2.0;
-    s += texture(tBloom, uv + d.zy).rgb;
-    s += texture(tBloom, uv + d.wy).rgb * 2.0;
-    s += texture(tBloom, uv + d.xy).rgb;
-    return s * (1.0 / 16.0);
-}
-
-vec3 inferno(float t) {
-${INFERNO_GLSL}
-    return c0 + t * (c1 + t * (c2 + t * (c3 + t * (c4 + t * (c5 + t * c6)))));
-}
-
-// False colour: log2 luminance over a fixed window of stops, through Inferno.
-vec3 scientific_false_colour(vec3 color) {
-    float y = dot(color, vec3(0.2126729, 0.7151522, 0.072175));
-    float t = (log2(max(y, 1e-12)) - scientificLog2Max) / scientificStops + 1.0;
-    return clamp(inferno(clamp(t, 0.0, 1.0)), 0.0, 1.0);
-}
-
 // PCG-style 3-D integer hash (Jarzynski & Olano 2020, JCGT 9(3)).
-uvec3 pcg3d(uvec3 v) {
-    v = v * 1664525u + 1013904223u;
-    v.x += v.y * v.z;
-    v.y += v.z * v.x;
-    v.z += v.x * v.y;
-    v ^= v >> 16u;
-    v.x += v.y * v.z;
-    v.y += v.z * v.x;
-    v.z += v.x * v.y;
+function pcg3d(seed) {
+    const v = seed.mul(uint(1664525)).add(uint(1013904223)).toVar();
+    v.x.addAssign(v.y.mul(v.z));
+    v.y.addAssign(v.z.mul(v.x));
+    v.z.addAssign(v.x.mul(v.y));
+    v.assign(v.bitXor(v.shiftRight(uvec3(16))));
+    v.x.addAssign(v.y.mul(v.z));
+    v.y.addAssign(v.z.mul(v.x));
+    v.z.addAssign(v.x.mul(v.y));
     return v;
 }
 
 // Triangular-PDF noise of +-1 LSB per channel, re-seeded every frame.
-vec3 tpdf_dither() {
-    uvec3 seed = uvec3(uvec2(gl_FragCoord.xy), uint(frameIndex));
-    vec3 a = vec3(pcg3d(seed)) * (1.0 / 4294967296.0);
-    vec3 b = vec3(pcg3d(seed ^ uvec3(0x9e3779b9u, 0x7f4a7c15u, 0x85ebca6bu))) * (1.0 / 4294967296.0);
-    return (a + b - 1.0) * (1.0 / 255.0);
+function tpdfDither(frameIndex) {
+    const seed = uvec3(uint(screenCoordinate.x), uint(screenCoordinate.y), frameIndex).toConst();
+    const salt = uvec3(uint(0x9e3779b9), uint(0x7f4a7c15), uint(0x85ebca6b));
+    const a = vec3(pcg3d(seed)).mul(1.0 / 4294967296.0);
+    const b = vec3(pcg3d(seed.bitXor(salt))).mul(1.0 / 4294967296.0);
+    return a
+        .add(b)
+        .sub(1.0)
+        .mul(1.0 / 255.0);
 }
 
-void main() {
-    vec3 color = texture(tScene, vUv).rgb;
-    if (bloomStrength > 0.0) color = mix(color, bloom_tent(vUv), bloomStrength);
-    color = max(whiteBalance * color, vec3(0.0));
-
-    vec3 display;
-    if (toneMapper == 3) {
-        display = scientific_false_colour(color);
-    } else {
-        if (toneMapper == 0) color = AgXToneMapping(color);
-        else if (toneMapper == 1) color = NeutralToneMapping(color);
-        else color = ACESFilmicToneMapping(color);
-        display = sRGBTransferOETF(vec4(clamp(color, 0.0, 1.0), 1.0)).rgb;
-    }
-    fragColor = vec4(display + tpdf_dither(), 1.0);
+function inferno(t) {
+    const last = INFERNO_COEFFICIENTS.length - 1;
+    let v = vec3(...INFERNO_COEFFICIENTS[last]);
+    for (let n = last - 1; n >= 0; n--) v = v.mul(t).add(vec3(...INFERNO_COEFFICIENTS[n]));
+    return v;
 }
-`;
 
 function createOutputMaterial() {
-    return new THREE.RawShaderMaterial({
-        glslVersion: THREE.GLSL3,
-        uniforms: {
-            tScene: { value: null },
-            tBloom: { value: null },
-            bloomTexel: { value: new THREE.Vector2(1, 1) },
-            bloomStrength: { value: 0 },
-            whiteBalance: { value: new THREE.Matrix3() },
-            toneMapper: { value: TONE_MAPPERS.agx },
-            toneMappingExposure: { value: 1 },
-            scientificLog2Max: { value: SCIENTIFIC_LOG2_MAX },
-            scientificStops: { value: SCIENTIFIC_RANGE_STOPS },
-            frameIndex: { value: 0 },
-        },
-        vertexShader: VERTEX_SHADER,
-        fragmentShader: FRAGMENT_SHADER,
-        depthTest: false,
-        depthWrite: false,
-    });
+    const u = {
+        tScene: texture(EMPTY_TEXTURE),
+        tBloom: texture(EMPTY_TEXTURE),
+        bloomTexel: uniform(new THREE.Vector2(1, 1)),
+        bloomStrength: uniform(0),
+        whiteBalance: uniform(new THREE.Matrix3()),
+        toneMapper: uniform(TONE_MAPPERS.agx),
+        frameIndex: uniform(0, 'uint'),
+    };
+    const node = Fn(() => {
+        const p = uv();
+        const color = u.tScene.sample(p).rgb.toVar();
+        If(u.bloomStrength.greaterThan(0.0), () => {
+            color.assign(mix(color, tent(u.tBloom, p, u.bloomTexel), u.bloomStrength));
+        });
+        color.assign(max(u.whiteBalance.mul(color), vec3(0.0)));
+        const display = vec3(0.0).toVar();
+        If(u.toneMapper.equal(TONE_MAPPERS.scientific), () => {
+            // False colour: log2 luminance over a fixed window of stops, through Inferno.
+            const y = dot(color, LUMA);
+            const t = log2(max(y, 1e-12))
+                .sub(SCIENTIFIC_LOG2_MAX)
+                .div(SCIENTIFIC_RANGE_STOPS)
+                .add(1.0);
+            display.assign(clamp(inferno(clamp(t, 0.0, 1.0)), 0.0, 1.0));
+        }).Else(() => {
+            const mapped = vec3(0.0).toVar();
+            If(u.toneMapper.equal(TONE_MAPPERS.agx), () => {
+                mapped.assign(agxToneMapping(color, float(1.0)));
+            })
+                .ElseIf(u.toneMapper.equal(TONE_MAPPERS.neutral), () => {
+                    mapped.assign(neutralToneMapping(color, float(1.0)));
+                })
+                .Else(() => {
+                    mapped.assign(acesFilmicToneMapping(color, float(1.0)));
+                });
+            display.assign(sRGBTransferOETF(clamp(mapped, 0.0, 1.0)));
+        });
+        return vec4(display.add(tpdfDither(u.frameIndex)), 1.0);
+    })();
+    return Object.assign(passMaterial(node), { uniforms: u });
 }
 
-export function setupOutputPass(renderer) {
-    const material = renderer.isWebGPURenderer
-        ? createNodeOutputMaterial({
-              toneMappers: TONE_MAPPERS,
-              infernoCoefficients: INFERNO_COEFFICIENTS,
-              scientificLog2Max: SCIENTIFIC_LOG2_MAX,
-              scientificStops: SCIENTIFIC_RANGE_STOPS,
-          })
-        : createOutputMaterial();
-    const quad = createPassQuad(renderer, material);
+export function setupOutputPass() {
+    const material = createOutputMaterial();
+    const quad = createPassQuad(material);
     let frameIndex = 0;
 
     return {
@@ -201,7 +168,6 @@ export function setupOutputPass(renderer) {
             quad.render(renderer);
         },
         dispose() {
-            quad.dispose?.();
             material.dispose();
         },
     };

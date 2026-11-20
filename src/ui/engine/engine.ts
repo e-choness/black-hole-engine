@@ -1,9 +1,8 @@
 // Typed façade over the imperative engine (src/app). React code reads and writes the engine only
 // through this module and params.ts, so the JavaScript modules stay free of UI concerns.
 
-import type { PerspectiveCamera, WebGLRenderer } from 'three';
+import type { PerspectiveCamera } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
-import { RAYTRACER_FRAGMENT_TEMPLATE } from '../../shaders/raytracer/index.js';
 import { init, onCanvasResize } from '../../app/core/renderer/renderer.js';
 import { renderFrame } from '../../app/core/renderer/render-loop.js';
 import * as runtimeState from '../../app/core/runtime/runtime-state.js';
@@ -309,18 +308,18 @@ export const setCaptureSmoothing = setAnimationTimelineCaptureCameraSmoothingEna
 
 // What the engine needs from the React Three Fiber canvas that hosts it (runtime-state.js).
 export interface ViewportHost {
-    gl: WebGLRenderer | WebGPURenderer;
+    gl: WebGPURenderer;
     size: () => { width: number; height: number };
     setDpr: (dpr: number) => void;
     setCamera: (camera: PerspectiveCamera) => void;
     restoreSize: () => void;
-    // Node renderer only: a new renderer on the same canvas, sized and initialised, in place of
-    // one whose GPU device or WebGL context was lost.
-    replaceRenderer?: () => Promise<WebGPURenderer>;
+    // A new renderer on the same canvas, sized and initialised, in place of one whose GPU device
+    // or WebGL context was lost.
+    replaceRenderer: () => Promise<WebGPURenderer>;
 }
 
 export function startEngine(viewport: ViewportHost): void {
-    init(RAYTRACER_FRAGMENT_TEMPLATE, viewport);
+    init(viewport);
 }
 
 export const renderEngineFrame = renderFrame as () => void;
