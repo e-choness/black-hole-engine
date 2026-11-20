@@ -12,11 +12,15 @@ export async function blockingViolations(page) {
         .map((violation) => `${violation.id}: ${violation.nodes.map((n) => n.target).join(' | ')}`);
 }
 
-// Collects console errors and uncaught page errors; every test expects the list to stay empty.
+// Collects console errors, deprecation notices (from three.js, React or any other dependency) and
+// uncaught page errors; every test expects the list to stay empty.
 export function trackPageProblems(page) {
     const problems = [];
     page.on('console', (message) => {
-        if (message.type() === 'error') problems.push(`console.error: ${message.text()}`);
+        const text = message.text();
+        // Libraries announce deprecations through console.warn, console.log or console.error.
+        if (message.type() === 'error') problems.push(`console.error: ${text}`);
+        else if (/deprecat/i.test(text)) problems.push(`deprecation notice: ${text}`);
     });
     page.on('pageerror', (error) => problems.push(`pageerror: ${error.message}`));
     return problems;

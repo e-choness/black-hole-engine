@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1
 
-# Stages: base -> deps -> dev (compose tooling) | source -> test | build -> dist | runtime; e2e.
+# Stages: base -> deps -> dev (compose tooling) | source -> test | build -> dist | runtime; e2e;
+# base -> deprecations.
 
 FROM node:26-slim@sha256:e6bedef217677b276c591795e169840edd9096dbf13f29df8ef8d1856b8820bc AS base
 LABEL com.black-hole.project=black-hole
@@ -32,6 +33,14 @@ COPY --chown=node:node . .
 FROM source AS test
 LABEL com.black-hole.project=black-hole
 RUN npm run lint && npm run typecheck && npm test
+
+# Asks the npm registry whether anything in the lockfile has been deprecated since it was locked;
+# CI builds it uncached.
+FROM base AS deprecations
+LABEL com.black-hole.project=black-hole
+COPY --chown=node:node package-lock.json ./
+COPY --chown=node:node scripts/check-deprecated.js scripts/
+RUN node scripts/check-deprecated.js
 
 FROM source AS build
 LABEL com.black-hole.project=black-hole

@@ -48,16 +48,17 @@ docker compose up dev
 
 Then open <http://localhost:5173>. Source changes reload in the browser.
 
-| Command                                          | What it does                                                  |
-| ------------------------------------------------ | ------------------------------------------------------------- |
-| `docker compose up dev`                          | Vite dev server with hot module reload                        |
-| `docker compose run --rm test`                   | ESLint, Prettier check and Vitest unit tests                  |
-| `docker compose run --rm build`                  | Production build into `dist/`                                 |
-| `docker compose up --build preview`              | Production nginx image on <http://localhost:8080>             |
-| `docker compose run --rm e2e`                    | Playwright e2e tests in headless Chromium with software WebGL |
-| `docker compose run --rm test npm run format`    | Format with Prettier and apply ESLint fixes                   |
-| `docker compose run --rm test npm install <pkg>` | Add a dependency (updates `package.json` and the lockfile)    |
-| `docker compose down --remove-orphans`           | Stop and remove the project's containers                      |
+| Command                                                 | What it does                                                  |
+| ------------------------------------------------------- | ------------------------------------------------------------- |
+| `docker compose up dev`                                 | Vite dev server with hot module reload                        |
+| `docker compose run --rm test`                          | ESLint, Prettier check and Vitest unit tests                  |
+| `docker compose run --rm build`                         | Production build into `dist/`                                 |
+| `docker compose up --build preview`                     | Production nginx image on <http://localhost:8080>             |
+| `docker compose run --rm e2e`                           | Playwright e2e tests in headless Chromium with software WebGL |
+| `docker compose run --rm test npm run format`           | Format with Prettier and apply ESLint fixes                   |
+| `docker compose run --rm test npm run check:deprecated` | Fail if the lockfile installs a deprecated package version    |
+| `docker compose run --rm test npm install <pkg>`        | Add a dependency (updates `package.json` and the lockfile)    |
+| `docker compose down --remove-orphans`                  | Stop and remove the project's containers                      |
 
 Settings can be exported or put in a `.env` file next to `compose.yaml`:
 
@@ -98,9 +99,10 @@ docker image prune --all --filter label=com.black-hole.project=black-hole
 ## Deployment
 
 **GitHub Pages.** On every push to `main`, CI lints, tests and builds the site, runs the e2e test
-and deploys `dist/` to GitHub Pages (set the Pages source to "GitHub Actions"). Asset URLs are
-relative, so the site works under a project sub-path. Pages cannot send custom headers, so the
-build embeds the Content Security Policy as a `<meta>` tag.
+and deploys `dist/` to GitHub Pages (set the Pages source to "GitHub Actions"). A separate job
+asks the npm registry whether a locked package has been deprecated; it reports one without holding
+back the deploy. Asset URLs are relative, so the site works under a project sub-path. Pages cannot
+send custom headers, so the build embeds the Content Security Policy as a `<meta>` tag.
 
 **Container.** The `runtime` stage of the Dockerfile serves the build with unprivileged nginx on
 port 8080: content-hashed assets are cached for a year, `index.html` and the service worker are
@@ -180,6 +182,8 @@ has started), `stopRecording()`, `state()` and `getPathValue(path)`.
 - Use [Conventional Commits](https://www.conventionalcommits.org/) with one change per commit.
 - Run `docker compose run --rm test` and `docker compose run --rm e2e` before opening a pull
   request; CI runs the same checks.
+- The e2e tests fail on console errors and on any console message about a deprecation, from this
+  project or a dependency.
 - Keep code comments about the code itself.
 - The Playwright image tag in the Dockerfile `e2e` stage must match the `@playwright/test`
   version in `package.json`. Dependabot proposes the two updates separately, so merge them
