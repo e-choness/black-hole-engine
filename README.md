@@ -7,15 +7,20 @@ setup into a scripted presentation that can be recorded to video.
 
 ## Features
 
-- Gravitational lensing from the exact Schwarzschild photon-orbit (Binet) equation, with optional
-  RK4 integration and Kerr-inspired disk velocities for spinning black holes.
-- Accretion flows: thin disk (Shakura-Sunyaev / Novikov-Thorne style), thick ADAF/RIAF torus,
+- Gravitational lensing with three solvers: the exact Schwarzschild photon-orbit (Binet) equation,
+  the same light paths with Kerr disk velocities, and full Kerr geodesics, which reproduce the
+  flattened, shifted shadow of a spinning black hole.
+- Accretion flows: a Novikov-Thorne thin disk with Kerr redshift, thick ADAF/RIAF torus,
   super-Eddington slim disk and GRMHD-inspired variants, with Doppler beaming, gravitational
   redshift and blackbody colours.
 - Relativistic jets, an orbiting planet lit by the disk, and a lensed, rotating procedural galaxy
   and star field that can be seen from outside, from its centre or from within its disk.
-- Bloom, temporal anti-aliasing and cinematic tone mapping. Quality presets range from Mobile to
-  Cinematic, and a one-time GPU benchmark picks the default.
+- Physical scale: masses from stellar black holes to quasars, with presets such as Sgr A*, M87*,
+  Cygnus X-1 and TON 618, derived quantities in physical units, and clocks that compare your
+  proper time with a distant observer's.
+- AgX, Khronos PBR Neutral, ACES and false-colour scientific tone mapping, energy-conserving
+  bloom, temporal anti-aliasing and the accumulation of still views. Quality presets range from
+  Mobile to Cinematic, and a one-time GPU benchmark picks the default.
 - Observer orbits plus scripted "dive" and "hover" scenarios.
 - Camera controls: drag to orbit, right-drag to pan, drag with both buttons to roll and scroll to
   zoom. On touch screens one finger orbits, two fingers pan and a pinch zooms.
@@ -23,6 +28,7 @@ setup into a scripted presentation that can be recorded to video.
   JSON import/export.
 - An interface with a searchable parameter inspector, a command palette (Ctrl/Cmd+K), keyboard
   shortcuts (?), physics notes, sound that follows the simulation and a layout for phones.
+- Links that restore the whole view, and an installable app that works offline.
 - Capture: PNG screenshots, frame-exact offline rendering to MP4 (H.264) or WebM (VP9 or AV1)
   through WebCodecs and [Mediabunny](https://mediabunny.dev), and real-time recording through
   MediaRecorder. Where the File System Access API is available, offline renders stream straight
