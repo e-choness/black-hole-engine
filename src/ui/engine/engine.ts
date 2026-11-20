@@ -42,7 +42,12 @@ export interface EngineParams {
     time_scale: number;
     accretion_disk: boolean;
     accretion_mode: 'thin_disk' | 'thick_torus' | 'slim_disk';
-    disk: { mass_msun: number; eddington_ratio: number; temperature_mode: string };
+    disk: {
+        mass_msun: number;
+        eddington_ratio: number;
+        temperature_mode: string;
+        structure: string;
+    };
     black_hole: { spin_enabled: boolean; spin: number; spin_strength: number };
     jet: { enabled: boolean; mode: string };
     observer: { motion: boolean; distance: number; orbital_inclination: number };

@@ -40,6 +40,8 @@ export function Shader() {
             color_correction: 1.0,
             limb_darkening: 'chandrasekhar',
             opacity: 1.0,
+            structure: 'arcs',
+            arc_sharpness: 4.0,
         },
         radiance_model: 'bolometric',
         torus: {
@@ -181,6 +183,8 @@ export function Shader() {
         that.parameters.jet_physical =
             that.parameters.jet.enabled && that.parameters.jet.mode === 'physical';
         that.parameters.grmhd_enabled = !!that.parameters.grmhd.enabled;
+        that.parameters.disk_arcs =
+            that.parameters.accretion_thin_disk && that.parameters.disk.structure === 'arcs';
         that.parameters.kerr_volume_steps =
             that.parameters.full_kerr &&
             (that.parameters.accretion_thick_torus ||

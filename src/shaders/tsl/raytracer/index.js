@@ -28,6 +28,7 @@ import { createPlanet } from './planet.js';
 import { createTrace } from './trace.js';
 
 export { createRaytracerUniforms } from './uniforms.js';
+export { diskArcNormalisation } from './accretion.js';
 
 // Largest value written to the half-float target (max 65504); NaN and negative values become 0
 // so they cannot spread through the TAA history or the bloom chain.

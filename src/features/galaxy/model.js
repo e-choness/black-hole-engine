@@ -90,6 +90,7 @@ export const GALAXY_DEFAULTS = Object.freeze({
     cloud_opacity: 0.02,
     nebulae: 0.15,
     background_stars: 1,
+    nebula_glow: 1,
 });
 
 // Ranges shared by the inspector, the share-link schema and clampGalaxyParams().
@@ -115,6 +116,7 @@ export const GALAXY_LIMITS = Object.freeze({
     cloud_opacity: [0, 0.2],
     nebulae: [0, 0.6],
     background_stars: [0, 3],
+    nebula_glow: [0, 4],
 });
 
 // Particle budget and cube-face size per quality preset. webgpu-galaxy's demo draws 750 000

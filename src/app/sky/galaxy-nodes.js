@@ -29,6 +29,7 @@ import {
     modelWorldMatrix,
     normalize,
     positionGeometry,
+    positionLocal,
     pow,
     select,
     sin,
@@ -49,6 +50,7 @@ import {
     NEAR_DISTANCE,
     ROTATION_SOFTENING,
 } from '../../features/galaxy/model.js';
+import { createFbm3 } from '../../shaders/tsl/nodes/noise.js';
 
 const TAU = 6.283185307179586;
 // Sprites stay between these sizes and their brightness is rescaled to the light they carry, so
@@ -321,9 +323,38 @@ function backgroundMaterial(u) {
     return additiveMaterial(vertex, pointFragment(color));
 }
 
-// Materials of the three particle layers; `u` holds GalaxySky's uniform nodes.
+// Diffuse nebula behind the particles, after the backdrop of webgpu-black-hole: two layers of
+// fractal noise over the sphere of directions, fixed in the hole frame like the field stars. Over
+// the sphere the noise has a mean of 0.5 and a standard deviation of 0.11, sampled, so
+// (n - mean) / sd is a standard score: the blue haze covers about two thirds of the sky and the
+// violet clouds about a third.
+const NEBULA_NOISE_MEAN = 0.5;
+const NEBULA_NOISE_SD = 0.11;
+const NEBULA_LAYERS = [
+    { scale: 1.6, gain: 0.35, offset: 0.15, color: [0.004, 0.012, 0.038] },
+    { scale: 4.5, gain: 0.6, offset: -0.3, color: [0.033, 0.008, 0.042] },
+];
+
+function nebulaMaterial(u) {
+    const fbm = createFbm3(2.0, 0.55);
+    const fragment = Fn(() => {
+        const dir = normalize(positionLocal).toConst();
+        let glow = vec3(0.0);
+        NEBULA_LAYERS.forEach((layer, i) => {
+            const n = fbm(dir.mul(layer.scale).add(u.u_nebula_offset.mul(i + 1)));
+            const score = n.sub(NEBULA_NOISE_MEAN).div(NEBULA_NOISE_SD);
+            const amount = clamp(score.mul(layer.gain).add(layer.offset), 0.0, 1.0);
+            glow = glow.add(vec3(...layer.color).mul(amount));
+        });
+        return vec4(glow.mul(u.u_nebula_glow), 1.0);
+    })();
+    return additiveMaterial(undefined, fragment);
+}
+
+// Materials of the sky layers; `u` holds GalaxySky's uniform nodes.
 export function createGalaxyNodeMaterials(u) {
     return {
+        nebula: nebulaMaterial(u),
         background: backgroundMaterial(u),
         clouds: cloudMaterial(u),
         stars: starMaterial(u),

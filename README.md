@@ -13,9 +13,9 @@ setup into a scripted presentation that can be recorded to video.
   flattened, shifted shadow of a spinning black hole.
 - Accretion flows: a Novikov-Thorne thin disk with Kerr redshift, thick ADAF/RIAF torus,
   super-Eddington slim disk and GRMHD-inspired variants, with Doppler beaming, gravitational
-  redshift and blackbody colours.
-- Relativistic jets, an orbiting planet lit by the disk, and a lensed, rotating procedural galaxy
-  and star field that can be seen from outside, from its centre or from within its disk.
+  redshift and blackbody colours; the thin disk shows turbulent arcs sheared by its rotation.
+- Relativistic jets, an orbiting planet lit by the disk, and a lensed, rotating procedural galaxy,
+  star field and nebula that can be seen from outside, from its centre or from within its disk.
 - Physical scale: masses from stellar black holes to quasars, with presets such as Sgr A*, M87*,
   Cygnus X-1 and TON 618, derived quantities in physical units, and clocks that compare your
   proper time with a distant observer's.

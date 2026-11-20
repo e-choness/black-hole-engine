@@ -54,6 +54,16 @@ test('the galaxy sky is placed, turns with the clock and follows its parameters'
     expect(status).toMatchObject({ face: 384, stars: 60000, clouds: 800, background: 3000 });
     expect(status.revision).toBeGreaterThan(0);
 
+    // The nebula is patchy and would pull the centroid, so the placement is checked without it;
+    // switching it off redraws the cube.
+    await page.evaluate(() => {
+        window.__BH__.params.sky.galaxy.nebula_glow = 0;
+    });
+    await page.waitForFunction((n) => window.__BH__.sky.revision > n, status.revision, {
+        timeout: 300_000,
+    });
+    const placed = await page.evaluate(() => window.__BH__.sky.revision);
+
     const start = await page.evaluate(skyCentroid);
     const view = await page.evaluate(() => window.__BH__.params.sky.galaxy);
     expect(Math.abs(start.lon - view.longitude)).toBeLessThan(6);
@@ -70,7 +80,7 @@ test('the galaxy sky is placed, turns with the clock and follows its parameters'
         });
         window.blackHolePresentation.seek(0.5);
     });
-    await page.waitForFunction((n) => window.__BH__.sky.revision > n, status.revision, {
+    await page.waitForFunction((n) => window.__BH__.sky.revision > n, placed, {
         timeout: 300_000,
     });
     const turned = await page.evaluate(skyCentroid);

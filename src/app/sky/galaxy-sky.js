@@ -219,15 +219,19 @@ export class GalaxySky {
             u_sky_flux: uniform(0),
             u_palette: texture(this.palette),
             u_cloud_noise: texture(this.cloudNoise),
+            u_nebula_glow: uniform(0),
+            u_nebula_offset: uniform(new THREE.Vector3()),
         };
 
         this.scene = new THREE.Scene();
         const materials = createGalaxyNodeMaterials(this.uniforms);
+        // A sphere around the cube camera carries the nebula; the particles add on top of it.
+        this.nebula = new THREE.Mesh(new THREE.SphereGeometry(500, 48, 24), materials.nebula);
         this.background = new THREE.Mesh(instancedQuad(), materials.background);
         this.clouds = new THREE.Mesh(instancedQuad(), materials.clouds);
         this.stars = new THREE.Mesh(instancedQuad(), materials.stars);
         // The galaxy's placement in the hole frame is the model matrix of its particles.
-        for (const object of [this.background, this.clouds, this.stars]) {
+        for (const object of [this.nebula, this.background, this.clouds, this.stars]) {
             object.frustumCulled = false;
             object.matrixAutoUpdate = false;
             this.scene.add(object);
@@ -323,6 +327,13 @@ export class GalaxySky {
             -2 / 3,
         );
         u.u_sky_flux.value = params.background_stars * BACKGROUND_FLUX;
+        u.u_nebula_glow.value = params.nebula_glow;
+        this.nebula.visible = params.nebula_glow > 0;
+        // Each seed shifts the nebula to another part of the noise.
+        const nebulaSalt = seedSalt(params.seed, SALT.sky);
+        u.u_nebula_offset.value.set(
+            ...[1, 2, 3].map((k) => (hashU32(nebulaSalt + k) / 4294967296) * 64),
+        );
 
         const colors = PALETTE_COLORS[params.palette] || PALETTE_COLORS.vivid;
         u.u_young_color.value.copy(paletteColor(colors.young));
@@ -441,7 +452,7 @@ export class GalaxySky {
     }
 
     dispose() {
-        for (const object of [this.background, this.clouds, this.stars]) {
+        for (const object of [this.nebula, this.background, this.clouds, this.stars]) {
             object.geometry.dispose();
             object.material.dispose();
         }

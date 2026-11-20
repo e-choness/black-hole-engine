@@ -261,6 +261,24 @@ four logarithms per hit. The effective temperature is `T(r) = T_peak (F / F_max)
   per camera frequency. Inside the ISCO it plunges with the ISCO energy and angular momentum
   (Cunningham 1975), which adds `-p_r u^r` to the emitted frequency.
 
+The surface brightness carries an artistic turbulence pattern on top of the flux; both patterns
+turn at `phi' = phi - 0.45 t / r^1.5` on the turbulence clock `t`. The default turbulent arcs
+follow webgpu-black-hole (Greenheck 2025): four octaves of 3-D value noise (lacunarity 2.5,
+persistence 0.7) sampled at `(1.6 r, 1.5 cos phi', 1.5 sin phi')`, so a noise cell is short in
+radius and long in azimuth. The gas density `rho = min(1, 1.5 n)^s` for the arc contrast `s` is
+divided by its mean over the disk, so the contrast leaves the mean brightness unchanged.
+Differential rotation winds the arcs up within a few turns, so every 12 s (a whole fraction of the
+turbulence loop when it is on) a copy from another part of the noise fades in while the previous
+cycle's copy fades out; the weights `w / sqrt(w^2 + (1 - w)^2)` keep the contrast of the two
+independent copies through the hand-over. The density is also the optical depth in units of its
+mean, and a patch blocks `min(1, (1 - e^-tau) / (1 - e^-1))` of the disk opacity, so the images
+behind the disk show through the gaps between arcs. The noise comes from a 64^3 volume of random
+R8 texels: the hardware's trilinear filter, sampled at the cell corner plus the smoothstep
+weights, gives the interpolant of hashed value noise from one fetch per octave. With GRMHD on,
+the arcs replace the log-normal MRI fluctuations, as they carry their own contrast. The plasma
+pattern instead layers 2-D fractal noise with spiral filaments over the whole disk; the thick
+torus and the slim disk always use it.
+
 ### Synchrotron jets
 
 Jets radiate an optically thin power law. A Doppler shift leaves its colour unchanged and scales
@@ -282,7 +300,10 @@ outwards, and the rotation law `Omega(r) = s / (1 + 0.1 r)`, whose speed flatten
 A flattened Plummer bulge (Plummer 1911; scale `0.11 R`, axis ratio 0.6, cut at four scale radii)
 holds a share of the stars. Field stars lie uniformly on the sphere with Euclidean counts
 `N(>F) ~ F^-3/2`, normalised so the bright end does not depend on their number, and blackbody
-colours from 2600 to 25 000 K.
+colours from 2600 to 25 000 K. Behind the particles a sphere carries a diffuse nebula, an
+artistic backdrop after webgpu-black-hole: two layers of 3-D fractal noise over the direction, a
+patchy blue haze over about two thirds of the sky and violet clouds over about a third, placed by
+the seed and fixed in the hole frame like the field stars.
 
 No particle is stored or integrated: each is a function of its index (the integer hash lowbias32,
 identical in JavaScript and in the shaders) and of the pattern phase `Phi = Omega_p t`, where `t` is the
@@ -516,6 +537,8 @@ SwiftShader (2494 ms without it); GPUs filter in hardware.
   apparent superluminal motion, are not modelled.
 - The galaxy is a particle model: its clouds glow and never absorb, so there are no dust lanes,
   and stars are sprites of at least 2 cube texels rather than point sources.
+- The disk arcs and the nebula are procedural noise, not simulated MRI turbulence or emission
+  nebulae.
 - Exposure is manual or anchored; there is no automatic exposure with adaptation.
 - The Scientific colour bar is a page overlay, so recordings and canvas captures leave it out.
 - Without float render targets the HDR frame falls back to RGBA8 and clips at 1.
@@ -560,6 +583,7 @@ SwiftShader (2494 ms without it); GPUs filter in hardware.
 - I. F. Mirabel and L. F. Rodriguez, "A superluminal source in the Galaxy", Nature 371, 46
   (1994).
 - D. Greenheck, "webgpu-galaxy", github.com/dgreenheck/webgpu-galaxy (2025).
+- D. Greenheck, "webgpu-black-hole", github.com/dgreenheck/webgpu-black-hole (2025).
 - H. C. Plummer, "On the problem of distribution in globular star clusters", MNRAS 71, 460
   (1911).
 - C. C. Lin and F. H. Shu, "On the spiral structure of disk galaxies", ApJ 140, 646 (1964).

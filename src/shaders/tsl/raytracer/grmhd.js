@@ -114,28 +114,38 @@ export function createGrmhd(F, U, acc) {
     const grmhd_density = (r, base_density) =>
         base_density.mul(pow(float(4.0).div(max(r, 1.0)), 1.2)).mul(U.grmhd_density_scale);
 
-    // MRI turbulence: log-normal fluctuations (sigma_ln ~ 0.5-1) on the shared pattern, with the
-    // dominant m = 1 spiral of the arrested flux tube in the MAD state.
+    // MRI turbulence on a turbulence pattern `base` with a mean of about 0.85: log-normal
+    // fluctuations (sigma_ln ~ 0.5-1) of the plasma pattern, or the gas density of the arcs, which
+    // already carries its own contrast, with the dominant m = 1 spiral of the arrested flux tube in
+    // the MAD state.
+    const mri_fluctuation = (base, r, angle, t, arcs) => {
+        const orbital_freq = float(1.0).div(pow(max(r, 1.5), 1.5));
+        const spiral_phase = angle.sub(rotation().mul(orbital_freq).mul(t)).toConst();
+        const mad_spiral = float(0.0).toVar();
+        If(U.grmhd_mad_flux.greaterThan(0.1), () => {
+            const lr = log(max(r, 1.0)).toConst();
+            const sp1 = sin(spiral_phase.add(lr.mul(2.5)));
+            const sp2 = sin(spiral_phase.mul(2.0).add(lr.mul(4.0)).add(1.3));
+            mad_spiral.assign(
+                U.grmhd_mad_flux.mul(max(sp1, 0.0).mul(0.3).add(max(sp2, 0.0).mul(0.15))),
+            );
+        });
+        if (arcs) return base.div(0.85).mul(mad_spiral.add(1.0));
+        const sigma_ln = U.grmhd_turbulence_amp.mul(0.6).add(0.4);
+        const log_fluct = exp(sigma_ln.mul(base.sub(0.85)).mul(2.0)).clamp(0.2, 5.0);
+        return log_fluct.mul(mad_spiral.add(1.0));
+    };
+
+    // On the plasma pattern, for the jets.
     const grmhd_mri_turbulence = Fn(
-        ([r, angle, t]) => {
-            const base = acc.accretion_turbulence(r, angle, t);
-            const orbital_freq = float(1.0).div(pow(max(r, 1.5), 1.5));
-            const spiral_phase = angle.sub(rotation().mul(orbital_freq).mul(t)).toConst();
-            const mad_spiral = float(0.0).toVar();
-            If(U.grmhd_mad_flux.greaterThan(0.1), () => {
-                const lr = log(max(r, 1.0)).toConst();
-                const sp1 = sin(spiral_phase.add(lr.mul(2.5)));
-                const sp2 = sin(spiral_phase.mul(2.0).add(lr.mul(4.0)).add(1.3));
-                mad_spiral.assign(
-                    U.grmhd_mad_flux.mul(max(sp1, 0.0).mul(0.3).add(max(sp2, 0.0).mul(0.15))),
-                );
-            });
-            // accretion_turbulence averages about 0.85, so the log-normal is centred there.
-            const sigma_ln = U.grmhd_turbulence_amp.mul(0.6).add(0.4);
-            const log_fluct = exp(sigma_ln.mul(base.sub(0.85)).mul(2.0)).clamp(0.2, 5.0);
-            return log_fluct.mul(mad_spiral.add(1.0));
-        },
+        ([r, angle, t]) => mri_fluctuation(acc.accretion_turbulence(r, angle, t), r, angle, t),
         { r: 'float', angle: 'float', t: 'float', return: 'float' },
+    );
+
+    // On the disk's own pattern, evaluated once by the trace.
+    const grmhd_disk_turbulence = Fn(
+        ([base, r, angle, t]) => mri_fluctuation(base, r, angle, t, F.disk_arcs),
+        { base: 'float', r: 'float', angle: 'float', t: 'float', return: 'float' },
     );
 
     // Non-thermal kappa-distribution boost; kappa -> infinity is thermal.
@@ -245,6 +255,7 @@ export function createGrmhd(F, U, acc) {
         grmhd_synchrotron_correction,
         grmhd_density,
         grmhd_mri_turbulence,
+        grmhd_disk_turbulence,
         grmhd_nonthermal_boost,
         grmhd_isco_stress_factor,
         grmhd_3d_density_turbulence,

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { EMISSION_LUT, bolometricLog2Coefficient } from '../physics/emission.js';
+import { createNoiseVolume } from '../../../shaders/tsl/nodes/noise.js';
 
 // Two RGBA32F rows read texel by texel: blackbody colour and luminance on a log-T grid, and the
 // colour of synchrotron power laws.
@@ -42,6 +43,7 @@ export function raytracerUniformValues() {
         planet_distance: 0.0,
         planet_radius: 0.0,
         emission_lut: createEmissionLutTexture(),
+        noise_volume: createNoiseVolume(),
         log2_exposure: 0.0,
         log2_look_scale: 0.0,
         radiance_visible: 0.0,
@@ -51,6 +53,8 @@ export function raytracerUniformValues() {
         disk_color_correction: 1.0,
         disk_limb: new THREE.Vector2(1, 0),
         disk_opacity: 1.0,
+        disk_arc_sharpness: 4.0,
+        disk_arc_norm: 1.0,
         disk_spin_a: 0.0,
         disk_pt_x0: Math.sqrt(6),
         disk_pt_roots: new THREE.Vector3(),

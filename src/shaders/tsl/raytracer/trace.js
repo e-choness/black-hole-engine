@@ -640,6 +640,9 @@ export function createTrace(F, U, lib) {
                                             const t_eff = em
                                                 .disk_temperature_at(r, disk_stress)
                                                 .toVar();
+                                            const turbulence = acc
+                                                .disk_turbulence(r, angle, turb_t)
+                                                .toConst();
                                             let emissivity;
                                             if (F.grmhd_enabled) {
                                                 // Mild beta-dependent electron temperature, MRI turbulence and
@@ -674,7 +677,12 @@ export function createTrace(F, U, lib) {
                                                     beta_g,
                                                 );
                                                 emissivity = grmhd
-                                                    .grmhd_mri_turbulence(r, angle, turb_t)
+                                                    .grmhd_disk_turbulence(
+                                                        turbulence,
+                                                        r,
+                                                        angle,
+                                                        turb_t,
+                                                    )
                                                     .mul(acc.accretion_outer_fade(r))
                                                     .mul(
                                                         grmhd
@@ -697,8 +705,8 @@ export function createTrace(F, U, lib) {
                                                     )
                                                     .toConst();
                                             } else {
-                                                emissivity = acc
-                                                    .accretion_emissivity(r, angle, turb_t)
+                                                emissivity = turbulence
+                                                    .mul(acc.accretion_outer_fade(r))
                                                     .toConst();
                                             }
 
@@ -754,11 +762,14 @@ export function createTrace(F, U, lib) {
                                                     ),
                                             );
 
-                                            // An optically thick disk ends the ray; a translucent one, or its
-                                            // tapered outer edge, lets the images behind it through.
+                                            // An optically thick disk ends the ray; a translucent one, its
+                                            // tapered outer edge or the gaps between arcs let the images
+                                            // behind it through.
                                             vol_transmittance.mulAssign(
                                                 float(1.0).sub(
-                                                    U.disk_opacity.mul(acc.accretion_outer_fade(r)),
+                                                    U.disk_opacity
+                                                        .mul(acc.accretion_outer_fade(r))
+                                                        .mul(acc.disk_coverage(turbulence)),
                                                 ),
                                             );
                                             If(vol_transmittance.lessThan(1e-4), () => {

@@ -300,6 +300,27 @@ export const PARAMS: ParamDef[] = [
                 help: 'Fraction of the light behind the thin disk that it blocks: 1 for an optically thick disk, lower values let the images behind it through.',
             }),
             choice(
+                'disk.structure',
+                'Structure',
+                options([
+                    ['arcs', 'Turbulent arcs'],
+                    ['plasma', 'Plasma'],
+                ]),
+                {
+                    control: 'segmented',
+                    apply: 'compile',
+                    track: 'scenario',
+                    visible: (p) => p.accretion_mode === 'thin_disk',
+                    help: 'Turbulent arcs: long filaments of gas sheared by the Keplerian rotation, with see-through gaps between them, in the style of webgpu-black-hole. Plasma: mottled turbulence with spiral filaments over the whole disk.',
+                },
+            ),
+            slider('disk.arc_sharpness', 'Arc contrast', 1, 10, 0.1, {
+                format: fixed(1),
+                track: 'scenario',
+                visible: (p) => p.accretion_mode === 'thin_disk' && p.disk.structure === 'arcs',
+                help: 'Exponent of the gas density of the arcs: higher values give thinner, brighter filaments and darker gaps at the same mean brightness.',
+            }),
+            choice(
                 'radiance_model',
                 'Radiance model',
                 options([
@@ -870,6 +891,10 @@ export const PARAMS: ParamDef[] = [
             slider('sky.galaxy.background_stars', 'Field stars', 0, 3, 0.01, {
                 format: fixed(2),
                 help: 'Brightness of the distant stars all over the sky, whose counts follow N(>F) ~ F^-3/2.',
+            }),
+            slider('sky.galaxy.nebula_glow', 'Nebula', 0, 4, 0.01, {
+                format: fixed(2),
+                help: 'Brightness of the diffuse blue and violet nebula behind the stars, an artistic backdrop in the style of webgpu-black-hole.',
             }),
         ].map((draft) => ({ ...draft, apply: 'redraw' as const })),
         galaxySky,

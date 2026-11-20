@@ -1,13 +1,16 @@
-// Accretion flows: the shared turbulence pattern, the ADAF/RIAF thick torus, the slim disk and
-// the colour temperature of the disk light that reaches the planet.
+// Accretion flows: the shared turbulence pattern, the turbulent arcs of the thin disk, the
+// ADAF/RIAF thick torus, the slim disk and the colour temperature of the disk light that reaches
+// the planet.
 
 import {
     Fn,
     If,
     abs,
     atan,
+    clamp,
     cos,
     exp,
+    floor,
     float,
     length,
     log,
@@ -15,13 +18,52 @@ import {
     mix,
     mod,
     pow,
+    round,
     select,
     sin,
     smoothstep,
+    sqrt,
     vec2,
+    vec3,
 } from 'three/tsl';
 import { fbm } from './math.js';
+import { createFbm3, createVolumeNoise3 } from '../nodes/noise.js';
 import { ACCRETION_WIDTH, DISK_SLIM_STRESS } from './emission.js';
+
+// Turbulent arcs, after dgreenheck/webgpu-black-hole: 3-D value noise sampled on (r, cos phi, sin
+// phi) with the azimuth on a small circle, so a noise cell spans a short radial interval and a long
+// stretch of azimuth. Gas density is min(1, ARC_GAIN n)^s for the noise n and the sharpness s.
+const ARC_LACUNARITY = 2.5;
+const ARC_PERSISTENCE = 0.7;
+// Noise cells per r_s across the disk, and the radius of the azimuth circle in noise space.
+const ARC_RADIAL_FREQUENCY = 1.6;
+const ARC_RING = 1.5;
+const ARC_GAIN = 1.5;
+// Value noise on uniform lattice values has a mean of 0.5.
+const ARC_NOISE_MEAN = 0.5;
+// Differential rotation winds the arcs up within a few turns, so the pattern restarts every cycle:
+// each cycle starts a new copy, taken from another part of the noise, that fades in over the cycle
+// while the copy of the previous cycle, one cycle further wound, fades out.
+const ARC_CYCLE = 12.0;
+// Shift in noise space between the copies of consecutive cycles, and the number of copies before
+// they repeat when the turbulence loop is off.
+const ARC_COPY_SHIFT = [7.31, 3.17, -5.43];
+const ARC_COPIES = 64.0;
+
+// Mean of min(1, ARC_GAIN n)^s over the disk and the copies for s = 1..10, sampled; the blend of
+// two copies changes it by less than 0.3 %. diskArcNormalisation() turns it into the factor that
+// gives the density a mean of 1 at any sharpness.
+const ARC_MEAN_POWER = [
+    0.7498, 0.5826, 0.467, 0.3844, 0.3238, 0.2782, 0.2433, 0.216, 0.1942, 0.1767,
+];
+
+export function diskArcNormalisation(sharpness) {
+    const s = Math.min(Math.max(sharpness, 1), 10);
+    const i = Math.min(Math.floor(s), 9);
+    const lo = Math.log(ARC_MEAN_POWER[i - 1]);
+    const hi = Math.log(ARC_MEAN_POWER[i]);
+    return 1 / Math.exp(lo + (hi - lo) * (s - i));
+}
 
 // Emission optical depth of the torus per unit fluid-frame length and unit local emissivity, so
 // a step adds tau S with the thermal source S = B(g T). A look scale: it puts the M87* and Sgr A*
@@ -104,14 +146,83 @@ export function createAccretion(F, U, em) {
         { radius: 'float', angle: 'float', t: 'float', return: 'float' },
     );
 
+    const arc_fbm = createFbm3(ARC_LACUNARITY, ARC_PERSISTENCE, createVolumeNoise3(U.noise_volume));
+    const arc_noise = (radius, phase, copy) =>
+        arc_fbm(
+            vec3(
+                radius.mul(ARC_RADIAL_FREQUENCY),
+                cos(phase).mul(ARC_RING),
+                sin(phase).mul(ARC_RING),
+            ).add(vec3(...ARC_COPY_SHIFT).mul(copy)),
+        );
+
+    // Gas density of the turbulent arcs, with a mean of 1, times the 0.85 mean of the plasma
+    // pattern, for which the GRMHD fluctuations and the exposure are set. Both copies turn at the
+    // rate of the plasma pattern.
+    const arc_turbulence = Fn(
+        ([radius, angle, t]) => {
+            // A whole number of cycles per loop period, each with its own copy, keeps looped
+            // videos seamless; t is already wrapped to the period. A loop of one cycle blends its
+            // copy with itself, so far out, where the copies are little wound apart, the arcs gain
+            // some contrast halfway through.
+            const looped = U.turbulence_loop_enabled.greaterThan(0.5);
+            const loop_cycles = max(round(U.turbulence_loop_seconds.div(ARC_CYCLE)), 1.0);
+            const cycle = select(
+                looped,
+                U.turbulence_loop_seconds.div(loop_cycles),
+                float(ARC_CYCLE),
+            ).toConst();
+            const copies = select(looped, loop_cycles, float(ARC_COPIES)).toConst();
+            const index = floor(t.div(cycle)).toConst();
+            const tc = t.sub(index.mul(cycle)).toConst();
+            const omega = disk_rotation_sign()
+                .mul(0.45)
+                .div(pow(max(radius, 1.001), 1.5))
+                .toConst();
+            const newer = arc_noise(radius, angle.sub(omega.mul(tc)), mod(index, copies)).sub(
+                ARC_NOISE_MEAN,
+            );
+            const older = arc_noise(
+                radius,
+                angle.sub(omega.mul(tc.add(cycle))),
+                mod(index.add(copies).sub(1.0), copies),
+            ).sub(ARC_NOISE_MEAN);
+            // The copies are independent, so these weights keep the variance of the blend and
+            // the arcs keep their contrast through the hand-over.
+            const w = tc.div(cycle).toConst();
+            const v = float(1.0).sub(w).toConst();
+            const n = newer
+                .mul(w)
+                .add(older.mul(v))
+                .div(sqrt(w.mul(w).add(v.mul(v))))
+                .add(ARC_NOISE_MEAN);
+            return pow(clamp(n.mul(ARC_GAIN), 0.0, 1.0), U.disk_arc_sharpness)
+                .mul(U.disk_arc_norm)
+                .mul(0.85);
+        },
+        { radius: 'float', angle: 'float', t: 'float', return: 'float' },
+    );
+
+    // Turbulence pattern of the thin disk: the plasma pattern or the arcs. The torus and the slim
+    // disk keep the plasma pattern, which is cheap enough to evaluate at every step through them.
+    const disk_turbulence = F.disk_arcs ? arc_turbulence : accretion_turbulence;
+
+    // Fraction of the light behind the thin disk that a patch of it blocks, per unit disk
+    // opacity: with the arcs, 1 - exp(-tau) for an optical depth that follows the density,
+    // scaled so a patch of mean density blocks the full opacity.
+    const disk_coverage = (turbulence) =>
+        F.disk_arcs
+            ? float(1.0)
+                  .sub(exp(turbulence.div(-0.85)))
+                  .div(1.0 - Math.exp(-1.0))
+                  .min(1.0)
+            : float(1.0);
+
     // Outer edge of the thin disk: surface density, and with it the emission and the optical
     // depth, tapers to zero over the last fifth of ACCRETION_WIDTH. The inner edge needs no taper:
     // the Page-Thorne flux itself vanishes at the ISCO.
     const accretion_outer_fade = (radius) =>
         float(1.0).sub(smoothstep(0.78, 1.0, radius.sub(ACCRETION_MIN_R).div(ACCRETION_WIDTH)));
-
-    const accretion_emissivity = (radius, angle, t) =>
-        accretion_turbulence(radius, angle, t).mul(accretion_outer_fade(radius));
 
     // --- ADAF/RIAF thick torus: geometrically thick, optically thin (M87*, Sgr A*) ---------
 
@@ -234,8 +345,9 @@ export function createAccretion(F, U, em) {
         disk_rotation_sign,
         equatorial_azimuth,
         accretion_turbulence,
+        disk_turbulence,
+        disk_coverage,
         accretion_outer_fade,
-        accretion_emissivity,
         torus_local_emissivity,
         torus_temperature,
         slim_disk_height,

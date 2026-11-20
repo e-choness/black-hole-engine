@@ -4,6 +4,7 @@ import { positionGeometry, vec4 } from 'three/tsl';
 import {
     createRaytracerNode,
     createRaytracerUniforms,
+    diskArcNormalisation,
 } from '../../../shaders/tsl/raytracer/index.js';
 import { raytracerUniformValues } from './raytracer-uniforms.js';
 import { Shader } from '../shader.js';
@@ -201,6 +202,9 @@ export function init(viewport) {
         var limb = LIMB_DARKENING_LAWS[p.disk.limb_darkening] || LIMB_DARKENING_LAWS.chandrasekhar;
         uniforms.disk_limb.value.set(limb[0], limb[1]);
         uniforms.disk_opacity.value = Math.min(Math.max(p.disk.opacity, 0.0), 1.0);
+        var sharpness = Math.min(Math.max(p.disk.arc_sharpness, 1.0), 10.0);
+        uniforms.disk_arc_sharpness.value = sharpness;
+        uniforms.disk_arc_norm.value = diskArcNormalisation(sharpness);
     }
 
     function updateUniformsImpl() {

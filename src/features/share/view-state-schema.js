@@ -18,7 +18,7 @@
 // The spin range is the Thorne limit +-0.998 used by the units presets, wider than the slider.
 //
 // Frozen: a link omits every field at its default, so changing a key, default or range here would
-// change what existing links mean. Add VIEW_STATE_V2 (with a migrate function where values need
+// change what existing links mean. Add a new version (with a migrate function where values need
 // translating) to VIEW_STATE_VERSIONS instead.
 
 import { createViewStateCodec } from './view-state-codec.js';
@@ -336,7 +336,30 @@ export const VIEW_STATE_V2 = deepFreeze({
     migrate: migrateV1,
 });
 
-export const VIEW_STATE_VERSIONS = Object.freeze([VIEW_STATE_V1, VIEW_STATE_V2]);
+// Version 3 adds the turbulent arcs of the thin disk and the nebula of the galaxy sky, both on by
+// default. Older links showed the plasma disk on a sky without the nebula, and keep doing so.
+function migrateV2(previous, carried) {
+    carried['disk.structure'] = 'plasma';
+    carried['sky.galaxy.nebula_glow'] = 0;
+    return carried;
+}
+
+export const VIEW_STATE_V3 = deepFreeze({
+    version: 3,
+    fields: [
+        ...VIEW_STATE_V2.fields,
+        choice('da', 'disk.structure', 'arcs', [
+            ['arcs', 'arc'],
+            ['plasma', 'pla'],
+        ]),
+        number('dh', 'disk.arc_sharpness', 4, 1, 10, 0.1),
+        number('kj', 'sky.galaxy.nebula_glow', 1, 0, 4, 0.01),
+    ],
+    refine: refineV1,
+    migrate: migrateV2,
+});
+
+export const VIEW_STATE_VERSIONS = Object.freeze([VIEW_STATE_V1, VIEW_STATE_V2, VIEW_STATE_V3]);
 
 const LATEST_FIELDS = VIEW_STATE_VERSIONS.at(-1).fields;
 
