@@ -1,7 +1,7 @@
 // Typed façade over the imperative engine (src/app). React code reads and writes the engine only
 // through this module and params.ts, so the JavaScript modules stay free of UI concerns.
 
-import type { PerspectiveCamera, Texture, WebGLRenderer } from 'three';
+import type { PerspectiveCamera, WebGLRenderer } from 'three';
 import { RAYTRACER_FRAGMENT_TEMPLATE } from '../../shaders/raytracer/index.js';
 import { init, onCanvasResize } from '../../app/core/renderer/renderer.js';
 import { renderFrame } from '../../app/core/renderer/render-loop.js';
@@ -306,10 +306,6 @@ export const setCaptureSmoothing = setAnimationTimelineCaptureCameraSmoothingEna
     enabled: boolean,
 ) => void;
 
-export interface EngineTextures {
-    moon: Texture;
-}
-
 // What the engine needs from the React Three Fiber canvas that hosts it (runtime-state.js).
 export interface ViewportHost {
     gl: WebGLRenderer;
@@ -319,8 +315,8 @@ export interface ViewportHost {
     restoreSize: () => void;
 }
 
-export function startEngine(textures: EngineTextures, viewport: ViewportHost): void {
-    init(RAYTRACER_FRAGMENT_TEMPLATE, textures, viewport);
+export function startEngine(viewport: ViewportHost): void {
+    init(RAYTRACER_FRAGMENT_TEMPLATE, viewport);
 }
 
 export const renderEngineFrame = renderFrame as () => void;

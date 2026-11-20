@@ -2,8 +2,6 @@ import { expect, test } from '@playwright/test';
 import { openSimulation, trackPageProblems } from './support.js';
 
 const PWA_EVENTS = ['bh:pwa-offline-ready', 'bh:pwa-update-ready', 'bh:pwa-error'];
-// The sky is generated on the GPU, so the planet map is the only texture the app loads.
-const TEXTURES = ['beach-ball.png'];
 
 // Records the controller's DOM events from the first script on, so none can be missed.
 function recordPwaEvents(page) {
@@ -100,7 +98,10 @@ test('serves the manifest, its icons and the link-preview image', async ({ page 
     expect(problems).toEqual([]);
 });
 
-test('precaches the app shell, caches textures and starts offline', async ({ page, context }) => {
+test('precaches the app shell, needs no other cache and starts offline', async ({
+    page,
+    context,
+}) => {
     const problems = trackPageProblems(page);
     await recordPwaEvents(page);
     await openSimulation(page);
@@ -114,12 +115,9 @@ test('precaches the app shell, caches textures and starts offline', async ({ pag
         expect(precache, path).toContain(path);
     }
     expect(precache.some((path) => /^\/assets\/three-.*\.js$/.test(path))).toBe(true);
-    expect(precache.filter((path) => /textures|og-image|\.map$|\.(mp4|webm)$/.test(path))).toEqual(
-        [],
-    );
-    expect(contents['bh-textures'].sort()).toEqual(
-        TEXTURES.map((file) => `/textures/${file}`).sort(),
-    );
+    expect(precache.filter((path) => /og-image|\.map$|\.(mp4|webm)$/.test(path))).toEqual([]);
+    // The sky and the planet are computed on the GPU, so nothing outside the precache is needed.
+    expect(Object.keys(contents)).toEqual([precacheName]);
 
     // The next visit is served by the worker, also when offline.
     const response = await page.reload();
@@ -135,7 +133,7 @@ test('precaches the app shell, caches textures and starts offline', async ({ pag
     await page.evaluate(() => window.__BH__.ready);
     await page.waitForFunction(() => window.__BH__.frameCount >= 2);
     const missing = await page.evaluate(() =>
-        fetch('./textures/not-cached.png').then(
+        fetch('./not-cached.png').then(
             (r) => `HTTP ${r.status}`,
             () => 'failed',
         ),
@@ -153,7 +151,7 @@ test('never caches video', async ({ page }) => {
 
     await page.evaluate(async () => {
         await fetch('./clip.mp4');
-        await fetch('./textures/clip.webm');
+        await fetch('./media/clip.webm');
         const video = document.createElement('video');
         const settled = new Promise((resolve) => {
             video.addEventListener('error', resolve, { once: true });

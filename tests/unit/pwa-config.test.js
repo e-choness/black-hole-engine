@@ -9,11 +9,7 @@ import {
     resolveSiteUrl,
     sitePreviewPlugin,
 } from '../../config/site-metadata.js';
-import {
-    TEXTURE_CACHE_NAME,
-    isTextureRequest,
-    isVideoRequest,
-} from '../../src/features/pwa/cache-rules.js';
+import { isVideoRequest } from '../../src/features/pwa/cache-rules.js';
 
 const ROOT = new URL('../../', import.meta.url);
 const readPublic = (path) => readFileSync(new URL(`public/${path}`, ROOT));
@@ -59,17 +55,15 @@ function jpegSize(bytes) {
 }
 
 const urlCases = [
-    // [url, request destination, same origin, video?, texture?]
-    ['https://a.test/app/textures/maps/1024/moon.jpg', 'image', true, false, true],
-    ['https://a.test/app/textures/beach-ball.png', 'image', true, false, true],
-    ['https://a.test/textures/galaxy-8k.webp', 'image', true, false, true],
-    ['https://cdn.test/textures/maps/512/moon.jpg', 'image', false, false, false],
-    ['https://a.test/app/textures/clip.mp4', 'video', true, true, false],
-    ['https://a.test/app/intro.WEBM', '', true, true, false],
-    ['https://a.test/app/stream', 'video', true, true, false],
-    ['https://a.test/app/textures/poster.png', 'video', true, true, true],
-    ['https://a.test/app/assets/index-abc.js', 'script', true, false, false],
-    ['https://a.test/app/og-image.jpg', 'image', true, false, false],
+    // [url, request destination, same origin, video?]
+    ['https://a.test/app/clip.mp4', 'video', true, true],
+    ['https://a.test/app/intro.WEBM', '', true, true],
+    ['https://a.test/app/stream', 'video', true, true],
+    ['https://a.test/app/poster.png', 'video', true, true],
+    ['https://cdn.test/media/clip.mov', '', false, true],
+    ['https://a.test/app/assets/index-abc.js', 'script', true, false],
+    ['https://a.test/app/og-image.jpg', 'image', true, false],
+    ['https://a.test/app/icons/pwa-192.png', 'image', true, false],
 ];
 
 function routeContext([href, destination, sameOrigin]) {
@@ -148,7 +142,7 @@ test('index.html repeats the site metadata in its head', () => {
     assert.ok(scripts.includes('/src/features/pwa/register.js'));
 });
 
-test('the precache holds the app shell but no textures, preview image, video or maps', () => {
+test('the precache holds the app shell but no preview image, video or maps', () => {
     const { globPatterns, globIgnores } = pwaOptions.workbox;
     const precached = (file) =>
         globPatterns.some((pattern) => matchesGlob(file, pattern)) &&
@@ -157,8 +151,6 @@ test('the precache holds the app shell but no textures, preview image, video or 
         assert.ok(precached(file), file);
     }
     for (const file of [
-        'textures/maps/2048/moon.jpg',
-        'textures/beach-ball.png',
         'og-image.jpg',
         'assets/index-a1.js.map',
         'clip.mp4',
@@ -180,23 +172,15 @@ test('navigations use the precache only for the page itself, whatever its query'
     assert.equal(workbox.cleanupOutdatedCaches, true);
 });
 
-test('video is never cached and comes first; textures use a revalidated runtime cache', () => {
-    const [video, textures, ...rest] = pwaOptions.workbox.runtimeCaching;
+test('video is the only runtime route, and it is never cached', () => {
+    const [video, ...rest] = pwaOptions.workbox.runtimeCaching;
     assert.deepEqual(rest, []);
     assert.equal(video.urlPattern, isVideoRequest);
     assert.equal(video.handler, 'NetworkOnly');
     assert.equal(video.options, undefined);
-    assert.equal(textures.urlPattern, isTextureRequest);
-    assert.equal(textures.handler, 'StaleWhileRevalidate');
-    assert.equal(textures.options.cacheName, TEXTURE_CACHE_NAME);
-    assert.deepEqual(textures.options.cacheableResponse, { statuses: [200] });
-    assert.ok(textures.options.expiration.maxEntries >= 8);
-    assert.ok(textures.options.expiration.maxAgeSeconds > 0);
-
     for (const testCase of urlCases) {
-        const [href, , , isVideo, isTexture] = testCase;
-        assert.equal(isVideoRequest(routeContext(testCase)), isVideo, `video: ${href}`);
-        assert.equal(isTextureRequest(routeContext(testCase)), isTexture, `texture: ${href}`);
+        const [href, , , isVideo] = testCase;
+        assert.equal(isVideoRequest(routeContext(testCase)), isVideo, href);
     }
 });
 

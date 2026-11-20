@@ -135,7 +135,7 @@ src/features/            galaxy model, units, clocks, sonification, view links a
 src/content/             physics notes shown in the app
 src/shaders/raytracer/   GLSL ES 3.00 ray tracer; index.js sets the order the shards are joined in
 src/styles/              stylesheets of the page and the timeline editor
-public/                  files served as-is: textures and icons
+public/                  files served as-is: icons and the link-preview image
 tests/unit/              Vitest unit tests
 tests/e2e/               Playwright tests: rendering, controls, recording, missing WebGL 2
 config/                  build settings: security headers, PWA, link previews, legal notice

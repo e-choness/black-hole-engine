@@ -1,12 +1,11 @@
 import { useCallback, useState } from 'react';
 import { App } from './App';
-import type { EngineTextures } from './engine/engine';
 import { initParams } from './params/params';
 import { Viewport } from './viewport/Viewport';
 
 // The viewport starts the engine once React Three Fiber has created the renderer. The interface
 // mounts after it, so every control can read the engine directly.
-export function Root({ textures }: { textures: EngineTextures }) {
+export function Root() {
     const [engineReady, setEngineReady] = useState(false);
     const onReady = useCallback(() => {
         initParams();
@@ -14,7 +13,7 @@ export function Root({ textures }: { textures: EngineTextures }) {
     }, []);
     return (
         <>
-            <Viewport textures={textures} onReady={onReady} />
+            <Viewport onReady={onReady} />
             {engineReady && <App />}
         </>
     );

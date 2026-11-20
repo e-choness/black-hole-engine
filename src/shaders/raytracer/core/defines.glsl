@@ -8,7 +8,7 @@
 
 // Note: despite the name, this is NOT a pure Y-axis rotation. It swaps the
 // XY axes and applies a rotation by angle `a` in the YZ plane. Used only for
-// background and planet texture coordinate transforms.
+// background and planet surface coordinate transforms.
 #define ROT_Y(a) mat3(0, cos(a), sin(a), 1, 0, 0, 0, sin(a), -cos(a))
 
 
@@ -65,7 +65,6 @@ uniform float grmhd_density_scale, grmhd_turbulence_amp;
 uniform float grmhd_electron_kappa, grmhd_magnetic_field_str;
 {{/grmhd_enabled}}
 
-uniform sampler2D planet_texture;
 uniform samplerCube sky_cube;
 
 // stepping and anti-aliasing parameters
@@ -98,7 +97,7 @@ const float PLANET_AMBIENT = 0.0;
 const float PLANET_LIGHTNESS = 1.5;
 const float PLANET_LIGHT_REF_DISTANCE = 14.0;
 
-// planet texture coordinate system
+// planet surface coordinate system
 const float PLANET_AXIAL_TILT = 30.0 * DEG_TO_RAD;
 mat3 PLANET_COORDS = ROT_Y(PLANET_AXIAL_TILT);
 

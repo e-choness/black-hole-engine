@@ -1,14 +1,7 @@
 import { once } from 'node:events';
 import { afterEach, test, vi } from 'vitest';
 import assert from 'node:assert/strict';
-import {
-    PWA_EVENTS,
-    TEXTURE_CACHE_NAME,
-    createPwaController,
-    isTextureRequest,
-} from '../../src/features/pwa/index.js';
-
-const ORIGIN = 'https://example.org';
+import { PWA_EVENTS, createPwaController } from '../../src/features/pwa/index.js';
 
 // registerSW() of virtual:pwa-register: keeps the callbacks so a test can play the lifecycle.
 function createFakeRegisterSW() {
@@ -29,33 +22,6 @@ function createFakeRegisterSW() {
     return fake;
 }
 
-// Cache Storage with one cache per name; urls listed in `failing` cannot be fetched.
-function createFakeCaches({ failing = [] } = {}) {
-    const stores = new Map();
-    return {
-        stores,
-        async open(name) {
-            if (!stores.has(name)) stores.set(name, new Set());
-            const store = stores.get(name);
-            return {
-                async match(url) {
-                    return store.has(url) ? { url } : undefined;
-                },
-                async add(url) {
-                    if (failing.includes(url)) throw new TypeError(`Failed to fetch ${url}`);
-                    store.add(url);
-                },
-            };
-        },
-    };
-}
-
-function resourceTimings(urls) {
-    return {
-        getEntriesByType: (type) => (type === 'resource' ? urls.map((name) => ({ name })) : []),
-    };
-}
-
 function recordEvents(eventTarget) {
     const events = [];
     for (const type of Object.values(PWA_EVENTS)) {
@@ -74,7 +40,6 @@ function setup(overrides = {}) {
         registerSW: fake.registerSW,
         eventTarget,
         navigatorRef,
-        cachesRef: undefined,
         reload,
         ...overrides,
     });
@@ -120,37 +85,12 @@ test('without service workers the controller reports unsupported and never regis
     assert.deepEqual(events, []);
 });
 
-test('the first installation copies the loaded textures into the runtime cache', async () => {
-    const cachesRef = createFakeCaches({ failing: [`${ORIGIN}/app/textures/stars.png`] });
-    const preloaded = await cachesRef.open(TEXTURE_CACHE_NAME);
-    await preloaded.add(`${ORIGIN}/app/textures/spectra.png`);
-    const { fake, controller, events, eventTarget } = setup({
-        cachesRef,
-        performanceRef: resourceTimings([
-            `${ORIGIN}/app/textures/milkyway.jpg`,
-            `${ORIGIN}/app/textures/milkyway.jpg`,
-            `${ORIGIN}/app/textures/spectra.png`,
-            `${ORIGIN}/app/textures/stars.png`,
-            `https://cdn.example.net/textures/remote.png`,
-            `${ORIGIN}/app/assets/index-abc.js`,
-            'not a url',
-        ]),
-        warmCache: {
-            cacheName: TEXTURE_CACHE_NAME,
-            match: (url) => isTextureRequest({ url, sameOrigin: url.origin === ORIGIN }),
-        },
-    });
+test('the first installation reports offline-ready once', async () => {
+    const { fake, controller, events, eventTarget } = setup();
     controller.start();
     const ready = once(eventTarget, PWA_EVENTS.offlineReady);
     fake.options.onOfflineReady();
-    assert.equal(controller.getSnapshot().offlineReady, false, 'reported after the copy');
     await ready;
-
-    assert.deepEqual(
-        [...cachesRef.stores.get(TEXTURE_CACHE_NAME)].sort(),
-        [`${ORIGIN}/app/textures/milkyway.jpg`, `${ORIGIN}/app/textures/spectra.png`],
-        'same-origin textures only; a failed copy is left to the worker',
-    );
     assert.deepEqual(controller.getSnapshot(), {
         status: 'offline-ready',
         offlineReady: true,
@@ -158,25 +98,6 @@ test('the first installation copies the loaded textures into the runtime cache',
         error: null,
     });
     assert.deepEqual(events, [{ type: PWA_EVENTS.offlineReady, detail: {} }]);
-});
-
-test('offline-ready comes straight away without a cache to warm', async () => {
-    for (const overrides of [
-        { warmCache: null, cachesRef: createFakeCaches() },
-        { warmCache: { cacheName: 'x', match: () => true }, cachesRef: undefined },
-        {
-            warmCache: { cacheName: 'x', match: () => true },
-            cachesRef: createFakeCaches(),
-            performanceRef: undefined,
-        },
-    ]) {
-        const { fake, controller, eventTarget } = setup(overrides);
-        controller.start();
-        const ready = once(eventTarget, PWA_EVENTS.offlineReady);
-        fake.options.onOfflineReady();
-        await ready;
-        assert.equal(controller.getSnapshot().status, 'offline-ready');
-    }
 });
 
 test('a new version waits for applyUpdate(), then reloads once it controls the page', async () => {

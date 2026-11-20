@@ -12,7 +12,6 @@ import {
     onEngineCanvasResize,
     renderEngineFrame,
     startEngine,
-    type EngineTextures,
 } from '../engine/engine';
 
 // The ray tracer is GLSL, so the canvas takes WebGLRenderer from the legacy entry. Every pass
@@ -54,17 +53,16 @@ function EngineFrame() {
 }
 
 interface ViewportProps {
-    textures: EngineTextures;
     onReady: () => void;
 }
 
 // The canvas fills the window underneath the interface; its pixel ratio carries the render scale.
-export const Viewport = memo(function Viewport({ textures, onReady }: ViewportProps) {
+export const Viewport = memo(function Viewport({ onReady }: ViewportProps) {
     const [dpr, setDpr] = useState(baseDevicePixelRatio);
     const start = (state: RootState) => {
         // React Three Fiber gives the renderer ACES tone mapping; the output pass tone-maps itself.
         state.renderer.toneMapping = NoToneMapping;
-        startEngine(textures, {
+        startEngine({
             gl: state.renderer,
             size: () => state.get().size,
             setDpr,

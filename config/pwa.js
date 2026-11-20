@@ -1,13 +1,9 @@
-import {
-    TEXTURE_CACHE_NAME,
-    isTextureRequest,
-    isVideoRequest,
-} from '../src/features/pwa/cache-rules.js';
+import { isVideoRequest } from '../src/features/pwa/cache-rules.js';
 import { SITE } from './site-metadata.js';
 
 // Installable app and offline support through vite-plugin-pwa (generateSW). The service worker
-// precaches the app shell (HTML, JS, CSS, fonts, the manifest and its icons), keeps textures in a
-// runtime cache and never caches video. src/features/pwa/register.js registers it.
+// precaches the app shell (HTML, JS, CSS, fonts, the manifest and its icons) and never caches
+// video. src/features/pwa/register.js registers it.
 
 // Rendered from public/icons/black-hole.svg by scripts/render-pwa-icons.js. Maskable icons keep
 // the artwork inside the central circle of 80 % diameter that every launcher mask leaves visible.
@@ -18,12 +14,10 @@ export const MANIFEST_ICONS = Object.freeze([
 ]);
 
 // The Workbox modules that workbox-build bundles into sw.js and workbox-[hash].js for the options
-// below; expiration and cacheable-response serve the texture cache. They never pass through Vite's
-// module graph, so the legal notice lists them explicitly (config/legal-notice.js).
+// below. They never pass through Vite's module graph, so the legal notice lists them explicitly
+// (config/legal-notice.js).
 export const SERVICE_WORKER_PACKAGES = Object.freeze([
-    'workbox-cacheable-response',
     'workbox-core',
-    'workbox-expiration',
     'workbox-precaching',
     'workbox-routing',
     'workbox-strategies',
@@ -35,8 +29,6 @@ export const APPLE_TOUCH_ICON = Object.freeze({
     sizes: '180x180',
     type: 'image/png',
 });
-
-const DAY = 24 * 60 * 60;
 
 export const pwaOptions = {
     // A new version waits for the user's consent (see pwa-controller.js) instead of reloading
@@ -79,22 +71,6 @@ export const pwaOptions = {
         ignoreURLParametersMatching: [/./],
         directoryIndex: 'index.html',
         cleanupOutdatedCaches: true,
-        // Routes are tried in order, so video stays network-only even if a later rule matched it.
-        runtimeCaching: [
-            { urlPattern: isVideoRequest, handler: 'NetworkOnly' },
-            {
-                urlPattern: isTextureRequest,
-                handler: 'StaleWhileRevalidate',
-                options: {
-                    cacheName: TEXTURE_CACHE_NAME,
-                    expiration: {
-                        maxEntries: 32,
-                        maxAgeSeconds: 30 * DAY,
-                        purgeOnQuotaError: true,
-                    },
-                    cacheableResponse: { statuses: [200] },
-                },
-            },
-        ],
+        runtimeCaching: [{ urlPattern: isVideoRequest, handler: 'NetworkOnly' }],
     },
 };

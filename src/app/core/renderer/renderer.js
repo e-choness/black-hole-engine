@@ -118,7 +118,7 @@ function applyRenderScaleFromSettingsImpl() {
 setApplyRenderScaleFromSettings(applyRenderScaleFromSettingsImpl);
 setResetTemporalAAHistory(resetTemporalAAHistoryImpl);
 
-export function init(glslSource, textures, viewport) {
+export function init(glslSource, viewport) {
     setShader(new Shader(glslSource));
 
     applyQualityPresetValues(shader.parameters, initialQualityPreset(), { selectSolver: true });
@@ -205,7 +205,6 @@ export function init(glslSource, textures, viewport) {
         sky_cube: { value: null },
         sky_mode: { value: 0.0 },
         sky_revision: { value: 0 },
-        planet_texture: { value: textures.moon },
     };
     setShaderUniforms(uniforms);
 

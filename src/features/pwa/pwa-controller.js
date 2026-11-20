@@ -16,11 +16,6 @@
 // The same moments are dispatched on `eventTarget` (window) for code that does not import this
 // module: PWA_EVENTS.offlineReady, PWA_EVENTS.updateReady with detail.applyUpdate, and
 // PWA_EVENTS.error with detail.error.
-//
-// The first visit loads its textures before the service worker exists, so they miss the runtime
-// cache and the app could not start offline. warmCache { cacheName, match(url) } copies the
-// matching resources this page loaded (its Resource Timing entries) into that cache after the
-// first installation, before offline-ready is reported.
 
 export const PWA_EVENTS = Object.freeze({
     offlineReady: 'bh:pwa-offline-ready',
@@ -39,9 +34,6 @@ export function createPwaController({
     registerSW,
     eventTarget = globalThis.window,
     navigatorRef = globalThis.navigator,
-    cachesRef = globalThis.caches,
-    performanceRef = globalThis.performance,
-    warmCache = null,
     reload = () => globalThis.location.reload(),
     updateInterval = HOUR,
     timers = globalThis,
@@ -75,33 +67,7 @@ export function createPwaController({
         eventTarget.dispatchEvent(new CustomEvent(type, { detail }));
     }
 
-    async function warmRuntimeCache() {
-        if (!warmCache || !cachesRef || typeof performanceRef?.getEntriesByType !== 'function') {
-            return;
-        }
-        const urls = new Set();
-        for (const entry of performanceRef.getEntriesByType('resource')) {
-            try {
-                if (warmCache.match(new URL(entry.name))) urls.add(entry.name);
-            } catch {}
-        }
-        if (urls.size === 0) return;
-        const cache = await cachesRef.open(warmCache.cacheName);
-        // cache.add() fetches through the HTTP cache, so the files the page just loaded are
-        // normally not downloaded again. A failure leaves that file to the worker's own caching.
-        await Promise.all(
-            [...urls].map(async (url) => {
-                try {
-                    if (!(await cache.match(url))) await cache.add(url);
-                } catch {}
-            }),
-        );
-    }
-
-    async function handleOfflineReady() {
-        try {
-            await warmRuntimeCache();
-        } catch {}
+    function handleOfflineReady() {
         update({
             offlineReady: true,
             status: snapshot.updateReady ? snapshot.status : 'offline-ready',
@@ -155,7 +121,7 @@ export function createPwaController({
         updateServiceWorker = registerSW({
             immediate: false,
             onOfflineReady: () => {
-                if (!disposed) void handleOfflineReady();
+                if (!disposed) handleOfflineReady();
             },
             onNeedRefresh: () => {
                 if (!disposed) handleNeedRefresh();

@@ -2,6 +2,21 @@
 //       Handles Lorentz contraction, light-travel-time retardation, Doppler
 //       temperature shift, and relativistic beaming of the disk illumination.
 
+// The planet's surface: eight meridian stripes, white and grey (sRGB 127), with the colours swapped
+// between the hemispheres so that the spin and the poles are visible. uv is the sphere_map()
+// coordinate. Each edge is a linear ramp 1/512 of the map wide, so it stays smooth when magnified.
+vec3 planet_albedo(vec2 uv) {
+    const float EDGE = 1.0 / 512.0;
+    const vec3 WHITE = vec3(1.0);
+    const vec3 GREY = vec3(0.212231);
+    float stripe = uv.x * 8.0;
+    float edge_distance = min(fract(stripe), 1.0 - fract(stripe)) / 8.0;
+    float across_stripes = (mod(floor(stripe), 2.0) < 0.5 ? 1.0 : -1.0) *
+        min(edge_distance / (0.5 * EDGE), 1.0);
+    float across_equator = clamp((0.5 - uv.y) / (0.5 * EDGE), -1.0, 1.0);
+    return mix(WHITE, GREY, 0.5 + 0.5 * across_stripes * across_equator);
+}
+
 vec4 planet_intersection(vec3 old_pos, vec3 ray, float t, float dt,
         vec3 planet_pos0, float ray_doppler_factor) {
 
@@ -92,7 +107,7 @@ vec4 planet_intersection(vec3 old_pos, vec3 ray, float t, float dt,
     vec3 light_color = blackbody(color_shift(planet_g) * light_temperature).rgb *
         thermal_brightness_ratio(light_temperature, planet_g);
 
-    ret = texture(planet_texture, tex_coord) * lightness;
+    ret = vec4(planet_albedo(tex_coord) * lightness, 1.0);
     ret.rgb *= light_color * exp2(log2_look_scale);
     if (isec_t < 0.0) isec_t = 0.5;
     ret.w = isec_t;
