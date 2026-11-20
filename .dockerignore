@@ -11,3 +11,4 @@ docs/*
 !docs/LEGAL.md
 *.log
 .env*
+.github/readme
