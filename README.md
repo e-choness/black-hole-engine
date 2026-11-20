@@ -77,11 +77,11 @@ worktrees) get their own containers and volumes.
 All caches live under `BH_CACHE_DIR` (`.cache/`, ignored by git) and are bind-mounted into the
 containers:
 
-| Path                 | Contents                                                                              |
-| -------------------- | ------------------------------------------------------------------------------------- |
-| `.cache/npm`         | npm download cache shared by all tooling containers                                   |
-| `.cache/screenshots` | Screenshots from the e2e test (`smoke-*.png`) and reference images (`baseline-*.png`) |
-| `.cache/playwright`  | Playwright HTML report (`report/`) and failure traces (`test-results/`)               |
+| Path                 | Contents                                                                   |
+| -------------------- | -------------------------------------------------------------------------- |
+| `.cache/npm`         | npm download cache shared by all tooling containers                        |
+| `.cache/screenshots` | Screenshots from the smoke e2e test (`smoke-page.png`, `smoke-render.png`) |
+| `.cache/playwright`  | Playwright HTML report (`report/`) and failure traces (`test-results/`)    |
 
 `node_modules` lives in named volumes scoped to the Compose project (`node_modules` for the Node
 tooling, `node_modules_e2e` for the Playwright image), so the host never receives a Linux
