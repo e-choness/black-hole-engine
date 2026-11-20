@@ -10,6 +10,12 @@ updates:
         dependency-type: production
       tooling:
         dependency-type: development
+    # React Three Fiber is pinned to a v10 alpha. Its canary builds (between beta and rc in semver
+    # order) are untested snapshots, so only alphas, betas, release candidates and releases are
+    # taken.
+    ignore:
+      - dependency-name: '@react-three/fiber'
+        versions: ['>=10.0.0-canary <10.0.0-rc']
 
   - package-ecosystem: github-actions
     directory: /

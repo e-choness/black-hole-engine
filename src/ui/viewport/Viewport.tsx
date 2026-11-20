@@ -1,6 +1,12 @@
 import { memo, useLayoutEffect, useState } from 'react';
-import { Canvas, useFrame, useStore, type RootState } from '@react-three/fiber';
-import { WebGLRenderer } from 'three';
+import {
+    Canvas,
+    useFrame,
+    useStore,
+    type DefaultGLProps,
+    type RootState,
+} from '@react-three/fiber/legacy';
+import { NoToneMapping, WebGLRenderer } from 'three';
 import {
     baseDevicePixelRatio,
     onEngineCanvasResize,
@@ -9,9 +15,10 @@ import {
     type EngineTextures,
 } from '../engine/engine';
 
-// Every pass draws a full-screen quad, so a multisampled canvas would only cost memory. On the web,
-// React Three Fiber passes the canvas element it renders.
-function createRenderer({ canvas }: { canvas: EventTarget }) {
+// The ray tracer is GLSL, so the canvas takes WebGLRenderer from the legacy entry. Every pass
+// draws a full-screen quad, so a multisampled canvas would only cost memory. On the web, React
+// Three Fiber passes the canvas element it renders.
+function createRenderer({ canvas }: DefaultGLProps) {
     return new WebGLRenderer({
         canvas: canvas as HTMLCanvasElement,
         antialias: false,
@@ -24,9 +31,9 @@ function noEvents() {
     return { enabled: false, priority: 0 };
 }
 
-// The engine draws every frame through its own passes; priority 1 keeps React Three Fiber from
-// rendering the scene itself. A resize clears the canvas, so the passes follow the new drawing
-// buffer and the next frame is drawn.
+// A job in the render phase replaces React Three Fiber's own render of the scene, so the engine
+// draws every frame through its own passes. A resize clears the canvas, so the passes follow the
+// new drawing buffer and the next frame is drawn.
 function EngineFrame() {
     const store = useStore();
     useLayoutEffect(
@@ -42,7 +49,7 @@ function EngineFrame() {
             }),
         [store],
     );
-    useFrame(renderEngineFrame, 1);
+    useFrame(renderEngineFrame, { phase: 'render' });
     return null;
 }
 
@@ -55,22 +62,24 @@ interface ViewportProps {
 export const Viewport = memo(function Viewport({ textures, onReady }: ViewportProps) {
     const [dpr, setDpr] = useState(baseDevicePixelRatio);
     const start = (state: RootState) => {
+        // React Three Fiber gives the renderer ACES tone mapping; the output pass tone-maps itself.
+        state.renderer.toneMapping = NoToneMapping;
         startEngine(textures, {
-            gl: state.gl,
+            gl: state.renderer,
             size: () => state.get().size,
             setDpr,
             setCamera: (camera) => state.set({ camera }),
             restoreSize: () => {
-                const { gl, size, viewport } = state.get();
-                gl.setPixelRatio(viewport.dpr);
-                gl.setSize(size.width, size.height);
+                const { renderer, size, viewport } = state.get();
+                renderer.setPixelRatio(viewport.dpr);
+                renderer.setSize(size.width, size.height);
             },
         });
         onReady();
     };
     return (
         <div className="viewport">
-            <Canvas gl={createRenderer} flat dpr={dpr} events={noEvents} onCreated={start}>
+            <Canvas gl={createRenderer} dpr={dpr} events={noEvents} onCreated={start}>
                 <EngineFrame />
             </Canvas>
         </div>
