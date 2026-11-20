@@ -97,9 +97,9 @@ relative, so the site works under a project sub-path. Pages cannot send custom h
 build embeds the Content Security Policy as a `<meta>` tag.
 
 **Container.** The `runtime` stage of the Dockerfile serves the build with unprivileged nginx on
-port 8080: content-hashed assets are cached for a year, `index.html` is always revalidated,
-responses are gzip-compressed and every response carries the security headers. `/healthz` serves
-the container health check.
+port 8080: content-hashed assets are cached for a year, `index.html` and the service worker are
+always revalidated, responses are gzip-compressed and every response carries the security headers.
+`/healthz` serves the container health check.
 
 ```sh
 docker build --target runtime --tag black-hole:local .
