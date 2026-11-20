@@ -1,5 +1,5 @@
 import { QUALITY_PRESETS } from '../../ui/quality-presets.js';
-import { hdrTarget, renderer, shader, taaPass } from './runtime-state.js';
+import { hdrTarget, renderer, rendererContextLost, shader, taaPass } from './runtime-state.js';
 import { probeSky, skyStatus } from '../sky.js';
 
 // URL switches used by automated tests and reproducible screenshots:
@@ -33,6 +33,10 @@ window.__BH__ = Object.freeze({
     get params() {
         return shader ? shader.parameters : null;
     },
+    // True from the loss of the GPU context or device until a renderer draws again.
+    get contextLost() {
+        return rendererContextLost;
+    },
     get accumulatedFrames() {
         return taaPass ? taaPass.accumulatedFrames : 0;
     },
@@ -47,8 +51,17 @@ window.__BH__ = Object.freeze({
     get sky() {
         return skyStatus();
     },
-    // Equirectangular readback of the galaxy cube: { width, height, rgb } in linear light.
+    // Equirectangular readback of the galaxy cube: { width, height, rgb } in linear light, or a
+    // promise of it with WebGPURenderer, whose readback is asynchronous.
     probeSky(width, height) {
         return probeSky(width, height);
+    },
+    // Takes the WebGPU device away as a driver reset would. A page can only destroy its device,
+    // and three reports no loss for that, so the hook reports it the way three reports a real one.
+    loseGpuDevice() {
+        if (!renderer || !renderer.backend || !renderer.backend.isWebGPUBackend) return false;
+        renderer.backend.device.destroy();
+        renderer.onDeviceLost({ api: 'WebGPU', message: 'Device lost by test', reason: 'unknown' });
+        return true;
     },
 });

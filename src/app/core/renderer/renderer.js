@@ -1,5 +1,12 @@
 import * as THREE from 'three';
+import { MeshBasicNodeMaterial } from 'three/webgpu';
+import { positionGeometry, vec4 } from 'three/tsl';
 import { RAYTRACER_VERTEX_SHADER } from '../../../shaders/raytracer/index.js';
+import {
+    createRaytracerNode,
+    createRaytracerUniforms,
+} from '../../../shaders/tsl/raytracer/index.js';
+import { raytracerUniformValues } from './raytracer-uniforms.js';
 import { Shader } from '../shader.js';
 import { clampObserverDistance, clampPlanetOrbitDistance } from '../observer.js';
 import { initializeCamera, updateCamera } from '../../scene/camera-runtime.js';
@@ -23,9 +30,7 @@ import {
 import { diveState, hoverState } from '../scenarios/scenario-state.js';
 import { SHADER_MASS, iscoRadius } from '../physics/kerr.js';
 import {
-    EMISSION_LUT,
     LIMB_DARKENING_LAWS,
-    bolometricLog2Coefficient,
     diskPeakTemperature,
     diskSpin,
     exposureLog2,
@@ -33,7 +38,7 @@ import {
     referenceLog2Luminance,
 } from '../physics/emission.js';
 import { kerrCameraFrame } from '../physics/kerr-camera.js';
-import { initSky } from '../sky.js';
+import { initSky, setSkyRenderer } from '../sky.js';
 import {
     DISK_TEMPERATURE_MIN,
     DISK_TEMPERATURE_MAX,
@@ -67,18 +72,6 @@ import {
     setApplyRenderScaleFromSettings,
     setResetTemporalAAHistory,
 } from '../runtime/runtime-state.js';
-
-// Two RGBA32F rows sampled with texelFetch: blackbody colour and luminance on a log-T grid, and
-// the colour of synchrotron power laws.
-function createEmissionLutTexture() {
-    var size = EMISSION_LUT.size;
-    var data = new Float32Array(size * 8);
-    data.set(EMISSION_LUT.blackbody, 0);
-    data.set(EMISSION_LUT.powerLaw, size * 4);
-    var texture = new THREE.DataTexture(data, size, 2, THREE.RGBAFormat, THREE.FloatType);
-    texture.needsUpdate = true;
-    return texture;
-}
 
 function resetTemporalAAHistoryImpl() {
     if (taaPass) taaPass.reset();
@@ -118,6 +111,56 @@ function applyRenderScaleFromSettingsImpl() {
 setApplyRenderScaleFromSettings(applyRenderScaleFromSettingsImpl);
 setResetTemporalAAHistory(resetTemporalAAHistoryImpl);
 
+// A lost GPU device or WebGL context never draws again for its renderer. The lost renderer is
+// disposed while its context is gone, so its deletions are no-ops, and a new one takes over the
+// canvas: at once for WebGPU, after the browser restores the context for WebGL. Scene, materials
+// and render targets carry over; the new renderer uploads them again on first use.
+var RECOVERY_ATTEMPTS = 4;
+
+function watchDeviceLoss(current) {
+    current.onDeviceLost = function (info) {
+        if (current !== renderer) return;
+        setRendererContextLost(true);
+        console.warn('GPU ' + info.api + ' device lost: ' + info.message);
+        try {
+            current.dispose();
+        } catch (e) {
+            console.warn('Disposing the lost renderer failed:', e);
+        }
+        if (info.api === 'WebGL') {
+            current.domElement.addEventListener(
+                'webglcontextrestored',
+                function () {
+                    recoverRenderer(0);
+                },
+                { once: true },
+            );
+        } else {
+            recoverRenderer(0);
+        }
+    };
+}
+
+function recoverRenderer(attempt) {
+    viewportHost.replaceRenderer().then(
+        function (next) {
+            setRenderer(next);
+            watchDeviceLoss(next);
+            setSkyRenderer(next);
+            onCanvasResize();
+            setRendererContextLost(false);
+            console.info('GPU renderer recreated.');
+        },
+        function (error) {
+            if (attempt + 1 < RECOVERY_ATTEMPTS) {
+                setTimeout(recoverRenderer, 1000 * 2 ** attempt, attempt + 1);
+            } else {
+                console.error('The GPU renderer could not be recreated:', error);
+            }
+        },
+    );
+}
+
 export function init(glslSource, viewport) {
     setShader(new Shader(glslSource));
 
@@ -126,86 +169,17 @@ export function init(glslSource, viewport) {
     setViewportHost(viewport);
     setScene(new THREE.Scene());
 
+    // WebGPURenderer (the node renderer) draws the TSL ray tracer, WebGLRenderer the GLSL one.
+    var nodeRenderer = !!viewport.gl.isWebGPURenderer;
     var geometry = new THREE.PlaneGeometry(2, 2);
-    var uniforms = {
-        time: { value: 0 },
-        turbulence_time_offset: { value: 0.0 },
-        turbulence_loop_enabled: { value: 0.0 },
-        turbulence_loop_seconds: { value: 20.0 },
-        resolution: { value: new THREE.Vector2() },
-        cam_pos: { value: new THREE.Vector3() },
-        cam_x: { value: new THREE.Vector3() },
-        cam_y: { value: new THREE.Vector3() },
-        cam_z: { value: new THREE.Vector3() },
-        cam_vel: { value: new THREE.Vector3() },
-        cam_pan: { value: new THREE.Vector2() },
-        taa_jitter: { value: new THREE.Vector2() },
-        interior_mode: { value: 0.0 },
-        cam_rain: { value: 0.0 },
-        cam_pos_ks: { value: new THREE.Vector3() },
-        cam_u_cov: { value: new THREE.Vector4(0, 0, 0, -1) },
-        cam_e1_cov: { value: new THREE.Vector4(1, 0, 0, 0) },
-        cam_e2_cov: { value: new THREE.Vector4(0, 1, 0, 0) },
-        cam_e3_cov: { value: new THREE.Vector4(0, 0, 1, 0) },
-        cam_doppler: { value: new THREE.Vector4(0, 0, 0, 1) },
-        planet_distance: { value: 0.0 },
-        planet_radius: { value: 0.0 },
-        emission_lut: { value: createEmissionLutTexture() },
-        log2_exposure: { value: 0.0 },
-        log2_look_scale: { value: 0.0 },
-        radiance_visible: { value: 0.0 },
-        bolometric_log2_coeff: { value: bolometricLog2Coefficient() },
-        disk_temperature_peak: { value: 5000.0 },
-        disk_uniform_temperature: { value: 0.0 },
-        disk_color_correction: { value: 1.0 },
-        disk_limb: { value: new THREE.Vector2(1, 0) },
-        disk_opacity: { value: 1.0 },
-        disk_spin_a: { value: 0.0 },
-        disk_pt_x0: { value: Math.sqrt(6) },
-        disk_pt_roots: { value: new THREE.Vector3() },
-        disk_pt_coeffs: { value: new THREE.Vector3() },
-        disk_flux_max: { value: 1.0 },
-        disk_isco_el: { value: new THREE.Vector2() },
-        jet_spectral_index: { value: 0.7 },
-        accretion_inner_r: { value: 3.0 },
-        bh_spin: { value: 0.9 },
-        bh_spin_strength: { value: 1.0 },
-        bh_rotation_enabled: { value: 1.0 },
-        photon_spin_lensing_scale: { value: 1.0 },
-        look_disk_gain: { value: 1.0 },
-        look_glow: { value: 0.0 },
-        look_doppler_boost: { value: 1.0 },
-        look_aberration_strength: { value: 1.0 },
-        look_galaxy_gain: { value: 1.0 },
-        torus_r0: { value: 4.0 },
-        torus_h_ratio: { value: 0.45 },
-        torus_radial_falloff: { value: 2.5 },
-        torus_opacity: { value: 0.015 },
-        torus_outer_radius: { value: 3.5 },
-        slim_h_ratio: { value: 0.15 },
-        slim_opacity: { value: 0.6 },
-        slim_puff_factor: { value: 2.5 },
-        jet_half_angle: { value: 5.0 },
-        jet_lorentz: { value: 3.0 },
-        jet_brightness: { value: 1.2 },
-        jet_length: { value: 30.0 },
-        jet_magnetization: { value: 10.0 },
-        jet_knot_spacing: { value: 6.0 },
-        jet_corona_brightness: { value: 1.5 },
-        jet_base_width: { value: 0.4 },
-        jet_corona_extent: { value: 0.5 },
-        grmhd_r_high: { value: 40.0 },
-        grmhd_magnetic_beta: { value: 10.0 },
-        grmhd_mad_flux: { value: 0.0 },
-        grmhd_density_scale: { value: 1.0 },
-        grmhd_turbulence_amp: { value: 1.0 },
-        grmhd_electron_kappa: { value: 5.0 },
-        grmhd_magnetic_field_str: { value: 1.0 },
-        grav_blueshift_factor: { value: 1.0 },
-        sky_cube: { value: null },
-        sky_mode: { value: 0.0 },
-        sky_revision: { value: 0 },
-    };
+    var uniformValues = raytracerUniformValues();
+    var uniforms = nodeRenderer
+        ? createRaytracerUniforms(uniformValues)
+        : Object.fromEntries(
+              Object.entries(uniformValues).map(function (entry) {
+                  return [entry[0], { value: entry[1] }];
+              }),
+          );
     setShaderUniforms(uniforms);
 
     // Disk temperature scale, Page-Thorne coefficients of the spin and the exposure that puts the
@@ -381,14 +355,23 @@ export function init(glslSource, viewport) {
 
     setUpdateUniforms(updateUniformsImpl);
 
-    var material = new THREE.ShaderMaterial({
-        glslVersion: THREE.GLSL3,
-        uniforms: uniforms,
-        vertexShader: RAYTRACER_VERTEX_SHADER,
-    });
+    var material;
+    if (nodeRenderer) {
+        material = new MeshBasicNodeMaterial();
+        material.vertexNode = vec4(positionGeometry.xy, 0.0, 1.0);
+        material.depthTest = false;
+        material.depthWrite = false;
+    } else {
+        material = new THREE.ShaderMaterial({
+            glslVersion: THREE.GLSL3,
+            uniforms: uniforms,
+            vertexShader: RAYTRACER_VERTEX_SHADER,
+        });
+    }
 
     scene.updateShader = function () {
-        material.fragmentShader = shader.compile();
+        if (nodeRenderer) material.fragmentNode = createRaytracerNode(shader.variant(), uniforms);
+        else material.fragmentShader = shader.compile();
         material.needsUpdate = true;
         shader.needsUpdate = true;
         resetTemporalAAHistoryImpl();
@@ -406,32 +389,39 @@ export function init(glslSource, viewport) {
     nextRenderer.domElement.id = 'bh-canvas';
     nextRenderer.domElement.style.touchAction = 'none';
     setRenderer(nextRenderer);
-    initSky(renderer, uniforms, Math.min(16, renderer.capabilities.getMaxAnisotropy()));
+    var maxAnisotropy = nodeRenderer
+        ? renderer.getMaxAnisotropy()
+        : renderer.capabilities.getMaxAnisotropy();
+    initSky(renderer, uniforms, Math.min(16, maxAnisotropy));
 
-    renderer.domElement.addEventListener(
-        'webglcontextlost',
-        function (e) {
-            e.preventDefault();
-            setRendererContextLost(true);
-            console.warn('WebGL context lost - GPU driver may have reset (TDR).');
-        },
-        false,
-    );
-    renderer.domElement.addEventListener(
-        'webglcontextrestored',
-        function () {
-            setRendererContextLost(false);
-            console.info('WebGL context restored.');
-            if (shader) shader.needsUpdate = true;
-            resetTemporalAAHistoryImpl();
-        },
-        false,
-    );
+    if (nodeRenderer) {
+        watchDeviceLoss(renderer);
+    } else {
+        renderer.domElement.addEventListener(
+            'webglcontextlost',
+            function (e) {
+                e.preventDefault();
+                setRendererContextLost(true);
+                console.warn('WebGL context lost - GPU driver may have reset (TDR).');
+            },
+            false,
+        );
+        renderer.domElement.addEventListener(
+            'webglcontextrestored',
+            function () {
+                setRendererContextLost(false);
+                console.info('WebGL context restored.');
+                if (shader) shader.needsUpdate = true;
+                resetTemporalAAHistoryImpl();
+            },
+            false,
+        );
+    }
 
     setHdrTarget(createRenderTarget(renderer, 1, 1));
     setBloomPass(setupBloom(renderer));
     setTaaPass(setupTemporalAA(renderer));
-    setOutputPass(setupOutputPass());
+    setOutputPass(setupOutputPass(renderer));
 
     var size = viewport.size();
     var nextCamera = new THREE.PerspectiveCamera(45, size.width / size.height, 1, 80000);

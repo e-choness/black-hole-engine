@@ -5,8 +5,13 @@
 // frame's energy. The output pass forms (1 - k) scene + k bloom without any threshold.
 
 import * as THREE from 'three';
-import { FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
-import { createPassMaterial, createRenderTarget, renderPass } from './post-processing.js';
+import { createNodeBloomMaterials } from './node-passes.js';
+import {
+    createPassMaterial,
+    createPassQuad,
+    createRenderTarget,
+    renderPass,
+} from './post-processing.js';
 
 const MAX_LEVELS = 8;
 
@@ -85,7 +90,7 @@ export function bloomLevelCount(width, height) {
     return Math.max(1, Math.min(MAX_LEVELS, levels));
 }
 
-export function setupBloom(renderer) {
+function createBloomMaterials() {
     const downMat = createPassMaterial(
         {
             tSource: { value: null },
@@ -103,7 +108,14 @@ export function setupBloom(renderer) {
         },
         UPSAMPLE_FRAGMENT_SHADER,
     );
-    const quad = new FullScreenQuad();
+    return { downMat, upMat };
+}
+
+export function setupBloom(renderer) {
+    const { downMat, upMat } = renderer.isWebGPURenderer
+        ? createNodeBloomMaterials()
+        : createBloomMaterials();
+    const quad = createPassQuad(renderer);
     let down = [];
     let up = [];
 
@@ -138,7 +150,7 @@ export function setupBloom(renderer) {
                 const image = source.image;
                 downMat.uniforms.tSource.value = source;
                 downMat.uniforms.texel.value.set(1 / image.width, 1 / image.height);
-                downMat.uniforms.karis.value = i === 0;
+                downMat.uniforms.karis.value = i === 0 ? 1 : 0;
                 renderPass(rdr, quad, downMat, down[i]);
                 source = down[i].texture;
             }
@@ -155,7 +167,7 @@ export function setupBloom(renderer) {
         },
         dispose() {
             disposeTargets();
-            quad.dispose();
+            quad.dispose?.();
             downMat.dispose();
             upMat.dispose();
         },

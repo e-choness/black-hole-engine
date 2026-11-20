@@ -1,6 +1,8 @@
 // Shared pieces of the full-screen post-processing passes (temporal AA, bloom).
 
 import * as THREE from 'three';
+import { createNodeQuad, createNodeRenderTarget } from './node-passes.js';
+import { FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 
 const FULLSCREEN_VERTEX_SHADER = /* glsl */ `
 out vec2 vUv;
@@ -27,6 +29,7 @@ export function createPassMaterial(uniforms, fragmentShader) {
 // WebGLRenderer requests both colour-buffer extensions at start-up, so has() reports what the
 // context supports. Without them the targets fall back to RGBA8 and clip at 1.
 export function createRenderTarget(renderer, width, height) {
+    if (renderer.isWebGPURenderer) return createNodeRenderTarget(width, height);
     const halfFloat =
         renderer.extensions.has('EXT_color_buffer_float') ||
         renderer.extensions.has('EXT_color_buffer_half_float');
@@ -34,6 +37,12 @@ export function createRenderTarget(renderer, width, height) {
         type: halfFloat ? THREE.HalfFloatType : THREE.UnsignedByteType,
         depthBuffer: false,
     });
+}
+
+// Full-screen quad for the renderer's materials: three's QuadMesh for node materials, which
+// follows the WebGPU texture orientation, and the addons' FullScreenQuad for GLSL.
+export function createPassQuad(renderer, material) {
+    return renderer.isWebGPURenderer ? createNodeQuad(material) : new FullScreenQuad(material);
 }
 
 // Draws `material` into `target`, or into the canvas when `target` is null.

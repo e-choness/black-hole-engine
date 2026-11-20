@@ -3,7 +3,8 @@
 // exact sRGB OETF and adds TPDF dither just before the 8-bit canvas quantises it.
 
 import * as THREE from 'three';
-import { FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
+import { createNodeOutputMaterial } from './node-passes.js';
+import { createPassQuad } from './post-processing.js';
 import { ANCHOR_LUMINANCE } from '../core/physics/emission.js';
 
 export const TONE_MAPPERS = { agx: 0, neutral: 1, aces: 2, scientific: 3 };
@@ -146,8 +147,8 @@ void main() {
 }
 `;
 
-export function setupOutputPass() {
-    const material = new THREE.RawShaderMaterial({
+function createOutputMaterial() {
+    return new THREE.RawShaderMaterial({
         glslVersion: THREE.GLSL3,
         uniforms: {
             tScene: { value: null },
@@ -166,7 +167,18 @@ export function setupOutputPass() {
         depthTest: false,
         depthWrite: false,
     });
-    const quad = new FullScreenQuad(material);
+}
+
+export function setupOutputPass(renderer) {
+    const material = renderer.isWebGPURenderer
+        ? createNodeOutputMaterial({
+              toneMappers: TONE_MAPPERS,
+              infernoCoefficients: INFERNO_COEFFICIENTS,
+              scientificLog2Max: SCIENTIFIC_LOG2_MAX,
+              scientificStops: SCIENTIFIC_RANGE_STOPS,
+          })
+        : createOutputMaterial();
+    const quad = createPassQuad(renderer, material);
     let frameIndex = 0;
 
     return {
@@ -176,7 +188,7 @@ export function setupOutputPass() {
         render(renderer, sceneTexture, bloom, settings) {
             const u = material.uniforms;
             u.tScene.value = sceneTexture;
-            u.tBloom.value = bloom ? bloom.texture : null;
+            if (bloom) u.tBloom.value = bloom.texture;
             u.bloomStrength.value = bloom ? bloom.strength : 0;
             if (bloom) u.bloomTexel.value.set(1 / bloom.width, 1 / bloom.height);
             const wb = settings.whiteBalance;
@@ -189,7 +201,7 @@ export function setupOutputPass() {
             quad.render(renderer);
         },
         dispose() {
-            quad.dispose();
+            quad.dispose?.();
             material.dispose();
         },
     };

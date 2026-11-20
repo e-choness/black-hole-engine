@@ -7,9 +7,10 @@
 // pixel integral (progressive accumulation).
 
 import * as THREE from 'three';
-import { FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
+import { createNodeResolveMaterial } from '../../graphics/node-passes.js';
 import {
     createPassMaterial,
+    createPassQuad,
     createRenderTarget,
     renderPass,
 } from '../../graphics/post-processing.js';
@@ -90,8 +91,8 @@ function clampSetting(value, fallback, min, max) {
     return Math.max(min, Math.min(max, v));
 }
 
-export function setupTemporalAA(renderer) {
-    var resolveMat = createPassMaterial(
+function createResolveMaterial() {
+    return createPassMaterial(
         {
             tCurrent: { value: null },
             tHistory: { value: null },
@@ -102,9 +103,15 @@ export function setupTemporalAA(renderer) {
         },
         RESOLVE_FRAGMENT_SHADER,
     );
+}
+
+export function setupTemporalAA(renderer) {
+    var resolveMat = renderer.isWebGPURenderer
+        ? createNodeResolveMaterial()
+        : createResolveMaterial();
 
     var pass = {
-        quad: new FullScreenQuad(),
+        quad: createPassQuad(renderer),
         historyRT: createRenderTarget(renderer, 1, 1),
         outputRT: createRenderTarget(renderer, 1, 1),
         historyValid: false,
@@ -150,7 +157,7 @@ export function setupTemporalAA(renderer) {
             u.texel.value.set(1 / currentTarget.width, 1 / currentTarget.height);
             u.historyWeight.value = useHistory ? baseWeight * attenuation : 0.0;
             u.clipGamma.value = clampSetting(settings.clip_gamma, 1.25, 0.25, 4.0);
-            u.accumulate.value = false;
+            u.accumulate.value = 0;
             this.accumulatedFrames = 0;
             return this.resolve(rdr);
         },
@@ -168,7 +175,7 @@ export function setupTemporalAA(renderer) {
             u.tCurrent.value = currentTarget.texture;
             u.tHistory.value = this.historyRT.texture;
             u.historyWeight.value = n / (n + 1);
-            u.accumulate.value = true;
+            u.accumulate.value = 1;
             this.accumulatedFrames = n + 1;
             return this.resolve(rdr);
         },

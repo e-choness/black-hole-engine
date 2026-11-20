@@ -23,8 +23,19 @@ export default defineConfig({
                 viewport: { width: 800, height: 450 },
                 deviceScaleFactor: 1,
                 launchOptions: {
-                    // Software WebGL2 so the suite runs on GPU-less CI machines.
-                    args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
+                    // Software WebGL2 so the suite runs on GPU-less CI machines; E2E_WEBGPU=1 adds
+                    // SwiftShader WebGPU on Vulkan, without which WebGPURenderer uses WebGL 2.
+                    args: [
+                        '--use-angle=swiftshader',
+                        '--enable-unsafe-swiftshader',
+                        ...(process.env.E2E_WEBGPU === '1'
+                            ? [
+                                  '--enable-unsafe-webgpu',
+                                  '--enable-features=Vulkan',
+                                  '--use-vulkan=swiftshader',
+                              ]
+                            : []),
+                    ],
                 },
             },
         },

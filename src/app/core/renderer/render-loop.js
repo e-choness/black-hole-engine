@@ -207,7 +207,8 @@ export function stepRendererForOfflineRecording(dt) {
 // One frame of the interactive view, called by React Three Fiber on every animation frame
 // (src/ui/viewport/Viewport.tsx). Offline recording steps its frames itself.
 export function renderFrame() {
-    if (!renderer || rendererOfflineSteppingActive) return;
+    // Nothing draws while the GPU context is lost; the clock clamps the gap when frames resume.
+    if (!renderer || rendererOfflineSteppingActive || rendererContextLost) return;
 
     var dt = getFrameDuration();
     stepRendererSimulation(dt, false);

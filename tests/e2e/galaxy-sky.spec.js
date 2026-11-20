@@ -3,8 +3,8 @@ import { openSimulation, trackPageProblems } from './support.js';
 
 // Luminance-weighted mean direction of the galaxy cube, as longitude and latitude in degrees of
 // the hole frame. The field stars are spread evenly and cancel, so it points at the galaxy.
-function skyCentroid() {
-    const { width, height, rgb } = window.__BH__.probeSky(256, 128);
+async function skyCentroid() {
+    const { width, height, rgb } = await window.__BH__.probeSky(256, 128);
     let x = 0;
     let y = 0;
     let z = 0;

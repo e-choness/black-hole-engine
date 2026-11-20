@@ -14,6 +14,11 @@ export function initSky(renderer, uniforms, anisotropy) {
     return galaxy;
 }
 
+// A renderer that replaces a lost one draws the cube again from scratch.
+export function setSkyRenderer(renderer) {
+    if (galaxy) galaxy.setRenderer(renderer);
+}
+
 export function updateSky(uniforms, params, time) {
     if (!galaxy) return;
     const sky = params.sky;

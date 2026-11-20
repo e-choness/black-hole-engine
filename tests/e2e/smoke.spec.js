@@ -62,27 +62,27 @@ test('renders the black hole without console or page errors', async ({ page }, t
     expect(problems).toEqual([]);
 });
 
-// A GPU driver reset takes the WebGL context away; the renderer must draw the scene again once the
-// browser restores it, with every shader, texture and render target recreated.
-test('draws again after the WebGL context is lost and restored', async ({ page }) => {
+// A GPU driver reset takes the WebGL context or the WebGPU device away; the renderer must draw the
+// scene again once the GPU is back, with every shader, texture and render target recreated.
+test('draws again after the GPU context is lost and restored', async ({ page }) => {
     const problems = trackPageProblems(page);
     await openSimulation(page);
     await page.waitForFunction((frames) => window.__BH__.frameCount >= frames, SETTLE_FRAMES);
 
-    await page.evaluate(() => {
-        const gl = document.getElementById('bh-canvas').getContext('webgl2');
-        window.__loseContext = gl.getExtension('WEBGL_lose_context');
-        window.__loseContext.loseContext();
-    });
-    await page.waitForFunction(() =>
-        document.getElementById('bh-canvas').getContext('webgl2').isContextLost(),
-    );
-    await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 500)));
-
-    await page.evaluate(() => window.__loseContext.restoreContext());
-    await page.waitForFunction(
-        () => !document.getElementById('bh-canvas').getContext('webgl2').isContextLost(),
-    );
+    // A WebGPU canvas has no WebGL context to lose; its device goes instead, and a new renderer
+    // takes the canvas over at once.
+    const lostDevice = await page.evaluate(() => window.__BH__.loseGpuDevice());
+    if (!lostDevice) {
+        await page.evaluate(() => {
+            const gl = document.getElementById('bh-canvas').getContext('webgl2');
+            window.__loseContext = gl.getExtension('WEBGL_lose_context');
+            window.__loseContext.loseContext();
+        });
+        await page.waitForFunction(() => window.__BH__.contextLost);
+        await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 500)));
+        await page.evaluate(() => window.__loseContext.restoreContext());
+    }
+    await page.waitForFunction(() => !window.__BH__.contextLost);
     const restoredAt = await page.evaluate(() => window.__BH__.frameCount);
     await page.waitForFunction(
         ([start, frames]) => window.__BH__.frameCount >= start + frames,

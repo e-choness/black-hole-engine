@@ -158,7 +158,9 @@ export function Shader(mustacheTemplate) {
         );
     };
 
-    this.compile = function () {
+    // Fills in the flags derived from the parameters that select the shader variant (solver
+    // family, flow model, jet mode) and returns the parameters with them.
+    this.variant = function () {
         // Older scenes name the exact solver by its former internal mode.
         if (that.parameters.kerr_mode === 'realtime_full_kerr_core') {
             that.parameters.kerr_mode = 'full_kerr';
@@ -186,7 +188,11 @@ export function Shader(mustacheTemplate) {
             (that.parameters.accretion_thick_torus ||
                 that.parameters.accretion_slim_disk ||
                 that.parameters.jet_enabled);
+        that.parameters.planet_enabled = that.parameters.planetEnabled();
+        return that.parameters;
+    };
 
-        return Mustache.render(mustacheTemplate, that.parameters);
+    this.compile = function () {
+        return Mustache.render(mustacheTemplate, that.variant());
     };
 }

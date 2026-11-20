@@ -3,9 +3,13 @@
 // are re-rendered only when the sky changes: every face after a parameter, budget or context
 // change, and while the galaxy turns only the faces its bounding sphere touches, once some
 // particle would have moved by a third of a texel. `revision` counts the renders, so frame
-// accumulation can tell when the sky behind a still view changed.
+// accumulation can tell when the sky behind a still view changed. With three's WebGPURenderer the
+// particles use the node materials of galaxy-nodes.js in place of the GLSL of galaxy-shaders.js.
 
 import * as THREE from 'three';
+import { CubeRenderTarget, QuadMesh, RenderTarget } from 'three/webgpu';
+import { texture, uniform } from 'three/tsl';
+import { createGalaxyNodeMaterials, createProbeNodeMaterial } from './galaxy-nodes.js';
 import { EMISSION_LUT } from '../core/physics/emission.js';
 import { sampleBlackbodyLut } from '../core/physics/colorimetry.js';
 import {
@@ -151,20 +155,47 @@ function createCloudNoise() {
     return texture;
 }
 
-// HDR cube storage: packed R11G11B10F (4 bytes per texel) where float colour buffers exist,
-// else RGBA16F, else 8-bit.
+const PACKED_FORMAT = {
+    name: 'R11F_G11F_B10F',
+    type: THREE.UnsignedInt101111Type,
+    format: THREE.RGBFormat,
+};
+const HALF_FORMAT = { name: 'RGBA16F', type: THREE.HalfFloatType, format: THREE.RGBAFormat };
+
+// HDR cube storage: packed R11G11B10F (4 bytes per texel) where it is renderable, else RGBA16F,
+// else 8-bit. WebGPU renders to RGBA16F everywhere and to the packed format with an optional
+// feature; three's WebGL 2 backend enables float colour buffers where they exist.
 function cubeTargetFormat(renderer) {
-    if (renderer.extensions.has('EXT_color_buffer_float')) {
-        return {
-            name: 'R11F_G11F_B10F',
-            type: THREE.UnsignedInt101111Type,
-            format: THREE.RGBFormat,
-        };
+    if (renderer.isWebGPURenderer) {
+        const backend = renderer.backend;
+        const packed = backend.isWebGPUBackend
+            ? renderer.hasFeature('rg11b10ufloat-renderable')
+            : backend.extensions.has('EXT_color_buffer_float');
+        return packed ? PACKED_FORMAT : HALF_FORMAT;
     }
-    if (renderer.extensions.has('EXT_color_buffer_half_float')) {
-        return { name: 'RGBA16F', type: THREE.HalfFloatType, format: THREE.RGBAFormat };
-    }
+    if (renderer.extensions.has('EXT_color_buffer_float')) return PACKED_FORMAT;
+    if (renderer.extensions.has('EXT_color_buffer_half_float')) return HALF_FORMAT;
     return { name: 'RGBA8', type: THREE.UnsignedByteType, format: THREE.RGBAFormat };
+}
+
+const UINT_UNIFORMS = new Set([
+    'u_arm_salt',
+    'u_bulge_salt',
+    'u_cloud_salt',
+    'u_sky_salt',
+    'u_arm_stars',
+]);
+
+// The same uniforms as TSL nodes, which keep their value so applyParams() serves both.
+function toUniformNodes(uniforms) {
+    return Object.fromEntries(
+        Object.entries(uniforms).map(([name, { value }]) => [
+            name,
+            value && value.isTexture
+                ? texture(value)
+                : uniform(value, UINT_UNIFORMS.has(name) ? 'uint' : undefined),
+        ]),
+    );
 }
 
 function instancedPoint() {
@@ -199,6 +230,7 @@ function additiveMaterial(uniforms, vertexShader, fragmentShader) {
 export class GalaxySky {
     constructor(renderer, { anisotropy = 1 } = {}) {
         this.renderer = renderer;
+        this.nodes = !!renderer.isWebGPURenderer;
         this.anisotropy = anisotropy;
         this.format = cubeTargetFormat(renderer);
         this.budget = DEFAULT_BUDGET;
@@ -251,18 +283,26 @@ export class GalaxySky {
         };
 
         this.scene = new THREE.Scene();
-        this.background = new THREE.Points(
-            instancedPoint(),
-            additiveMaterial(this.uniforms, BACKGROUND_VERTEX, BACKGROUND_FRAGMENT),
-        );
-        this.clouds = new THREE.Mesh(
-            instancedQuad(),
-            additiveMaterial(this.uniforms, CLOUD_VERTEX, CLOUD_FRAGMENT),
-        );
-        this.stars = new THREE.Points(
-            instancedPoint(),
-            additiveMaterial(this.uniforms, STAR_VERTEX, STAR_FRAGMENT),
-        );
+        if (this.nodes) {
+            this.uniforms = toUniformNodes(this.uniforms);
+            const materials = createGalaxyNodeMaterials(this.uniforms);
+            this.background = new THREE.Mesh(instancedQuad(), materials.background);
+            this.clouds = new THREE.Mesh(instancedQuad(), materials.clouds);
+            this.stars = new THREE.Mesh(instancedQuad(), materials.stars);
+        } else {
+            this.background = new THREE.Points(
+                instancedPoint(),
+                additiveMaterial(this.uniforms, BACKGROUND_VERTEX, BACKGROUND_FRAGMENT),
+            );
+            this.clouds = new THREE.Mesh(
+                instancedQuad(),
+                additiveMaterial(this.uniforms, CLOUD_VERTEX, CLOUD_FRAGMENT),
+            );
+            this.stars = new THREE.Points(
+                instancedPoint(),
+                additiveMaterial(this.uniforms, STAR_VERTEX, STAR_FRAGMENT),
+            );
+        }
         // The galaxy's placement in the hole frame is the model matrix of its particles.
         for (const object of [this.background, this.clouds, this.stars]) {
             object.frustumCulled = false;
@@ -283,6 +323,12 @@ export class GalaxySky {
         return this.target.texture;
     }
 
+    setRenderer(renderer) {
+        this.renderer = renderer;
+        this.signature = '';
+        this.syncCameras();
+    }
+
     syncCameras() {
         if (this.cubeCamera.coordinateSystem !== this.renderer.coordinateSystem) {
             this.cubeCamera.coordinateSystem = this.renderer.coordinateSystem;
@@ -294,7 +340,8 @@ export class GalaxySky {
     ensureTarget(face) {
         if (this.target && this.target.width === face) return this.target;
         const previous = this.target;
-        this.target = new THREE.WebGLCubeRenderTarget(face, {
+        const CubeTarget = this.nodes ? CubeRenderTarget : THREE.WebGLCubeRenderTarget;
+        this.target = new CubeTarget(face, {
             type: this.format.type,
             format: this.format.format,
             generateMipmaps: true,
@@ -446,6 +493,7 @@ export class GalaxySky {
     // Reads back an equirectangular thumbnail of the cube (longitude across, latitude up, in the
     // hole frame) for tests and diagnostics: linear RGB rows from the south pole up.
     probe(width = 64, height = 32) {
+        if (this.nodes) return this.probeNodes(width, height);
         const renderer = this.renderer;
         const float = renderer.extensions.has('EXT_color_buffer_float');
         const target = new THREE.WebGLRenderTarget(width, height, {
@@ -484,6 +532,37 @@ export class GalaxySky {
             for (let c = 0; c < 3; c++) {
                 const v = raw[i * 4 + c];
                 rgb[i * 3 + c] = float ? v : THREE.DataUtils.fromHalfFloat(v);
+            }
+        }
+        return { width, height, rgb };
+    }
+
+    // probe() for WebGPURenderer, whose readback is asynchronous: resolves to the same result.
+    async probeNodes(width, height) {
+        const renderer = this.renderer;
+        const target = new RenderTarget(width, height, {
+            type: THREE.FloatType,
+            depthBuffer: false,
+        });
+        const lod = Math.max(0, Math.log2((Math.PI * this.budget.face) / width));
+        const material = createProbeNodeMaterial(this.target.texture, lod);
+        const quad = new QuadMesh(material);
+        const previousTarget = renderer.getRenderTarget();
+        renderer.setRenderTarget(target);
+        quad.render(renderer);
+        renderer.setRenderTarget(previousTarget);
+        const raw = await renderer.readRenderTargetPixelsAsync(target, 0, 0, width, height);
+        target.dispose();
+        material.dispose();
+        // WebGPU returns the top row (north) first, WebGL the bottom row.
+        const northFirst = !!renderer.backend.isWebGPUBackend;
+        const rgb = new Float32Array(width * height * 3);
+        for (let row = 0; row < height; row++) {
+            const source = northFirst ? height - 1 - row : row;
+            for (let col = 0; col < width; col++) {
+                for (let c = 0; c < 3; c++) {
+                    rgb[(row * width + col) * 3 + c] = raw[(source * width + col) * 4 + c];
+                }
             }
         }
         return { width, height, rgb };
