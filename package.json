@@ -55,5 +55,10 @@
     "sonner": "^2.0.8",
     "three": "^0.187.0",
     "zustand": "^5.1.0"
+  },
+  "overrides": {
+    "workbox-build": {
+      "glob": "^14.0.6"
+    }
   }
 }
