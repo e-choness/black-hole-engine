@@ -143,6 +143,7 @@ Then open <http://localhost:5173>. Source changes reload in the browser.
 | `docker compose run --rm build`                                   | Production build into `dist/`                                |
 | `docker compose up --build preview`                               | Production nginx image on <http://localhost:8080>            |
 | `docker compose run --rm e2e`                                     | Playwright e2e tests in headless Chromium on software WebGPU |
+| `docker compose run --rm e2e npx playwright test --grep @smoke`   | Only the smoke e2e tests, as CI runs them on a push          |
 | `docker compose run --rm -e VITE_BACKEND=webgl e2e`               | The e2e tests on the WebGL 2 backend                         |
 | `docker compose run --rm e2e node scripts/render-readme-media.js` | Render the README banner and gallery                         |
 | `docker compose run --rm test npm run format`                     | Format with Prettier and apply ESLint fixes                  |
@@ -323,8 +324,11 @@ scripts/                 build helpers and the README image renderer
 
 ## Deployment
 
-**GitHub Pages.** On every push to `main`, CI lints, tests and builds the site, runs the e2e test
-and deploys `dist/` to GitHub Pages (set the Pages source to "GitHub Actions"). A separate job
+**GitHub Pages.** On every push to `main`, CI lints, tests and builds the site, runs the e2e tests
+tagged `@smoke` and deploys `dist/` to GitHub Pages (set the Pages source to "GitHub Actions").
+Pull requests, a weekly run and manual runs take the whole e2e suite, split across four jobs.
+Changes that touch only the README, its images or the Dependabot configuration start no run. A
+separate job
 asks the npm registry whether a locked package has been deprecated; it reports one without holding
 back the deploy. Asset URLs are relative, so the site works under a project sub-path. Pages cannot
 send custom headers, so the build embeds the Content Security Policy as a `<meta>` tag.

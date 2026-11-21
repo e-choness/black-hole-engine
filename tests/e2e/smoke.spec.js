@@ -31,36 +31,45 @@ function sampleCanvasLuminance() {
     });
 }
 
-test('renders the black hole without console or page errors', async ({ page }, testInfo) => {
-    const problems = trackPageProblems(page);
-    await openSimulation(page);
-    await page.waitForFunction((frames) => window.__BH__.frameCount >= frames, SETTLE_FRAMES);
+test(
+    'renders the black hole without console or page errors',
+    { tag: '@smoke' },
+    async ({ page }, testInfo) => {
+        const problems = trackPageProblems(page);
+        await openSimulation(page);
+        await page.waitForFunction((frames) => window.__BH__.frameCount >= frames, SETTLE_FRAMES);
 
-    const quality = await page.evaluate(() => window.__BH__.params.quality);
-    expect(quality).toBe('mobile');
+        const quality = await page.evaluate(() => window.__BH__.params.quality);
+        expect(quality).toBe('mobile');
 
-    const luminance = await page.evaluate(sampleCanvasLuminance);
-    expect(luminance.max, 'the accretion disk should produce bright pixels').toBeGreaterThan(96);
-    expect(luminance.mean, 'the frame should not be blown out').toBeLessThan(200);
+        const luminance = await page.evaluate(sampleCanvasLuminance);
+        expect(luminance.max, 'the accretion disk should produce bright pixels').toBeGreaterThan(
+            96,
+        );
+        expect(luminance.mean, 'the frame should not be blown out').toBeLessThan(200);
 
-    await mkdir(SCREENSHOT_DIR, { recursive: true });
-    const pagePath = path.join(SCREENSHOT_DIR, 'smoke-page.png');
-    await page.screenshot({ path: pagePath });
-    await testInfo.attach('page', { path: pagePath, contentType: 'image/png' });
+        await mkdir(SCREENSHOT_DIR, { recursive: true });
+        const pagePath = path.join(SCREENSHOT_DIR, 'smoke-page.png');
+        await page.screenshot({ path: pagePath });
+        await testInfo.attach('page', { path: pagePath, contentType: 'image/png' });
 
-    await page.addStyleTag({
-        content:
-            'body * { visibility: hidden !important; } #bh-canvas { visibility: visible !important; }',
-    });
-    await page.evaluate(
-        () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
-    );
-    const renderPath = path.join(SCREENSHOT_DIR, 'smoke-render.png');
-    await page.locator('#bh-canvas').screenshot({ path: renderPath });
-    await testInfo.attach('render', { path: renderPath, contentType: 'image/png' });
+        await page.addStyleTag({
+            content:
+                'body * { visibility: hidden !important; } #bh-canvas { visibility: visible !important; }',
+        });
+        await page.evaluate(
+            () =>
+                new Promise((resolve) =>
+                    requestAnimationFrame(() => requestAnimationFrame(resolve)),
+                ),
+        );
+        const renderPath = path.join(SCREENSHOT_DIR, 'smoke-render.png');
+        await page.locator('#bh-canvas').screenshot({ path: renderPath });
+        await testInfo.attach('render', { path: renderPath, contentType: 'image/png' });
 
-    expect(problems).toEqual([]);
-});
+        expect(problems).toEqual([]);
+    },
+);
 
 // A GPU driver reset takes the WebGL context or the WebGPU device away; the renderer must draw the
 // scene again once the GPU is back, with every shader, texture and render target recreated.

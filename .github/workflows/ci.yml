@@ -1,16 +1,31 @@
 name: CI
 
+# The README, its images and the Dependabot configuration are not part of the site, so changes
+# to only those start no run. The weekly run takes the whole e2e suite and the deprecation check
+# even when nothing was pushed.
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - README.md
+      - .github/readme/**
+      - .github/dependabot.yml
   pull_request:
     branches: [main]
+    paths-ignore:
+      - README.md
+      - .github/readme/**
+      - .github/dependabot.yml
+  schedule:
+    - cron: '17 4 * * 1'
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+# Grouped by event as well, so a push to main never queues behind a weekly or manual run.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 defaults:
@@ -77,10 +92,17 @@ jobs:
         with:
           path: dist/
 
+  # Every frame is drawn on the CPU, so the whole suite outlasts one job's time limit. A push to
+  # main runs only the tests tagged @smoke, and the deploy waits for them; pull requests, the
+  # weekly run and manual runs split the whole suite across four jobs.
   e2e:
-    name: End-to-end tests
+    name: End-to-end tests (${{ matrix.part }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        part: ${{ fromJSON(github.event_name == 'push' && '["smoke"]' || '["shard-1", "shard-2", "shard-3", "shard-4"]') }}
     steps:
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -100,23 +122,33 @@ jobs:
           provenance: false
           sbom: false
           cache-from: type=gha,scope=e2e
-          cache-to: type=gha,scope=e2e,mode=max
+          # The first job of the matrix writes the cache for all of them.
+          cache-to: ${{ strategy.job-index == 0 && 'type=gha,scope=e2e,mode=max' || '' }}
 
       # The image runs as uid 1000 and the runner as uid 1001, so the bind-mounted output
       # directories must be writable by both.
       - name: Run Playwright
+        env:
+          PART: ${{ matrix.part }}
+          INDEX: ${{ strategy.job-index }}
+          TOTAL: ${{ strategy.job-total }}
         run: |
+          if [ "$PART" = smoke ]; then
+            selection=(--grep @smoke)
+          else
+            selection=(--shard="$((INDEX + 1))/$TOTAL")
+          fi
           install -d -m 0777 .cache/screenshots .cache/playwright
           docker run --rm --init --shm-size=1g --env CI=true \
             --volume "$PWD/.cache/screenshots:/app/.cache/screenshots" \
             --volume "$PWD/.cache/playwright:/app/.cache/playwright" \
-            black-hole-e2e:ci
+            black-hole-e2e:ci npx playwright test "${selection[@]}"
 
       - name: Upload screenshots
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: screenshots
+          name: screenshots-${{ matrix.part }}
           path: .cache/screenshots/
           if-no-files-found: warn
           retention-days: 14
@@ -125,7 +157,7 @@ jobs:
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.part }}
           path: .cache/playwright/
           if-no-files-found: warn
           retention-days: 14
