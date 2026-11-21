@@ -1,9 +1,9 @@
-import { isVideoRequest } from '../src/features/pwa/cache-rules.js';
+import { isPlanetMapRequest, isVideoRequest } from '../src/features/pwa/cache-rules.js';
 import { SITE } from './site-metadata.js';
 
 // Installable app and offline support through vite-plugin-pwa (generateSW). The service worker
-// precaches the app shell (HTML, JS, CSS, fonts, the manifest and its icons) and never caches
-// video. src/features/pwa/register.js registers it.
+// precaches the app shell (HTML, JS, CSS, fonts, the manifest and its icons), caches the planet's
+// map once it has been fetched and never caches video. src/features/pwa/register.js registers it.
 
 // Rendered from public/icons/black-hole.svg by scripts/render-pwa-icons.js. Maskable icons keep
 // the artwork inside the central circle of 80 % diameter that every launcher mask leaves visible.
@@ -71,6 +71,13 @@ export const pwaOptions = {
         ignoreURLParametersMatching: [/./],
         directoryIndex: 'index.html',
         cleanupOutdatedCaches: true,
-        runtimeCaching: [{ urlPattern: isVideoRequest, handler: 'NetworkOnly' }],
+        runtimeCaching: [
+            { urlPattern: isVideoRequest, handler: 'NetworkOnly' },
+            {
+                urlPattern: isPlanetMapRequest,
+                handler: 'CacheFirst',
+                options: { cacheName: 'planet-maps' },
+            },
+        ],
     },
 };

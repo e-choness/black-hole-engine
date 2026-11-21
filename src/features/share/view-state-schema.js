@@ -359,7 +359,32 @@ export const VIEW_STATE_V3 = deepFreeze({
     migrate: migrateV2,
 });
 
-export const VIEW_STATE_VERSIONS = Object.freeze([VIEW_STATE_V1, VIEW_STATE_V2, VIEW_STATE_V3]);
+// Version 4 adds the surface of the test planet, the map of Jupiter by default. Older links showed
+// the reference stripes, and keep doing so.
+function migrateV3(previous, carried) {
+    carried['planet.surface'] = 'stripes';
+    return carried;
+}
+
+export const VIEW_STATE_V4 = deepFreeze({
+    version: 4,
+    fields: [
+        ...VIEW_STATE_V3.fields,
+        choice('ns', 'planet.surface', 'jupiter', [
+            ['jupiter', 'jup'],
+            ['stripes', 'str'],
+        ]),
+    ],
+    refine: refineV1,
+    migrate: migrateV3,
+});
+
+export const VIEW_STATE_VERSIONS = Object.freeze([
+    VIEW_STATE_V1,
+    VIEW_STATE_V2,
+    VIEW_STATE_V3,
+    VIEW_STATE_V4,
+]);
 
 const LATEST_FIELDS = VIEW_STATE_VERSIONS.at(-1).fields;
 

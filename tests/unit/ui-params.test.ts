@@ -140,6 +140,7 @@ const LEGACY_INSPECTOR_PATHS = [
     'planet.enabled',
     'planet.distance',
     'planet.radius',
+    'planet.surface',
     'aberration',
     'beaming',
     'physical_beaming',

@@ -1,6 +1,7 @@
 import { QUALITY_PRESETS } from '../../ui/quality-presets.js';
 import { hdrTarget, renderer, rendererContextLost, shader, taaPass } from './runtime-state.js';
 import { probeSky, skyStatus } from '../sky.js';
+import { planetSurfaceStatus } from '../planet-surface.js';
 
 // URL switches used by automated tests and reproducible screenshots:
 //   ?quality=<preset>  start with that quality preset and skip the GPU benchmark
@@ -46,6 +47,10 @@ window.__BH__ = Object.freeze({
             canvas: renderer ? [renderer.domElement.width, renderer.domElement.height] : null,
             passes: hdrTarget ? [hdrTarget.width, hdrTarget.height] : null,
         };
+    },
+    // Loading state of the planet's map: 'idle', 'loading', 'ready' or 'failed'.
+    get planetSurface() {
+        return planetSurfaceStatus();
     },
     // Galaxy cube: revision, face size, particle counts and storage format.
     get sky() {

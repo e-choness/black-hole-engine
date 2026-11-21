@@ -116,7 +116,8 @@ test('precaches the app shell, needs no other cache and starts offline', async (
     }
     expect(precache.some((path) => /^\/assets\/three-.*\.js$/.test(path))).toBe(true);
     expect(precache.filter((path) => /og-image|\.map$|\.(mp4|webm)$/.test(path))).toEqual([]);
-    // The sky and the planet are computed on the GPU, so nothing outside the precache is needed.
+    // The sky is computed on the GPU and the mobile preset draws no planet, so nothing outside the
+    // precache is needed.
     expect(Object.keys(contents)).toEqual([precacheName]);
 
     // The next visit is served by the worker, also when offline.

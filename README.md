@@ -46,9 +46,9 @@ recorded to video.
 - **Accretion flows**: a Novikov-Thorne thin disk with Kerr redshift, thick ADAF/RIAF torus,
   super-Eddington slim disk and GRMHD-inspired variants, with Doppler beaming, gravitational
   redshift and blackbody colours; the thin disk shows turbulent arcs sheared by its rotation.
-- **Jets, a planet and a galaxy**: relativistic jets, an orbiting planet lit by the disk, and a
-  lensed, rotating procedural galaxy, star field and nebula that can be seen from outside, from
-  its centre or from within its disk.
+- **Jets, a planet and a galaxy**: relativistic jets, an orbiting Jupiter (from a Cassini colour
+  map) lit by the disk, and a lensed, rotating procedural galaxy, star field and nebula that can
+  be seen from outside, from its centre or from within its disk.
 - **Physical scale**: masses from stellar black holes to quasars, with presets such as Sgr A\*,
   M87\*, Cygnus X-1 and TON 618, derived quantities in physical units, and clocks that compare
   your proper time with a distant observer's.
@@ -88,32 +88,32 @@ Every image is a view link: click one to open that exact view in the live demo.
 <table>
   <tr>
     <td width="50%" valign="top">
-      <a href="https://e-choness.github.io/black-hole-engine/#v=3&amp;ca=0,-4,0&amp;od=11"><img src=".github/readme/thin-disk.jpg" alt="Novikov–Thorne thin disk with turbulent arcs, a/M = 0.9" width="100%"></a>
-      <br><sub>Novikov–Thorne thin disk with turbulent arcs, a/M = 0.9 · <a href="https://e-choness.github.io/black-hole-engine/#v=3&amp;ca=0,-4,0&amp;od=11">open live</a></sub>
+      <a href="https://e-choness.github.io/black-hole-engine/#v=4&amp;ca=0,-4,0&amp;od=11"><img src=".github/readme/thin-disk.jpg" alt="Novikov–Thorne thin disk with turbulent arcs, a/M = 0.9" width="100%"></a>
+      <br><sub>Novikov–Thorne thin disk with turbulent arcs, a/M = 0.9 · <a href="https://e-choness.github.io/black-hole-engine/#v=4&amp;ca=0,-4,0&amp;od=11">open live</a></sub>
     </td>
     <td width="50%" valign="top">
-      <a href="https://e-choness.github.io/black-hole-engine/#v=3&amp;ca=0,-6,0&amp;od=16&amp;kv=disk&amp;kd=0.62&amp;ki=88&amp;kp=25&amp;ko=75&amp;ka=5"><img src=".github/readme/galaxy.jpg" alt="Inside the disk of the lensed procedural galaxy" width="100%"></a>
-      <br><sub>Inside the disk of the lensed procedural galaxy · <a href="https://e-choness.github.io/black-hole-engine/#v=3&amp;ca=0,-6,0&amp;od=16&amp;kv=disk&amp;kd=0.62&amp;ki=88&amp;kp=25&amp;ko=75&amp;ka=5">open live</a></sub>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top">
-      <a href="https://e-choness.github.io/black-hole-engine/#v=3&amp;ca=0,-14,0&amp;od=14&amp;dm=torus&amp;je=1&amp;jm=phys"><img src=".github/readme/torus.jpg" alt="Thick ADAF torus with relativistic jets" width="100%"></a>
-      <br><sub>Thick ADAF torus with relativistic jets · <a href="https://e-choness.github.io/black-hole-engine/#v=3&amp;ca=0,-14,0&amp;od=14&amp;dm=torus&amp;je=1&amp;jm=phys">open live</a></sub>
-    </td>
-    <td width="50%" valign="top">
-      <a href="https://e-choness.github.io/black-hole-engine/#v=3&amp;ca=0,-28,0&amp;od=13&amp;lt=sci"><img src=".github/readme/scientific.jpg" alt="False-colour luminance with the Scientific tone mapper" width="100%"></a>
-      <br><sub>False-colour luminance with the Scientific tone mapper · <a href="https://e-choness.github.io/black-hole-engine/#v=3&amp;ca=0,-28,0&amp;od=13&amp;lt=sci">open live</a></sub>
+      <a href="https://e-choness.github.io/black-hole-engine/#v=4&amp;ca=0,-6,0&amp;od=16&amp;kv=disk&amp;kd=0.62&amp;ki=88&amp;kp=25&amp;ko=75&amp;ka=5"><img src=".github/readme/galaxy.jpg" alt="Inside the disk of the lensed procedural galaxy" width="100%"></a>
+      <br><sub>Inside the disk of the lensed procedural galaxy · <a href="https://e-choness.github.io/black-hole-engine/#v=4&amp;ca=0,-6,0&amp;od=16&amp;kv=disk&amp;kd=0.62&amp;ki=88&amp;kp=25&amp;ko=75&amp;ka=5">open live</a></sub>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <a href="https://e-choness.github.io/black-hole-engine/#v=3&amp;ca=0,-62,0&amp;od=15"><img src=".github/readme/face-on.jpg" alt="The thin disk from high above" width="100%"></a>
-      <br><sub>The thin disk from high above · <a href="https://e-choness.github.io/black-hole-engine/#v=3&amp;ca=0,-62,0&amp;od=15">open live</a></sub>
+      <a href="https://e-choness.github.io/black-hole-engine/#v=4&amp;ca=0,-14,0&amp;od=14&amp;dm=torus&amp;je=1&amp;jm=phys"><img src=".github/readme/torus.jpg" alt="Thick ADAF torus with relativistic jets" width="100%"></a>
+      <br><sub>Thick ADAF torus with relativistic jets · <a href="https://e-choness.github.io/black-hole-engine/#v=4&amp;ca=0,-14,0&amp;od=14&amp;dm=torus&amp;je=1&amp;jm=phys">open live</a></sub>
     </td>
     <td width="50%" valign="top">
-      <a href="https://e-choness.github.io/black-hole-engine/#v=3&amp;ca=0,-1,0&amp;od=10&amp;bs=0.998&amp;de=0&amp;ne=0&amp;km=grid"><img src=".github/readme/kerr-shadow.jpg" alt="Shadow of a near-extremal Kerr hole on a coordinate grid" width="100%"></a>
-      <br><sub>Shadow of a near-extremal Kerr hole on a coordinate grid · <a href="https://e-choness.github.io/black-hole-engine/#v=3&amp;ca=0,-1,0&amp;od=10&amp;bs=0.998&amp;de=0&amp;ne=0&amp;km=grid">open live</a></sub>
+      <a href="https://e-choness.github.io/black-hole-engine/#v=4&amp;ca=0,-28,0&amp;od=13&amp;lt=sci"><img src=".github/readme/scientific.jpg" alt="False-colour luminance with the Scientific tone mapper" width="100%"></a>
+      <br><sub>False-colour luminance with the Scientific tone mapper · <a href="https://e-choness.github.io/black-hole-engine/#v=4&amp;ca=0,-28,0&amp;od=13&amp;lt=sci">open live</a></sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="https://e-choness.github.io/black-hole-engine/#v=4&amp;ca=0,-62,0&amp;od=15"><img src=".github/readme/face-on.jpg" alt="The thin disk from high above" width="100%"></a>
+      <br><sub>The thin disk from high above · <a href="https://e-choness.github.io/black-hole-engine/#v=4&amp;ca=0,-62,0&amp;od=15">open live</a></sub>
+    </td>
+    <td width="50%" valign="top">
+      <a href="https://e-choness.github.io/black-hole-engine/#v=4&amp;ca=0,-1,0&amp;od=10&amp;bs=0.998&amp;de=0&amp;ne=0&amp;km=grid"><img src=".github/readme/kerr-shadow.jpg" alt="Shadow of a near-extremal Kerr hole on a coordinate grid" width="100%"></a>
+      <br><sub>Shadow of a near-extremal Kerr hole on a coordinate grid · <a href="https://e-choness.github.io/black-hole-engine/#v=4&amp;ca=0,-1,0&amp;od=10&amp;bs=0.998&amp;de=0&amp;ne=0&amp;km=grid">open live</a></sub>
     </td>
   </tr>
 </table>

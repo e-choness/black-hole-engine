@@ -134,8 +134,8 @@ test('nothing is applied or written until the view changes', () => {
     vi.advanceTimersByTime(399);
     assert.deepEqual(windowRef.calls, []);
     vi.advanceTimersByTime(1);
-    assert.deepEqual(windowRef.calls, [['replace', `${PAGE}#v=3&bs=0.5`]]);
-    assert.equal(windowRef.location.hash, '#v=3&bs=0.5');
+    assert.deepEqual(windowRef.calls, [['replace', `${PAGE}#v=4&bs=0.5`]]);
+    assert.equal(windowRef.location.hash, '#v=4&bs=0.5');
 });
 
 test('continuous changes are written at most every maxWait', () => {
@@ -148,9 +148,9 @@ test('continuous changes are written at most every maxWait', () => {
     }
     vi.advanceTimersByTime(400);
     assert.deepEqual(windowRef.calls, [
-        ['replace', `${PAGE}#v=3&ca=19,-3,0`],
-        ['replace', `${PAGE}#v=3&ca=39,-3,0`],
-        ['replace', `${PAGE}#v=3&ca=49,-3,0`],
+        ['replace', `${PAGE}#v=4&ca=19,-3,0`],
+        ['replace', `${PAGE}#v=4&ca=39,-3,0`],
+        ['replace', `${PAGE}#v=4&ca=49,-3,0`],
     ]);
 });
 
@@ -159,9 +159,9 @@ test('volatile fields stay out of the address bar but go into share links', () =
     sync.start();
     app.state = { 'observerState.time': 12.5, 'black_hole.spin': 0.5 };
     assert.equal(sync.flush(), true);
-    assert.deepEqual(windowRef.calls, [['replace', `${PAGE}#v=3&bs=0.5`]]);
-    assert.equal(sync.shareUrl(), 'https://example.org/black-hole/#v=3&ot=12.5&bs=0.5');
-    assert.equal(sync.shareUrl({}), 'https://example.org/black-hole/#v=3');
+    assert.deepEqual(windowRef.calls, [['replace', `${PAGE}#v=4&bs=0.5`]]);
+    assert.equal(sync.shareUrl(), 'https://example.org/black-hole/#v=4&ot=12.5&bs=0.5');
+    assert.equal(sync.shareUrl({}), 'https://example.org/black-hole/#v=4');
     app.state = { 'observerState.time': 99, 'black_hole.spin': 0.5 };
     assert.equal(sync.flush(), false);
 });
@@ -180,11 +180,11 @@ test('a new scenario mode or mass preset gets its own history entry', () => {
     app.state = { ...app.state, 'scenario.mode': 'static' };
     sync.flush({ history: 'replace' });
     assert.deepEqual(windowRef.calls, [
-        ['push', `${PAGE}#v=3&om=o`],
-        ['replace', `${PAGE}#v=3&om=o&od=20`],
-        ['push', `${PAGE}#v=3&om=o&od=20&mp=sgr-a-star`],
-        ['push', `${PAGE}#v=3&om=o&od=20&bs=0.5&mp=sgr-a-star`],
-        ['replace', `${PAGE}#v=3&od=20&bs=0.5&mp=sgr-a-star`],
+        ['push', `${PAGE}#v=4&om=o`],
+        ['replace', `${PAGE}#v=4&om=o&od=20`],
+        ['push', `${PAGE}#v=4&om=o&od=20&mp=sgr-a-star`],
+        ['push', `${PAGE}#v=4&om=o&od=20&bs=0.5&mp=sgr-a-star`],
+        ['replace', `${PAGE}#v=4&od=20&bs=0.5&mp=sgr-a-star`],
     ]);
     assert.equal(windowRef.entries.length, 4);
 });
@@ -244,7 +244,7 @@ test('fragments that are no view state are left alone', () => {
     assert.deepEqual(applied, []);
     app.state = { 'black_hole.spin': 0.5 };
     assert.equal(sync.flush(), true);
-    assert.equal(windowRef.location.hash, '#v=3&bs=0.5');
+    assert.equal(windowRef.location.hash, '#v=4&bs=0.5');
 });
 
 test('a view back at its defaults clears the fragment', () => {
@@ -275,7 +275,7 @@ test('pause() holds writes until resume(); navigation still applies', () => {
     sync.resume();
     assert.equal(sync.paused, false);
     vi.advanceTimersByTime(400);
-    assert.deepEqual(windowRef.calls, [['replace', `${PAGE}#v=3&bs=0.4`]]);
+    assert.deepEqual(windowRef.calls, [['replace', `${PAGE}#v=4&bs=0.4`]]);
 });
 
 test('a throttled History API is retried on the next change', () => {
@@ -291,7 +291,7 @@ test('a throttled History API is retried on the next change', () => {
     assert.equal(sync.flush(), false);
     sync.schedule();
     vi.advanceTimersByTime(400);
-    assert.deepEqual(windowRef.calls, [['replace', `${PAGE}#v=3&bs=0.5`]]);
+    assert.deepEqual(windowRef.calls, [['replace', `${PAGE}#v=4&bs=0.5`]]);
 });
 
 test('dispose() stops listening and cancels pending writes', () => {

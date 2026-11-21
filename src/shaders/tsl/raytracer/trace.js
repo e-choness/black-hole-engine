@@ -20,6 +20,7 @@ import {
     exp,
     exp2,
     float,
+    fract,
     fwidth,
     int,
     length,
@@ -33,6 +34,7 @@ import {
     sign,
     sin,
     sqrt,
+    vec2,
     vec3,
     vec4,
 } from 'three/tsl';
@@ -53,6 +55,9 @@ const SKY_BRIGHTNESS = 1.5;
 // Screen-space change of the escape direction (rad per pixel) beyond which neighbouring rays are
 // taken to be discontinuous, e.g. on opposite sides of a caustic.
 const SKY_MAX_GRADIENT = 1.0;
+// Screen-space change of the planet's map coordinate (map widths per pixel) beyond which
+// neighbouring rays are taken to see different images of the planet.
+const PLANET_MAX_GRADIENT = 0.25;
 // Full Kerr: step length, as a fraction of r, inside volumetric emitters.
 const KERR_VOLUME_STEP = 0.06;
 
@@ -86,6 +91,11 @@ export function createTrace(F, U, lib) {
             const escaped = bool(false).toVar();
 
             const P = F.planet_enabled ? planetConstants(U) : null;
+            // A hit on the mapped planet: its lighting (with the transmittance in front of it) and
+            // its map coordinate, for the filtered lookup after the march.
+            const planet_seen = F.planet_textured ? bool(false).toVar() : null;
+            const planet_light = F.planet_textured ? vec3(0.0).toVar() : null;
+            const planet_uv = F.planet_textured ? vec2(0.0).toVar() : null;
             let planet_pos0 = null;
             if (P && !F.light_travel_time) {
                 const planet_ang0 = t.mul(P.orbital_ang_vel);
@@ -548,7 +558,16 @@ export function createTrace(F, U, lib) {
                                 .toConst();
                             If(planet_isec.w.greaterThan(0.0), () => {
                                 solid_isec_t.assign(planet_isec.w);
-                                color.addAssign(vol_transmittance.mul(planet_isec.rgb));
+                                const planet_rgb = vol_transmittance.mul(planet_isec.rgb);
+                                if (F.planet_textured) {
+                                    planet_seen.assign(true);
+                                    planet_light.assign(planet_rgb);
+                                    planet_uv.assign(
+                                        planet.planet_surface_coord(old_pos, ray, t, dt, pos0),
+                                    );
+                                } else {
+                                    color.addAssign(planet_rgb);
+                                }
                             });
                         },
                     );
@@ -1168,6 +1187,34 @@ export function createTrace(F, U, lib) {
                     sky_footprint.assign(0.0);
                 },
             );
+            if (F.planet_textured) {
+                // The map is filtered like the sky, with the screen-space gradients of its
+                // coordinate. The longitude is differentiated on whichever side of the map's seam
+                // changes less, so the seam picks no coarse level. Where the quad leaves the
+                // planet or spans two of its images, the lookup falls back to level 0.
+                const uv = planet_uv.toConst();
+                const u_shifted = fract(uv.x.add(0.5)).toConst();
+                const smaller = (a, b) => select(abs(a).lessThanEqual(abs(b)), a, b);
+                const uv_dx = vec2(smaller(dFdx(uv.x), dFdx(u_shifted)), dFdx(uv.y)).toConst();
+                const uv_dy = vec2(smaller(dFdy(uv.x), dFdy(u_shifted)), dFdy(uv.y)).toConst();
+                const uv_jump = max(dot(uv_dx, uv_dx), dot(uv_dy, uv_dy));
+                const planet_footprint = float(1.0 / Math.sqrt(F.sample_count)).toVar();
+                If(
+                    fwidth(select(planet_seen, float(1.0), float(0.0)))
+                        .greaterThan(0.0)
+                        .or(uv_jump.lessThanEqual(PLANET_MAX_GRADIENT * PLANET_MAX_GRADIENT).not()),
+                    () => {
+                        planet_footprint.assign(0.0);
+                    },
+                );
+                If(planet_seen, () => {
+                    const albedo = U.planet_map
+                        .sample(uv)
+                        .grad(uv_dx.mul(planet_footprint), uv_dy.mul(planet_footprint)).rgb;
+                    color.addAssign(planet_light.mul(albedo));
+                });
+            }
+
             If(sky_visible, () => {
                 // Light from static sources at infinity arrives with g = 1 / bg_doppler, and the sky
                 // shifts like any other blackbody emitter (no clamp, no D^3).

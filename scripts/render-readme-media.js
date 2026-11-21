@@ -34,7 +34,7 @@ const BANNER = {
     height: 640,
     quality: 'high',
     frames: 16,
-    view: 'v=3&ca=12,-5,0&cp=-0.2,0.015&od=13&ne=0',
+    view: 'v=4&ca=12,-5,0&cp=-0.2,0.015&od=13&ne=0',
     alt: 'Black Hole Engine: a ray-traced black hole whose accretion disk is bent over and under its shadow by gravitational lensing',
     title: 'Black Hole Engine',
     tagline: 'Real-time general-relativistic ray tracing in the browser',
@@ -45,32 +45,32 @@ const GALLERY = [
     {
         name: 'thin-disk',
         caption: 'Novikov–Thorne thin disk with turbulent arcs, a/M = 0.9',
-        view: 'v=3&ca=0,-4,0&od=11',
+        view: 'v=4&ca=0,-4,0&od=11',
     },
     {
         name: 'galaxy',
         caption: 'Inside the disk of the lensed procedural galaxy',
-        view: 'v=3&ca=0,-6,0&od=16&kv=disk&kd=0.62&ki=88&kp=25&ko=75&ka=5',
+        view: 'v=4&ca=0,-6,0&od=16&kv=disk&kd=0.62&ki=88&kp=25&ko=75&ka=5',
     },
     {
         name: 'torus',
         caption: 'Thick ADAF torus with relativistic jets',
-        view: 'v=3&ca=0,-14,0&od=14&dm=torus&je=1&jm=phys',
+        view: 'v=4&ca=0,-14,0&od=14&dm=torus&je=1&jm=phys',
     },
     {
         name: 'scientific',
         caption: 'False-colour luminance with the Scientific tone mapper',
-        view: 'v=3&ca=0,-28,0&od=13&lt=sci',
+        view: 'v=4&ca=0,-28,0&od=13&lt=sci',
     },
     {
         name: 'face-on',
         caption: 'The thin disk from high above',
-        view: 'v=3&ca=0,-62,0&od=15',
+        view: 'v=4&ca=0,-62,0&od=15',
     },
     {
         name: 'kerr-shadow',
         caption: 'Shadow of a near-extremal Kerr hole on a coordinate grid',
-        view: 'v=3&ca=0,-1,0&od=10&bs=0.998&de=0&ne=0&km=grid',
+        view: 'v=4&ca=0,-1,0&od=10&bs=0.998&de=0&ne=0&km=grid',
     },
 ].map((scene) => ({
     width: 960,
@@ -181,6 +181,7 @@ async function render(browser, scene, { draft, outDir }) {
         );
         await page.waitForFunction(() => globalThis.__BH__ !== undefined);
         await page.evaluate(() => globalThis.__BH__.ready);
+        await page.waitForFunction(() => globalThis.__BH__.planetSurface !== 'loading');
         await page.evaluate((count) => {
             globalThis.__BH__.params.accumulation.max_frames = count;
         }, frames);

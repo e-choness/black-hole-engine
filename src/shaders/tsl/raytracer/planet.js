@@ -1,6 +1,7 @@
 // Ray-sphere intersection and shading of the orbiting reference planet: Lorentz contraction,
 // light-travel-time retardation, Doppler temperature shift and relativistic beaming of the disk
-// light it reflects.
+// light it reflects. Its surface is either the reference stripes drawn here or the map in
+// planet_map, whose albedo trace.js applies after the march so it can be filtered.
 
 import {
     Fn,
@@ -20,6 +21,7 @@ import {
     select,
     sin,
     sqrt,
+    vec2,
     vec3,
     vec4,
 } from 'three/tsl';
@@ -79,36 +81,61 @@ const planet_albedo = Fn(
     { uv: 'vec2', return: 'vec3' },
 );
 
+// The march step seen from the moving planet: its direction and the offset from the planet's
+// centre, both contracted along the orbit, the planet's velocity, and the coefficients of the
+// ray-sphere quadratic.
+function planetStep(F, P, old_pos, ray_in, t, dt, planet_pos0) {
+    const ray = ray_in.div(dt).toVar();
+    const planet_dir = vec3(planet_pos0.y, planet_pos0.x.negate(), 0.0).div(P.distance).toConst();
+
+    let planet_vel;
+    if (F.light_travel_time) {
+        const planet_ang1 = t.sub(dt).mul(P.orbital_ang_vel).toConst();
+        const planet_pos1 = vec3(cos(planet_ang1), sin(planet_ang1), 0.0).mul(P.distance);
+        planet_vel = planet_pos1.sub(planet_pos0).div(dt).toConst();
+        // Into the moving planet's frame.
+        ray.subAssign(planet_vel);
+    } else {
+        planet_vel = planet_dir.mul(P.orbital_ang_vel.mul(P.distance)).toConst();
+    }
+
+    const d = old_pos.sub(planet_pos0).toVar();
+    if (F.lorentz_contraction) {
+        ray.assign(contract(ray, planet_dir, P.gamma));
+        d.assign(contract(d, planet_dir, P.gamma));
+    }
+
+    const dotp = dot(d, ray).toConst();
+    const c_coeff = dot(d, d).sub(sq(P.radius));
+    const ray2 = dot(ray, ray).toConst();
+    const discr = dotp.mul(dotp).sub(ray2.mul(c_coeff)).toConst();
+    return { ray, planet_dir, planet_vel, d, dotp, ray2, discr };
+}
+
+// Surface coordinate of a point on the unit sphere, turned by the planet's rotation at the time
+// the light left it; isec_t is the hit's position as a fraction of the step.
+function surfaceCoord(F, P, t, dt, isec_t, surface_point) {
+    const rot_phase = float(t).toVar();
+    if (F.light_travel_time) rot_phase.subAssign(isec_t.mul(dt));
+    rot_phase.assign(rot_phase.mul(P.rotation_ang_vel).mul(0.5 / M_PI));
+    const tex_coord = sphere_map(planetCoords(surface_point)).toVar();
+    tex_coord.x.assign(mod(tex_coord.x.add(rot_phase), 1.0));
+    return tex_coord;
+}
+
 export function createPlanet(F, U, em, acc) {
     const planet_intersection = Fn(
         ([old_pos, ray_in, t, dt, planet_pos0, ray_doppler_factor]) => {
             const P = planetConstants(U);
-            const ray = ray_in.div(dt).toVar();
-            const planet_dir = vec3(planet_pos0.y, planet_pos0.x.negate(), 0.0)
-                .div(P.distance)
-                .toConst();
-
-            let planet_vel;
-            if (F.light_travel_time) {
-                const planet_ang1 = t.sub(dt).mul(P.orbital_ang_vel).toConst();
-                const planet_pos1 = vec3(cos(planet_ang1), sin(planet_ang1), 0.0).mul(P.distance);
-                planet_vel = planet_pos1.sub(planet_pos0).div(dt).toConst();
-                // Into the moving planet's frame.
-                ray.subAssign(planet_vel);
-            } else {
-                planet_vel = planet_dir.mul(P.orbital_ang_vel.mul(P.distance)).toConst();
-            }
-
-            const d = old_pos.sub(planet_pos0).toVar();
-            if (F.lorentz_contraction) {
-                ray.assign(contract(ray, planet_dir, P.gamma));
-                d.assign(contract(d, planet_dir, P.gamma));
-            }
-
-            const dotp = dot(d, ray).toConst();
-            const c_coeff = dot(d, d).sub(sq(P.radius));
-            const ray2 = dot(ray, ray).toConst();
-            const discr = dotp.mul(dotp).sub(ray2.mul(c_coeff)).toConst();
+            const { ray, planet_dir, planet_vel, d, dotp, ray2, discr } = planetStep(
+                F,
+                P,
+                old_pos,
+                ray_in,
+                t,
+                dt,
+                planet_pos0,
+            );
             If(discr.lessThan(0.0), () => {
                 return vec4(0.0);
             });
@@ -122,19 +149,11 @@ export function createPlanet(F, U, em, acc) {
             isec_t.divAssign(dt);
 
             const light_dir = vec3(planet_pos0).toVar();
-            const rot_phase = float(t).toVar();
-            if (F.light_travel_time) {
-                light_dir.addAssign(planet_vel.mul(isec_t).mul(dt));
-                rot_phase.subAssign(isec_t.mul(dt));
-            }
-            rot_phase.assign(rot_phase.mul(P.rotation_ang_vel).mul(0.5 / M_PI));
+            if (F.light_travel_time) light_dir.addAssign(planet_vel.mul(isec_t).mul(dt));
             light_dir.assign(light_dir.div(P.distance));
             if (F.light_travel_time) light_dir.subAssign(planet_vel);
             if (F.lorentz_contraction) light_dir.assign(contract(light_dir, planet_dir, P.gamma));
             light_dir.assign(normalize(light_dir));
-
-            const tex_coord = sphere_map(planetCoords(surface_point)).toVar();
-            tex_coord.x.assign(mod(tex_coord.x.add(rot_phase), 1.0));
 
             const diffuse = max(0.0, dot(surface_point, light_dir.negate()));
             const distance_attenuation = clamp(
@@ -161,10 +180,10 @@ export function createPlanet(F, U, em, acc) {
                 .blackbody(em.color_shift(planet_g).mul(light_temperature))
                 .rgb.mul(em.thermal_brightness_ratio(light_temperature, planet_g));
 
-            const rgb = planet_albedo(tex_coord)
-                .mul(lightness)
-                .mul(light_color)
-                .mul(exp2(U.log2_look_scale));
+            const albedo = F.planet_textured
+                ? vec3(1.0)
+                : planet_albedo(surfaceCoord(F, P, t, dt, isec_t, surface_point));
+            const rgb = albedo.mul(lightness).mul(light_color).mul(exp2(U.log2_look_scale));
             return vec4(rgb, select(isec_t.lessThan(0.0), float(0.5), isec_t));
         },
         {
@@ -178,5 +197,38 @@ export function createPlanet(F, U, em, acc) {
         },
     );
 
-    return { planet_intersection };
+    // Map coordinate of the point where a step that hits the planet meets it. The map has east to
+    // the right, against the longitude of sphere_map, so the prograde spin turns it eastwards.
+    const planet_surface_coord = Fn(
+        ([old_pos, ray_in, t, dt, planet_pos0]) => {
+            const P = planetConstants(U);
+            const { ray, d, dotp, ray2, discr } = planetStep(
+                F,
+                P,
+                old_pos,
+                ray_in,
+                t,
+                dt,
+                planet_pos0,
+            );
+            const isec_t = dotp
+                .negate()
+                .sub(sqrt(max(discr, 0.0)))
+                .div(ray2)
+                .toConst();
+            const surface_point = d.add(ray.mul(isec_t)).div(P.radius).toConst();
+            const coord = surfaceCoord(F, P, t, dt, isec_t.div(dt), surface_point);
+            return vec2(float(1.0).sub(coord.x), coord.y);
+        },
+        {
+            old_pos: 'vec3',
+            ray_in: 'vec3',
+            t: 'float',
+            dt: 'float',
+            planet_pos0: 'vec3',
+            return: 'vec2',
+        },
+    );
+
+    return { planet_intersection, planet_surface_coord };
 }

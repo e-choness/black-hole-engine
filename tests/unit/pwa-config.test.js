@@ -9,7 +9,7 @@ import {
     resolveSiteUrl,
     sitePreviewPlugin,
 } from '../../config/site-metadata.js';
-import { isVideoRequest } from '../../src/features/pwa/cache-rules.js';
+import { isPlanetMapRequest, isVideoRequest } from '../../src/features/pwa/cache-rules.js';
 
 const ROOT = new URL('../../', import.meta.url);
 const readPublic = (path) => readFileSync(new URL(`public/${path}`, ROOT));
@@ -55,15 +55,19 @@ function jpegSize(bytes) {
 }
 
 const urlCases = [
-    // [url, request destination, same origin, video?]
-    ['https://a.test/app/clip.mp4', 'video', true, true],
-    ['https://a.test/app/intro.WEBM', '', true, true],
-    ['https://a.test/app/stream', 'video', true, true],
-    ['https://a.test/app/poster.png', 'video', true, true],
-    ['https://cdn.test/media/clip.mov', '', false, true],
-    ['https://a.test/app/assets/index-abc.js', 'script', true, false],
-    ['https://a.test/app/og-image.jpg', 'image', true, false],
-    ['https://a.test/app/icons/pwa-192.png', 'image', true, false],
+    // [url, request destination, same origin, video?, planet map?]
+    ['https://a.test/app/clip.mp4', 'video', true, true, false],
+    ['https://a.test/app/intro.WEBM', '', true, true, false],
+    ['https://a.test/app/stream', 'video', true, true, false],
+    ['https://a.test/app/poster.png', 'video', true, true, false],
+    ['https://cdn.test/media/clip.mov', '', false, true, false],
+    ['https://a.test/app/assets/index-abc.js', 'script', true, false, false],
+    ['https://a.test/app/og-image.jpg', 'image', true, false, false],
+    ['https://a.test/app/icons/pwa-192.png', 'image', true, false, false],
+    ['https://a.test/app/assets/jupiter-Dk3_x9a-.webp', 'image', true, false, true],
+    ['https://a.test/assets/jupiter-abc123.webp', '', true, false, true],
+    ['https://cdn.test/assets/jupiter-abc123.webp', 'image', false, false, false],
+    ['https://a.test/app/jupiter.webp', 'image', true, false, false],
 ];
 
 function routeContext([href, destination, sameOrigin]) {
@@ -155,6 +159,7 @@ test('the precache holds the app shell but no preview image, video or maps', () 
         'assets/index-a1.js.map',
         'clip.mp4',
         'assets/intro-c3.webm',
+        'assets/jupiter-d4.webp',
         'docs/physics.html',
         'docs/LEGAL.md',
     ]) {
@@ -172,15 +177,19 @@ test('navigations use the precache only for the page itself, whatever its query'
     assert.equal(workbox.cleanupOutdatedCaches, true);
 });
 
-test('video is the only runtime route, and it is never cached', () => {
-    const [video, ...rest] = pwaOptions.workbox.runtimeCaching;
+test('video is never cached, and the planet map is cached once fetched', () => {
+    const [video, planetMap, ...rest] = pwaOptions.workbox.runtimeCaching;
     assert.deepEqual(rest, []);
     assert.equal(video.urlPattern, isVideoRequest);
     assert.equal(video.handler, 'NetworkOnly');
     assert.equal(video.options, undefined);
+    assert.equal(planetMap.urlPattern, isPlanetMapRequest);
+    assert.equal(planetMap.handler, 'CacheFirst');
+    assert.deepEqual(planetMap.options, { cacheName: 'planet-maps' });
     for (const testCase of urlCases) {
-        const [href, , , isVideo] = testCase;
+        const [href, , , isVideo, isPlanetMap] = testCase;
         assert.equal(isVideoRequest(routeContext(testCase)), isVideo, href);
+        assert.equal(isPlanetMapRequest(routeContext(testCase)), isPlanetMap, href);
     }
 });
 

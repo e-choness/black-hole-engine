@@ -10,3 +10,10 @@ export function isVideoRequest({ request, url }) {
         request?.destination === 'video' || /\.(?:mp4|m4v|mov|webm|ogv|mkv)$/i.test(url.pathname)
     );
 }
+
+// The planet's map is fetched when the planet is first drawn with it rather than precached, as
+// the mobile preset draws no planet. Its file name carries a content hash, so a cached copy never
+// goes stale.
+export function isPlanetMapRequest({ url, sameOrigin }) {
+    return sameOrigin === true && /\/assets\/jupiter-[\w-]+\.webp$/.test(url.pathname);
+}

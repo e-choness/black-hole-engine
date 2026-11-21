@@ -39,6 +39,7 @@ import {
 } from '../physics/emission.js';
 import { kerrCameraFrame } from '../physics/kerr-camera.js';
 import { initSky, setSkyRenderer } from '../sky.js';
+import { initPlanetSurface, updatePlanetSurface } from '../planet-surface.js';
 import {
     DISK_TEMPERATURE_MIN,
     DISK_TEMPERATURE_MAX,
@@ -217,6 +218,7 @@ export function init(viewport) {
         );
         uniforms.planet_distance.value = shader.parameters.planet.distance;
         uniforms.planet_radius.value = shader.parameters.planet.radius;
+        updatePlanetSurface(uniforms, shader.parameters);
         shader.parameters.observer.distance = clampObserverDistance(
             shader.parameters.observer.distance,
             shader.parameters.observer.motion,
@@ -376,6 +378,7 @@ export function init(viewport) {
     nextRenderer.domElement.style.touchAction = 'none';
     setRenderer(nextRenderer);
     initSky(renderer, uniforms, Math.min(16, renderer.getMaxAnisotropy()));
+    initPlanetSurface(Math.min(16, renderer.getMaxAnisotropy()));
     watchDeviceLoss(renderer);
 
     setHdrTarget(createRenderTarget(1, 1));

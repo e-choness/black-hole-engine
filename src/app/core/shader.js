@@ -111,6 +111,7 @@ export function Shader() {
             enabled: true,
             distance: 14.0,
             radius: 0.4,
+            surface: 'jupiter',
         },
         lorentz_contraction: true,
         gravitational_time_dilation: true,
@@ -136,6 +137,9 @@ export function Shader() {
         },
         planetEnabled: function () {
             return this.planet.enabled && this.quality !== 'mobile';
+        },
+        planetTextured: function () {
+            return this.planetEnabled() && this.planet.surface === 'jupiter';
         },
         observerMotion: function () {
             return this.observer.motion;
@@ -191,6 +195,7 @@ export function Shader() {
                 that.parameters.accretion_slim_disk ||
                 that.parameters.jet_enabled);
         that.parameters.planet_enabled = that.parameters.planetEnabled();
+        that.parameters.planet_textured = that.parameters.planetTextured();
         return that.parameters;
     };
 }

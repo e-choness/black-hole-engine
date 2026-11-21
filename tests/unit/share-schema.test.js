@@ -11,6 +11,7 @@ import {
     VIEW_STATE_V1,
     VIEW_STATE_V2,
     VIEW_STATE_V3,
+    VIEW_STATE_V4,
     VIEW_STATE_VERSIONS,
     viewStateCodec,
 } from '../../src/features/share/index.js';
@@ -94,11 +95,9 @@ test('version 2 adds the sky to version 1', () => {
     assert.ok(added.every((field) => field.key.startsWith('k') && field.path.startsWith('sky.')));
 });
 
-test('version 3 adds the disk arcs and the nebula to version 2 and is the latest', () => {
+test('version 3 adds the disk arcs and the nebula to version 2', () => {
     assert.deepEqual(validateViewStateSchema(VIEW_STATE_V3), []);
-    assert.equal(VIEW_STATE_VERSIONS.at(-1), VIEW_STATE_V3);
-    assert.equal(codec.version, 3);
-    assert.equal(codec.fields, VIEW_STATE_V3.fields);
+    assert.equal(VIEW_STATE_VERSIONS[2], VIEW_STATE_V3);
     assert.ok(Object.isFrozen(VIEW_STATE_V3) && Object.isFrozen(VIEW_STATE_V3.fields));
     VIEW_STATE_V2.fields.forEach((field, index) =>
         assert.equal(VIEW_STATE_V3.fields[index], field),
@@ -119,11 +118,36 @@ test('older links keep the plasma disk and the sky without the nebula', () => {
     const latest = codec.decode('v=3').state;
     assert.equal(latest['disk.structure'], 'arcs');
     assert.equal(latest['sky.galaxy.nebula_glow'], 1);
-    assert.equal(codec.encode(codec.decode('v=2').state), 'v=3&da=pla&kj=0');
+    assert.equal(codec.encode(codec.decode('v=2').state), 'v=4&da=pla&kj=0&ns=str');
+});
+
+test('version 4 adds the planet surface to version 3 and is the latest', () => {
+    assert.deepEqual(validateViewStateSchema(VIEW_STATE_V4), []);
+    assert.equal(VIEW_STATE_VERSIONS.at(-1), VIEW_STATE_V4);
+    assert.equal(codec.version, 4);
+    assert.equal(codec.fields, VIEW_STATE_V4.fields);
+    assert.ok(Object.isFrozen(VIEW_STATE_V4) && Object.isFrozen(VIEW_STATE_V4.fields));
+    VIEW_STATE_V3.fields.forEach((field, index) =>
+        assert.equal(VIEW_STATE_V4.fields[index], field),
+    );
+    assert.deepEqual(
+        VIEW_STATE_V4.fields.slice(VIEW_STATE_V3.fields.length).map((field) => field.path),
+        ['planet.surface'],
+    );
+});
+
+test('older links keep the reference stripes on the planet', () => {
+    for (const text of ['v=1', 'v=2', 'v=3', 'v=3&nd=20']) {
+        const { state, issues } = codec.decode(text);
+        assert.deepEqual(issues, [], text);
+        assert.equal(state['planet.surface'], 'stripes', text);
+    }
+    assert.equal(codec.decode('v=4').state['planet.surface'], 'jupiter');
+    assert.equal(codec.encode(codec.decode('v=3').state), 'v=4&ns=str');
 });
 
 test('the sky fields share the ranges of the galaxy model', () => {
-    for (const field of VIEW_STATE_V3.fields) {
+    for (const field of VIEW_STATE_V4.fields) {
         const name = field.path.replace(/^sky.galaxy./, '');
         if (field.type !== 'number' || !Object.hasOwn(GALAXY_LIMITS, name)) continue;
         assert.deepEqual([field.min, field.max], GALAXY_LIMITS[name], field.path);
@@ -144,7 +168,7 @@ test('version 1 links get the place in the galaxy of their scenario', () => {
 });
 
 test('defaults and bound paths mirror the app at start-up', () => {
-    for (const field of VIEW_STATE_V3.fields) {
+    for (const field of VIEW_STATE_V4.fields) {
         if (field.custom) continue;
         if (field.paths) {
             field.paths.forEach((path, index) => {
@@ -208,7 +232,7 @@ test('a typical shared view is short and readable', () => {
     const text = codec.encode(m87View);
     assert.equal(
         text,
-        'v=3&ca=35.2,12.5,0&dm=torus&dt=20000&to=0.02&gr=80&gb=5&gm=0.8&gd=1.2&gt=1.5&gk=4.5' +
+        'v=4&ca=35.2,12.5,0&dm=torus&dt=20000&to=0.02&gr=80&gb=5&gm=0.8&gd=1.2&gt=1.5&gk=4.5' +
             '&gf=1.5&je=1&jm=phys&ja=4&jl=5&jn=35&jg=15&jk=7&jw=0.35&jx=0.6&ps=0.08&pr=0.9',
     );
     assert.deepEqual(codec.decode(`#${text}`).state, codec.normalize(m87View).state);
@@ -222,7 +246,7 @@ test('a typical shared view is short and readable', () => {
             'disk.mass_msun': 4.297e6,
             'black_hole.spin': -0.5,
         }),
-        'v=3&om=d&ot=1234.57&or=1.2346&op=1&bs=-0.5&mm=4.297e6&mp=sgr-a-star',
+        'v=4&om=d&ot=1234.57&or=1.2346&op=1&bs=-0.5&mm=4.297e6&mp=sgr-a-star',
     );
 });
 
@@ -230,7 +254,7 @@ test('the longest possible fragment fits the length limit', () => {
     const longest = {};
     const widest = (spec) =>
         spec.min < 0 ? spec.min + spec.step : Number((spec.max - spec.step).toFixed(8)) || spec.max;
-    for (const field of VIEW_STATE_V3.fields) {
+    for (const field of VIEW_STATE_V4.fields) {
         if (field.type === 'number' && field.scale === 'log') {
             longest[field.path] = Number((field.min * 1.23456789).toPrecision(field.digits));
         } else if (field.type === 'number') longest[field.path] = widest(field);
@@ -263,7 +287,7 @@ test('random states survive encode and decode unchanged', () => {
     };
     for (let i = 0; i < 300; i += 1) {
         const raw = {};
-        for (const field of VIEW_STATE_V3.fields) {
+        for (const field of VIEW_STATE_V4.fields) {
             if (next() < 0.5) continue;
             if (field.type === 'number') {
                 raw[field.path] = field.nullable && next() < 0.3 ? null : numberIn(field);
@@ -355,5 +379,5 @@ test('collectViewState() and applyBoundViewState() bridge presentation paths', (
     assert.equal(writes.get('black_hole.spin'), 0.5);
     assert.equal(writes.get('observer.distance'), 20);
     assert.ok(!writes.has('cameraPan') && !writes.has('camera.angles'));
-    assert.equal(writes.size, VIEW_STATE_V3.fields.length - Object.keys(custom).length + 1);
+    assert.equal(writes.size, VIEW_STATE_V4.fields.length - Object.keys(custom).length + 1);
 });

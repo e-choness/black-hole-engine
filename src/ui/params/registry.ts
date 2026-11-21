@@ -608,6 +608,21 @@ export const PARAMS: ParamDef[] = [
             visible: (p) => p.planet.enabled,
             help: 'Planet size in simulation units.',
         }),
+        choice(
+            'planet.surface',
+            'Surface',
+            options([
+                ['jupiter', 'Jupiter'],
+                ['stripes', 'Reference stripes'],
+            ]),
+            {
+                control: 'segmented',
+                apply: 'compile',
+                available: planetAvailable,
+                visible: (p) => p.planet.enabled,
+                help: 'Jupiter: the Cassini colour map of Jupiter, lit by the disk. Reference stripes: white and grey meridians, swapped between the hemispheres, that make the spin and the poles easy to follow.',
+            },
+        ),
     ]),
 
     ...section('look', 'Tone and exposure', [

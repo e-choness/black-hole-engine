@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { EMISSION_LUT, bolometricLog2Coefficient } from '../physics/emission.js';
 import { createNoiseVolume } from '../../../shaders/tsl/nodes/noise.js';
+import { createPlanetMapPlaceholder } from '../planet-surface.js';
 
 // Two RGBA32F rows read texel by texel: blackbody colour and luminance on a log-T grid, and the
 // colour of synchrotron power laws.
@@ -42,6 +43,7 @@ export function raytracerUniformValues() {
         cam_doppler: new THREE.Vector4(0, 0, 0, 1),
         planet_distance: 0.0,
         planet_radius: 0.0,
+        planet_map: createPlanetMapPlaceholder(),
         emission_lut: createEmissionLutTexture(),
         noise_volume: createNoiseVolume(),
         log2_exposure: 0.0,
