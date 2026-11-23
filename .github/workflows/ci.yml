@@ -210,3 +210,51 @@ jobs:
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+
+  # Pushes the files deployed to GitHub Pages, without source maps, to an itch.io channel. butler
+  # uploads only what changed since the last build and skips the push when nothing did. The page
+  # must be of kind HTML with the channel marked as played in the browser, which only the itch.io
+  # edit page can set.
+  itch:
+    name: Publish to itch.io
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [verify, e2e]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: itch-io
+      cancel-in-progress: false
+    environment:
+      name: itch-io
+      url: https://echoness.itch.io/black-hole
+    env:
+      ITCH_TARGET: echoness/black-hole:html5
+      # broth publishes no checksums, so the digest is of the archive as first downloaded.
+      BUTLER_VERSION: 15.32.0
+      BUTLER_SHA256: 2335971394ef6596f95ded0833e85ee28755e13761716ef4c91d6b11f69162f5
+    steps:
+      - name: Download the site
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: github-pages
+          path: ${{ runner.temp }}/pages
+
+      - name: Install butler
+        run: |
+          archive="$RUNNER_TEMP/butler.zip"
+          curl --fail --silent --show-error --location --retry 3 --output "$archive" \
+            "https://broth.itch.zone/butler/linux-amd64/$BUTLER_VERSION/archive.zip"
+          echo "$BUTLER_SHA256  $archive" | sha256sum --check --strict
+          unzip -q "$archive" -d "$RUNNER_TEMP/butler"
+          chmod +x "$RUNNER_TEMP/butler/butler"
+          echo "$RUNNER_TEMP/butler" >> "$GITHUB_PATH"
+
+      - name: Push to itch.io
+        env:
+          BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+        run: |
+          site="$RUNNER_TEMP/site"
+          mkdir "$site"
+          tar -xf "$RUNNER_TEMP/pages/artifact.tar" -C "$site"
+          butler push "$site" "$ITCH_TARGET" --ignore '*.map' --if-changed \
+            --userversion "${GITHUB_SHA::7}"
