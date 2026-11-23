@@ -6,7 +6,9 @@
 // reports changes, the contract of React's useSyncExternalStore(); the snapshot object is replaced
 // only when a value changes. status is one of
 //   idle          start() not called yet
-//   unsupported   no service workers (insecure context or an old browser)
+//   unsupported   no service workers (insecure context or an old browser), or the page is
+//                 embedded in another page's frame (the itch.io page), where it can't be
+//                 installed and a worker would only be partitioned under the embedding site
 //   registering   waiting for the page load, then for the registration
 //   registered    a worker is registered; on a repeat visit it already serves the app offline
 //   offline-ready the first installation finished: the app now works offline
@@ -34,6 +36,7 @@ export function createPwaController({
     registerSW,
     eventTarget = globalThis.window,
     navigatorRef = globalThis.navigator,
+    embedded = globalThis.window !== undefined && globalThis.window.top !== globalThis.window,
     reload = () => globalThis.location.reload(),
     updateInterval = HOUR,
     timers = globalThis,
@@ -113,7 +116,7 @@ export function createPwaController({
         if (disposed) return false;
         if (started) return snapshot.status !== 'unsupported';
         started = true;
-        if (!navigatorRef || !('serviceWorker' in navigatorRef)) {
+        if (embedded || !navigatorRef || !('serviceWorker' in navigatorRef)) {
             update({ status: 'unsupported' });
             return false;
         }

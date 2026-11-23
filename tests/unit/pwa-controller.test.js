@@ -85,6 +85,14 @@ test('without service workers the controller reports unsupported and never regis
     assert.deepEqual(events, []);
 });
 
+test('a page embedded in a frame reports unsupported and never registers', () => {
+    const { fake, controller, events } = setup({ embedded: true });
+    assert.equal(controller.start(), false);
+    assert.equal(controller.getSnapshot().status, 'unsupported');
+    assert.equal(fake.calls.length, 0);
+    assert.deepEqual(events, []);
+});
+
 test('the first installation reports offline-ready once', async () => {
     const { fake, controller, events, eventTarget } = setup();
     controller.start();
