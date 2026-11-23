@@ -1,8 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { chromium } from '@playwright/test';
-import { build, preview } from 'vite';
 import { resolveSiteUrl, SITE } from '../config/site-metadata.js';
+import { openCaptureSession } from './lib/engine-capture.js';
 
 // Renders the README banner and gallery from a production build with headless Chromium and
 // software WebGL 2, and rewrites the gallery block of README.md so its captions and live links
@@ -11,8 +10,7 @@ import { resolveSiteUrl, SITE } from '../config/site-metadata.js';
 // Names limit the run to those images; the README block is rewritten only by a full run.
 // --draft renders at half size with fewer accumulated frames into .cache/readme-draft/.
 // --readme only rewrites the README block, for example after a caption changed.
-// Every scene is a view link (src/features/share), so the live demo opens the same view; the
-// frozen e2e clock makes every run draw the same frame.
+// Every scene is a view link, so the live demo opens the same view (see lib/engine-capture.js).
 
 const PORT = 4175;
 const README = new URL('../README.md', import.meta.url);
@@ -81,139 +79,99 @@ const GALLERY = [
     ...scene,
 }));
 
-// Copies the canvas in an animation frame queued after the render loop's, while the drawing buffer
-// of that frame is still intact, and draws the banner's title over it. A converged view without
-// moving parts stops drawing and its canvas is cleared once presented, so the capture asks for one
-// more accumulated frame.
-function captureCanvas({ width, height, jpegQuality, text }) {
-    globalThis.__BH__.params.accumulation.max_frames += 1;
-    return new Promise((resolve, reject) => {
-        globalThis.requestAnimationFrame(async () => {
-            try {
-                const source = globalThis.document.getElementById('bh-canvas');
-                const target = globalThis.document.createElement('canvas');
-                target.width = width;
-                target.height = height;
-                const context = target.getContext('2d');
-                context.imageSmoothingQuality = 'high';
-                context.drawImage(source, 0, 0, width, height);
-                if (text) {
-                    const unit = height / 640;
-                    const fonts = {
-                        title: `600 ${Math.round(88 * unit)}px "Space Grotesk Variable"`,
-                        tagline: `400 ${Math.round(30 * unit)}px "Inter Variable"`,
-                        tag: `500 ${Math.round(19 * unit)}px "JetBrains Mono Variable"`,
-                    };
-                    await Promise.all(
-                        Object.values(fonts).map((font) => globalThis.document.fonts.load(font)),
-                    );
-                    // A dark scrim on the left keeps the text legible over the sky.
-                    const scrim = context.createLinearGradient(0, 0, width * 0.62, 0);
-                    scrim.addColorStop(0, 'rgba(5, 6, 10, 0.82)');
-                    scrim.addColorStop(0.55, 'rgba(5, 6, 10, 0.45)');
-                    scrim.addColorStop(1, 'rgba(5, 6, 10, 0)');
-                    context.fillStyle = scrim;
-                    context.fillRect(0, 0, width, height);
+// Evaluated in the page: draws the frame and, for the banner, its title.
+async function compose({ frame, width, height, jpegQuality, text }) {
+    const image = new globalThis.Image();
+    image.src = frame;
+    await image.decode();
+    const target = globalThis.document.createElement('canvas');
+    target.width = width;
+    target.height = height;
+    const context = target.getContext('2d');
+    context.imageSmoothingQuality = 'high';
+    context.drawImage(image, 0, 0, width, height);
+    if (text) {
+        const unit = height / 640;
+        const fonts = {
+            title: `600 ${Math.round(88 * unit)}px "Space Grotesk Variable"`,
+            tagline: `400 ${Math.round(30 * unit)}px "Inter Variable"`,
+            tag: `500 ${Math.round(19 * unit)}px "JetBrains Mono Variable"`,
+        };
+        await Promise.all(Object.values(fonts).map((font) => globalThis.document.fonts.load(font)));
+        // A dark scrim on the left keeps the text legible over the sky.
+        const scrim = context.createLinearGradient(0, 0, width * 0.62, 0);
+        scrim.addColorStop(0, 'rgba(5, 6, 10, 0.82)');
+        scrim.addColorStop(0.55, 'rgba(5, 6, 10, 0.45)');
+        scrim.addColorStop(1, 'rgba(5, 6, 10, 0)');
+        context.fillStyle = scrim;
+        context.fillRect(0, 0, width, height);
 
-                    const left = Math.round(96 * unit);
-                    context.textBaseline = 'alphabetic';
-                    context.shadowColor = 'rgba(0, 0, 0, 0.6)';
-                    context.shadowBlur = 24 * unit;
-                    context.fillStyle = '#ffffff';
-                    context.font = fonts.title;
-                    context.letterSpacing = `${-1.5 * unit}px`;
-                    const words = text.title.split(' ');
-                    const split = Math.ceil(words.length / 2);
-                    const lines = [words.slice(0, split).join(' '), words.slice(split).join(' ')];
-                    context.fillText(lines[0], left, 268 * unit);
-                    context.fillText(lines[1], left, 360 * unit);
+        const left = Math.round(96 * unit);
+        context.textBaseline = 'alphabetic';
+        context.shadowColor = 'rgba(0, 0, 0, 0.6)';
+        context.shadowBlur = 24 * unit;
+        context.fillStyle = '#ffffff';
+        context.font = fonts.title;
+        context.letterSpacing = `${-1.5 * unit}px`;
+        const words = text.title.split(' ');
+        const split = Math.ceil(words.length / 2);
+        const lines = [words.slice(0, split).join(' '), words.slice(split).join(' ')];
+        context.fillText(lines[0], left, 268 * unit);
+        context.fillText(lines[1], left, 360 * unit);
 
-                    context.font = fonts.tagline;
-                    context.letterSpacing = '0px';
-                    context.fillStyle = 'rgba(236, 239, 247, 0.86)';
-                    context.fillText(text.tagline, left, 428 * unit);
+        context.font = fonts.tagline;
+        context.letterSpacing = '0px';
+        context.fillStyle = 'rgba(236, 239, 247, 0.86)';
+        context.fillText(text.tagline, left, 428 * unit);
 
-                    context.shadowBlur = 0;
-                    context.font = fonts.tag;
-                    context.letterSpacing = `${1 * unit}px`;
-                    let x = left;
-                    const top = 470 * unit;
-                    const padX = 14 * unit;
-                    const tagHeight = 38 * unit;
-                    for (const tag of text.tags) {
-                        const label = tag.toUpperCase();
-                        const tagWidth = context.measureText(label).width + 2 * padX;
-                        context.beginPath();
-                        context.roundRect(x, top, tagWidth, tagHeight, tagHeight / 2);
-                        context.fillStyle = 'rgba(255, 180, 77, 0.12)';
-                        context.fill();
-                        context.lineWidth = Math.max(1, 1.5 * unit);
-                        context.strokeStyle = 'rgba(255, 180, 77, 0.55)';
-                        context.stroke();
-                        context.fillStyle = '#ffd59a';
-                        context.fillText(label, x + padX, top + tagHeight * 0.66);
-                        x += tagWidth + 12 * unit;
-                    }
-                }
-                resolve(target.toDataURL('image/jpeg', jpegQuality));
-            } catch (error) {
-                reject(error);
-            }
-        });
-    });
+        context.shadowBlur = 0;
+        context.font = fonts.tag;
+        context.letterSpacing = `${1 * unit}px`;
+        let x = left;
+        const top = 470 * unit;
+        const padX = 14 * unit;
+        const tagHeight = 38 * unit;
+        for (const tag of text.tags) {
+            const label = tag.toUpperCase();
+            const tagWidth = context.measureText(label).width + 2 * padX;
+            context.beginPath();
+            context.roundRect(x, top, tagWidth, tagHeight, tagHeight / 2);
+            context.fillStyle = 'rgba(255, 180, 77, 0.12)';
+            context.fill();
+            context.lineWidth = Math.max(1, 1.5 * unit);
+            context.strokeStyle = 'rgba(255, 180, 77, 0.55)';
+            context.stroke();
+            context.fillStyle = '#ffd59a';
+            context.fillText(label, x + padX, top + tagHeight * 0.66);
+            x += tagWidth + 12 * unit;
+        }
+    }
+    return target.toDataURL('image/jpeg', jpegQuality);
 }
 
-async function render(browser, scene, { draft, outDir }) {
+async function render(session, scene, { draft, outDir }) {
     const scale = draft ? 0.5 : 1;
     const width = Math.round(scene.width * scale);
     const height = Math.round(scene.height * scale);
-    const frames = draft ? Math.min(6, scene.frames) : scene.frames;
-    const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1 });
-    const problems = [];
-    page.on('pageerror', (error) => problems.push(error.message));
-    page.on('console', (message) => {
-        if (message.type() === 'error') problems.push(message.text());
-    });
     const started = Date.now();
-    try {
-        await page.goto(
-            `http://127.0.0.1:${PORT}/?quality=${scene.quality}&e2e=1&backend=webgl#${scene.view}`,
-        );
-        await page.waitForFunction(() => globalThis.__BH__ !== undefined);
-        await page.evaluate(() => globalThis.__BH__.ready);
-        await page.waitForFunction(() => globalThis.__BH__.planetSurface !== 'loading');
-        await page.evaluate((count) => {
-            globalThis.__BH__.params.accumulation.max_frames = count;
-        }, frames);
-        await page.waitForFunction(
-            (count) => globalThis.__BH__.accumulatedFrames >= count,
-            frames,
-            {
-                timeout: 1_800_000,
-                polling: 500,
-            },
-        );
-        const text = scene.title
-            ? { title: scene.title, tagline: scene.tagline, tags: scene.tags }
-            : null;
-        const dataUrl = await page.evaluate(captureCanvas, {
-            width,
-            height,
-            jpegQuality: scene === BANNER ? 0.9 : 0.86,
-            text,
-        });
-        if (problems.length > 0)
-            throw new Error(`the page reported errors: ${problems.join('; ')}`);
-        const jpeg = Buffer.from(dataUrl.slice(dataUrl.indexOf(',') + 1), 'base64');
-        const output = new URL(`../${outDir}/${scene.name}.jpg`, import.meta.url);
-        await writeFile(output, jpeg);
-        const seconds = Math.round((Date.now() - started) / 1000);
-        console.log(
-            `${fileURLToPath(output)}: ${width}x${height}, ${Math.round(jpeg.length / 1024)} KiB, ${seconds} s`,
-        );
-    } finally {
-        await page.close();
-    }
+    const text = scene.title
+        ? { title: scene.title, tagline: scene.tagline, tags: scene.tags }
+        : null;
+    const jpeg = await session.render({
+        view: scene.view,
+        quality: scene.quality,
+        width,
+        height,
+        frames: draft ? Math.min(6, scene.frames) : scene.frames,
+        compose,
+        args: { jpegQuality: scene === BANNER ? 0.9 : 0.86, text },
+    });
+    const output = new URL(`../${outDir}/${scene.name}.jpg`, import.meta.url);
+    await writeFile(output, jpeg);
+    const seconds = Math.round((Date.now() - started) / 1000);
+    console.log(
+        `${fileURLToPath(output)}: ${width}x${height}, ${Math.round(jpeg.length / 1024)} KiB, ${seconds} s`,
+    );
 }
 
 function escapeHtml(text) {
@@ -264,18 +222,10 @@ const selected = names.length > 0 ? scenes.filter((scene) => names.includes(scen
 const outDir = draft ? '.cache/readme-draft' : MEDIA_DIR;
 await mkdir(new URL(`../${outDir}/`, import.meta.url), { recursive: true });
 
-await build({ logLevel: 'warn' });
-const server = await preview({
-    logLevel: 'warn',
-    preview: { host: '127.0.0.1', port: PORT, strictPort: true },
-});
-const browser = await chromium.launch({
-    args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
-});
+const session = await openCaptureSession({ port: PORT });
 try {
-    for (const scene of selected) await render(browser, scene, { draft, outDir });
+    for (const scene of selected) await render(session, scene, { draft, outDir });
     if (!draft && names.length === 0) await updateReadme();
 } finally {
-    await browser.close();
-    await server.close();
+    await session.close();
 }
