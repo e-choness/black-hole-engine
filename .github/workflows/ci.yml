@@ -1,20 +1,22 @@
 name: CI
 
-# The README, its images and the Dependabot configuration are not part of the site, so changes
-# to only those start no run. The weekly run takes the whole e2e suite and the deprecation check
-# even when nothing was pushed.
+# The README, its images, the itch.io page art and the Dependabot configuration are not part of
+# the site, so changes to only those start no run. The weekly run takes the whole e2e suite and
+# the deprecation check even when nothing was pushed.
 on:
   push:
     branches: [main]
     paths-ignore:
       - README.md
       - .github/readme/**
+      - .github/itch/**
       - .github/dependabot.yml
   pull_request:
     branches: [main]
     paths-ignore:
       - README.md
       - .github/readme/**
+      - .github/itch/**
       - .github/dependabot.yml
   schedule:
     - cron: '17 4 * * 1'
