@@ -3,7 +3,7 @@
 # Stages: base -> deps -> dev (compose tooling) | source -> test | build -> dist | runtime; e2e;
 # base -> deprecations.
 
-FROM node:26-slim@sha256:e6bedef217677b276c591795e169840edd9096dbf13f29df8ef8d1856b8820bc AS base
+FROM node:26-slim@sha256:abe7e5a82b61a8ef67b315b85497c9e65173387ccf2f4a029248184b8e020be5 AS base
 LABEL com.black-hole.project=black-hole
 ENV NPM_CONFIG_UPDATE_NOTIFIER=false \
     NPM_CONFIG_FUND=false \
